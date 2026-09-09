@@ -34,7 +34,7 @@ jobs:
 
       - name: Install UI dependencies
         working-directory: Web_UI
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build GitHub Pages UI
         working-directory: Web_UI

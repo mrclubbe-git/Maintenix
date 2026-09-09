@@ -1,0 +1,20 @@
+{
+  "name": "server-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "docxtemplater": "^3.67.6",
+    "docxtemplater-image-module-free": "^1.1.1",
+    "express": "^5.2.1",
+    "image-size": "^2.0.2",
+    "multer": "^2.0.2",
+    "pizzip": "^3.2.0"
+  }
+}

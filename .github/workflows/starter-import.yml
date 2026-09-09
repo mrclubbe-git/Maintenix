@@ -1,0 +1,128 @@
+name: Complete starter import
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: ${{ hashFiles('.import/manifest.tsv') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch public Volt baseline
+        run: git clone --depth 1 https://github.com/themesberg/volt-react-dashboard.git /tmp/volt
+
+      - name: Reconstruct supplied files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .import/payload/*.txt > /tmp/maintenix-payload.txt
+          python3 <<'PY'
+          from pathlib import Path
+          import base64, gzip, shutil
+
+          payload = Path('/tmp/maintenix-payload.txt').read_bytes().decode('utf-8')
+          pos = 0
+          copies = []
+          while pos < len(payload):
+              end = payload.find('\n', pos)
+              if end < 0:
+                  raise RuntimeError(f'Invalid payload header at character {pos}')
+              header = payload[pos:end]
+              pos = end + 1
+              parts = header.split('\t')
+              if parts[0] == 'COPY':
+                  if len(parts) != 3:
+                      raise RuntimeError(f'Invalid COPY record: {header!r}')
+                  copies.append((parts[1], parts[2]))
+                  continue
+              if parts[0] != 'FILE' or len(parts) != 4:
+                  raise RuntimeError(f'Invalid FILE record: {header!r}')
+              _, rel, mode, size_s = parts
+              size = int(size_s)
+              data = payload[pos:pos+size]
+              if len(data) != size:
+                  raise RuntimeError(f'Truncated payload for {rel}')
+              pos += size
+              if pos >= len(payload) or payload[pos] != '\n':
+                  raise RuntimeError(f'Missing record separator after {rel}')
+              pos += 1
+              if mode == 'TEXT':
+                  raw = data.encode('utf-8')
+              elif mode == 'B64':
+                  raw = base64.b64decode(data)
+              elif mode == 'GZB64':
+                  raw = gzip.decompress(base64.b64decode(data))
+              else:
+                  raise RuntimeError(f'Unknown encoding {mode!r} for {rel}')
+              target = Path(rel)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+
+          for dst, src in copies:
+              source = Path(src)
+              if not source.is_file():
+                  raise RuntimeError(f'COPY source missing: {src}')
+              target = Path(dst)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+          PY
+
+      - name: Restore exact baseline files and verify ZIP hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          failures=0
+          while IFS=$'\t' read -r expected size path; do
+            [ -n "$path" ] || continue
+            actual=""
+            if [ -f "$path" ]; then
+              actual="$(git hash-object "$path")"
+            fi
+            if [ "$actual" = "$expected" ]; then
+              continue
+            fi
+
+            if [[ "$path" == Web_UI/* ]]; then
+              source="/tmp/volt/${path#Web_UI/}"
+              if [ -f "$source" ] && [ "$(git -C /tmp/volt hash-object "$source")" = "$expected" ]; then
+                mkdir -p "$(dirname "$path")"
+                cp "$source" "$path"
+                actual="$(git hash-object "$path")"
+              fi
+            fi
+
+            if [ "$actual" != "$expected" ]; then
+              echo "HASH_MISMATCH $path expected=$expected actual=${actual:-MISSING}"
+              failures=$((failures + 1))
+            fi
+          done < .import/manifest.tsv
+
+          if [ "$failures" -ne 0 ]; then
+            echo "$failures starter files could not be reconstructed exactly."
+            exit 1
+          fi
+
+      - name: Remove import scaffolding and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .import
+          rm -f Web_UI/.gitkeep Server_API/.gitkeep
+          rm -f .github/workflows/starter-import.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: import starter application files"
+          git push origin HEAD:main

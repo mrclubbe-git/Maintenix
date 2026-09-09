@@ -1,0 +1,246 @@
+{
+    "weekly": {
+        "NFPA 72": [
+            {
+                "question": "Panel shows NORMAL (no alarm / supervisory / trouble)",
+                "extra": null
+            },
+            {
+                "question": "Panel time/date correct; no unexpected disables/bypasses",
+                "extra": null
+            },
+            {
+                "question": "Review last 7 days event history; record notable entries",
+                "extra": "text"
+            },
+            {
+                "question": "Releasing zones: correct ARM/AUTO status as designed",
+                "extra": null
+            },
+            {
+                "question": "Remote status/control units: normal state; no comms fault",
+                "extra": null
+            },
+            {
+                "question": "ASD: no airflow/filter/fan faults; display normal",
+                "extra": "text"
+            },
+            {
+                "question": "ASD sampling points visually unobstructed (walk-by)",
+                "extra": null
+            },
+            {
+                "question": "Gas termination unit (GTU): indicators normal (healthy/power)",
+                "extra": null
+            },
+            {
+                "question": "Visual: damage, water ingress, corrosion, loose glands, access blocked",
+                "extra": null
+            }
+        ],
+        "NFPA 2001": [
+            {
+                "question": "Cylinders: general condition OK (no damage/corrosion/leaks); access clear",
+                "extra": null
+            },
+            {
+                "question": "Cylinder pressure indication in normal range",
+                "extra": null
+            },
+            {
+                "question": "Cylinder/valve safety devices, pins, tamper seals intact",
+                "extra": null
+            },
+            {
+                "question": "Discharge piping/nozzles: visually intact, no obstructions/paint/damage",
+                "extra": null
+            },
+            {
+                "question": "Protected enclosure: doors normally closed, no new penetrations",
+                "extra": null
+            },
+            {
+                "question": "Pressure relief vent (if installed): unobstructed",
+                "extra": null
+            },
+            {
+                "question": "Warning signage visible and intact",
+                "extra": null
+            }
+        ]
+    },
+    "monthly": {
+        "NFPA 72": [
+            {
+                "question": "Panel enclosure: locks/labels/circuit legends intact; clean",
+                "extra": null
+            },
+            {
+                "question": "Power supply visual: AC present; charger normal LEDs",
+                "extra": null
+            },
+            {
+                "question": "Battery visual: no swelling/leak/corrosion; terminals tight",
+                "extra": "voltage"
+            },
+            {
+                "question": "Point detectors: correct location/orientation; not painted/covered",
+                "extra": null
+            },
+            {
+                "question": "Point detectors: environment OK (dust/steam/airflow changes)",
+                "extra": null
+            },
+            {
+                "question": "ASD pipework: supports intact; joints secure; no damage",
+                "extra": null
+            },
+            {
+                "question": "ASD filter condition checked",
+                "extra": null
+            },
+            {
+                "question": "Remote status/control units: lamp test / indication test",
+                "extra": null
+            },
+            {
+                "question": "GTU wiring/terminations visually sound",
+                "extra": null
+            },
+            {
+                "question": "Housekeeping: access clear; signage/zone chart present",
+                "extra": null
+            }
+        ],
+        "NFPA 2001": [
+            {
+                "question": "Cylinder bank: record pressure and ambient temperature",
+                "extra": "pressure_temp"
+            },
+            {
+                "question": "Cylinder mounting/brackets: secure, no movement",
+                "extra": null
+            },
+            {
+                "question": "Manifold/check valves/discharge hoses: condition OK",
+                "extra": null
+            },
+            {
+                "question": "Actuation devices: solenoid/pneumatic actuators intact",
+                "extra": null
+            },
+            {
+                "question": "Pilot cylinder: pressure in range; tubing intact",
+                "extra": null
+            },
+            {
+                "question": "Manual release station(s): accessible, labeled",
+                "extra": null
+            },
+            {
+                "question": "Abort/Hold switch: accessible, labeled",
+                "extra": null
+            },
+            {
+                "question": "Protected enclosure changes: HVAC, ceiling, etc.",
+                "extra": null
+            }
+        ]
+    },
+    "quarterly": {
+        "NFPA 72": [
+            {
+                "question": "Battery: measure float voltage and record",
+                "extra": "voltage"
+            },
+            {
+                "question": "Check detector spacing (room changes or layout changes)",
+                "extra": "text"
+            },
+            {
+                "question": "Check ASD airflow and thresholds",
+                "extra": null
+            },
+            {
+                "question": "Test one device per zone: ensure panel reacts correctly",
+                "extra": null
+            }
+        ],
+        "NFPA 2001": [
+            {
+                "question": "Discharge nozzle alignment check",
+                "extra": null
+            },
+            {
+                "question": "Check protected volume integrity",
+                "extra": null
+            },
+            {
+                "question": "Check cylinder pressure trend compared to previous logs",
+                "extra": null
+            }
+        ]
+    },
+    "annual": {
+        "NFPA 72": [
+            {
+                "question": "Test 100% of detection devices",
+                "extra": null
+            },
+            {
+                "question": "Test manual call points / release buttons",
+                "extra": null
+            },
+            {
+                "question": "Test ASD per manufacturer procedure",
+                "extra": null
+            },
+            {
+                "question": "Check panel firmware/software and documentation updates",
+                "extra": "text"
+            }
+        ],
+        "NFPA 2001": [
+            {
+                "question": "Weigh cylinders or use pressure-to-weight conversion",
+                "extra": "weight"
+            },
+            {
+                "question": "Check discharge hoses, seals, and flexible components",
+                "extra": null
+            },
+            {
+                "question": "Enclosure integrity test (door fan or equivalent)",
+                "extra": null
+            },
+            {
+                "question": "Review maintenance logs for trends",
+                "extra": null
+            }
+        ]
+    },
+    "general": {
+        "general": [
+            {
+                "question": "Is the service label signed",
+                "extra": "photo"
+            },
+            {
+                "question": "Is the service log book updated",
+                "extra": "photo"
+            },
+            {
+                "question": "Is the fire system set to auto/manual mode",
+                "extra": "photo"
+            },
+            {
+                "question": "Are all emergency doors closed",
+                "extra": "photo"
+            },
+            {
+                "question": "Is the main door closed/locked",
+                "extra": "photo"
+            }
+        ]
+    }
+}

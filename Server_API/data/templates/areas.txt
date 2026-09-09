@@ -1,0 +1,146 @@
+Drum plant 11kv sub F893-G2800
+Drum plant 3.3 kv sub  F894-G2800
+Drum plant 380v sub Bottom  F895-G2800
+Cyclone plant 11kv sub F893-G3200
+Cyclone 3.3Kv sub F894-G3200
+Cyclone 380V sub Top  F895-G3200
+Cyclone plant 380V sub Bottom  F894-G3200
+Waste bottom 11KV sub  F893-G4800
+Waste bottom 380V sub  F895-G4800
+Waste Handling Top F893-G5000
+Plant Main sub G11  F893-G1100
+Plant Main G11 Cable room  F893-G1100
+Robot Room  J222-G1700
+Taster Plant (DMS) Substation F893-G7000
+Taster Plant Cable room  F894-G7001
+JIG Main Lab Substation J543-G4600
+
+Quaternary Crusher sub F894-G4000
+Quaternary Screening 11Kv sub F893-G3600
+Quaternary Screening 380V sub F894-G3600
+Blending bed north sub 380kv  F895-G8200
+Blending bed north sub 11kv F893-G8200
+Blending bed south sub 380 F894-G8000
+Blending bed south sub 11kv F893-G8000
+South Fine 380V sub F895-G8400
+Stacker 771 mcc F771-G6100
+Stacker 772 mcc F772-G6100
+Stacker 773 mcc F773-G6100
+Stacker 774 mcc F774-G6100
+Stacker/reclaimer F851-G6100
+Load out 3 380V sub F895-G8600
+Load out 1&2 380V sub  F895-G4500
+Reclaimer 848 F848-G6300
+Reclaimer 847 mcc F847-G6300
+Reclaimer 775 mcc F775-G6300
+Reclaimer F421-G1000
+Reclaimer F411-G1000
+Direct Reduction Plant F893-G7800
+Load out 1 lube room F850-G8500
+Load out 3 lube room F780-G8500
+Load out 3 lube room F950-G8500
+lube room  F883-G2600
+
+Stockpile 380v sub F893-G2200
+Tertiary 11kv sub  F893-G2000
+Tertiary 380Vsub F895-G2000
+Pre/Sec crushing 380V sub F895-G1600
+In pit Stockpile sub  F894-G1800
+Lube room F701-G3100
+Lube room F702-G3100
+Lube room F703-G3100
+
+Clarified water pump house 3.3kv sub F894-G2400
+Clarified water pump house 380v sub F895-G2400
+Clarified water pump house 11kv sub F893-G2400
+Booster pump house 380V sub  F895-G2500
+Generator Room (BPH)  F897-G9300
+UCC 380V sub  F895-G9000
+Hopper 380 F895-G6400
+Hopper 11KV sub  F893-G6400
+
+Telemetery server room F450-G3500
+
+PSR Container  F638-G3272
+MSR Container  F638-G1223
+MOIC Building Control room -
+IMSO Buiding Offices -
+GSS (Finance) Server room -
+IM LOM Server room  -
+Jig Beneficiation Control server  J544-G3402
+
+Server Load-out 1&2 UPS room F638-G3224
+Server Load-out 1&2 PLC room F638-G3224
+Server room Load-out 1&2 F638-G3224
+Server room KGB  F638-G3129
+Server room KGB UPS F638-G3129
+Tertiary server room  F895-G2027
+Tertiary UPS room  F895-G2027
+
+Nooitgedacht 380V sub  F895-G6511
+Tshipi Training subs  F606-G0500
+On Boarding Centre subs  F606-G0600
+LOM Haul Truck Workshop Substation F895-G5700
+LOM Haul Truck Workshop PLC room  F895-G5700
+Total subsation  F895-G5900
+Bucket & Bowl Substation F895-G5800
+Export water pipe line sub  F895-G6700
+Total Sprinkler/Deluge system -
+Utility sprinker/Deluge system  F638-G1174
+
+Feed Bunkers Sub  J542-G2800
+Jig Beneficiation Cable  J542-G3000
+Jig Beneficiation 525V J543-G3000
+Jig Beneficiation 3.3KV J542-G3000
+Jig Beneficiation 11KV J542-G3000
+Jig G10 Main sub  J893-G1000
+SEB 1 B Sub 525v  J543-G3402
+SEB 1B Sub  J543-G3402
+SEB 1 B BTU J543-G3402
+SEB 1 B Cable room  J543-G3402
+JIG Control Room  J544-G3402
+JIG Training Centre  J545-G3402
+Jig Workshop Tool store  J546-G3402
+Transformer Deluge system J543-G2800
+De-Watering Plant Substation J543-G3600
+Transformer Deluge system J543-G3600
+
+DMS Modular Plant Substation J543-G3905
+DMS Modular Plant Substation J543-G3907
+DMS Modular Plant Substation J543-G3901
+DMS Modular Plant Substation J543-G3909
+DMS Modular Plant Substation J543-G3902
+DMS Modular Plant Substation J543-G3904
+DMS Modular Plant Substation J543-G3908
+DMS Modular Plant Substation J542-G3901
+DMS Modular Plant Substation J542-G3902
+DMS Modular Plant Substation J542-G3905
+DMS Modular Plant Substation J542-G3910
+DMS Modular Plant Substation J542-G3903
+DMS Modular Plant Substation J543-G3903
+DMS Modular Plant Substation J542-G3904
+DMS Modular Plant Substation J543-G3906
+
+Primary Secondary Crusher  J542-G2000
+Tertiary Crusher Main 525V  J543-G2400
+Tertiary Crusher Main 525V  cable room J543-G2400
+Tertiary Crusher Main 11kv J542-G2400
+Tertiary Crusher Main 11kv cable room  J542-G2400
+Pit Sub 5 66KV J542-G1300
+Rom sub J542-G2201
+Jig Pre control room J110-
+
+Inpit Stacker Substation F894-G7600
+Inpit 1400 Substation F893-G7400
+Inpit Tripper Substation F894-G7500
+
+Return Water sub J543-G4000
+Jig Slimes Feed  J543-G3400
+Jig Product Stacker E-house (J211)  J452-G1100
+Jig Product Beds sub/Final Product Handeling  J542-G3800
+Waste Pivot sub  J543-G4400
+JIG Process Water Substation J542-G3200
+JIG Slimes Feed Substation J542-G3400
+JIG Thickener Substation J543-G3403
+JIG Product Stacker E-house J210-G1000
+VSD 525V Hopper substation  F525-G

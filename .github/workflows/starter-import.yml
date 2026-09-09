@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   import:
-    if: ${{ hashFiles('.import/manifest.tsv') != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout staging commit
@@ -116,7 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf .import
-          rm -f Web_UI/.gitkeep Server_API/.gitkeep
+          find Web_UI Server_API -name .gitkeep -type f -delete
           rm -f .github/workflows/starter-import.yml
           rmdir .github/workflows 2>/dev/null || true
           rmdir .github 2>/dev/null || true

@@ -1,0 +1,225 @@
+{
+  "users": [
+    {
+      "id": "admin",
+      "email": "mrclubbe@gmail.com",
+      "name": "Charl Lubbe",
+      "role": "ADMIN",
+      "status": "APPROVED",
+      "password": {
+        "salt": "b7ad51ee49f01bef2b10cc4f5d783f00",
+        "hash": "1ad01c2d360e4459ec9c78f5de13d6302bbc33e07f93036a9e8ba3cd47b170d3b198f2edfcc59887218ff4b9bb188edb74cfc37086e0253fbd991972d519f141",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-01-20T09:05:25.460Z",
+      "approvedAt": "2026-01-20T09:05:25.460Z",
+      "approvedBy": "seed",
+      "photoUrl": "/uploads/profilepics/admin_1769900972562.jpeg"
+    },
+    {
+      "id": "u_0d84bc90710b039b18627054",
+      "email": "marnu.olievier.botha@gmail.com",
+      "name": "Marnu Botha",
+      "role": "L2",
+      "status": "APPROVED",
+      "password": {
+        "salt": "0a3f4deeab0cfb1fb6d601d7bbd6f100",
+        "hash": "d7b6601417f84c372b83fea13731db5679e73f865cf98d04593c7e12eecc77387f9a075f9c8b48857748c20b7e9b733bc457d3e2192a3309735fa8740b3a4563",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-01-20T12:36:15.396Z",
+      "approvedAt": "2026-01-20T12:48:00.260Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_0d84bc90710b039b18627054_1770815368931.jpeg"
+    },
+    {
+      "id": "u_b77f4a85de3d0f325180632e",
+      "email": "letlhogonolodoctor6@gmail.com",
+      "name": "Doctor Mokomane",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "2c9caf1d7bf616d983a7b820691813bc",
+        "hash": "69d9519ce023f55c8db6cb5fc9e574073872463dafa739d80156f19091ee0ac6d4a85b48dbda1cc64137d672a9241b71b5a02bfb88316fc051be176793b909c3",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-01-29T12:00:29.911Z",
+      "approvedAt": "2026-01-29T12:00:57.288Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_b77f4a85de3d0f325180632e_1770815166848.jpeg"
+    },
+    {
+      "id": "u_de69384310d4e49930c274a8",
+      "email": "jakkie@collabrisk.co.za",
+      "name": "Jakkie Lubbe",
+      "role": "L3",
+      "status": "APPROVED",
+      "password": {
+        "salt": "0cf8568df907a6e6f3617445ed43e2a6",
+        "hash": "d18ccef641834876d328b396d0769b7870ff601d0101e221e0e399539097ccf7d81a8771ed997d7ae7fde705354c93192e8bee98a4deaee0c2a9088792c27c36",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-01-31T17:53:04.164Z",
+      "approvedAt": "2026-01-31T17:53:37.898Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_de69384310d4e49930c274a8_1770815864364.jpeg"
+    },
+    {
+      "id": "u_a450376590b043b5eaf58972",
+      "email": "ryno@collabrisk.co.za",
+      "name": "Ryno Jordaan",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "5d1faacf48f63ec31eb5b98d7f0b516e",
+        "hash": "1965d727013f6a599c120d365ea36d4ff59b6dd1804e10def98e482e7f02ba8f87b001b8e1f23ab3db61b61a1acd5ba1e4f7343fc08f67a5e87a312a7adcd882",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-03T07:32:17.155Z",
+      "approvedAt": "2026-02-03T07:32:48.607Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_a450376590b043b5eaf58972_1770104273480.jpeg"
+    },
+    {
+      "id": "u_f110d2d617093946e65cf4fd",
+      "email": "strydomj904@gmail.com",
+      "name": "Johan Strydom",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "67c55dbce764e1ed7e1f453e88f68f70",
+        "hash": "8e09c92462f2789dfb2b5ac180664ff4ff8db711065ced53cf450bdfa3ed69bfe905bb26e1ce451399615cc37a290ad213a4f45a973190ed53c6918c4f9fed95",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-11T12:44:48.812Z",
+      "approvedAt": "2026-02-11T13:03:12.437Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_f110d2d617093946e65cf4fd_1770815186709.jpeg"
+    },
+    {
+      "id": "u_82168dc3f4ebbc64bf43b60d",
+      "email": "asive@collabrisk.co.za",
+      "name": "Asive Matha",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "dbec3f05ce8b657b95379288a5457e4a",
+        "hash": "9bacfabd6aef3533db41954736a15c674d97d44f56a72229efca19d76b807d5f31d42678af756d451eb8e569ead2dfcaadf3c06371240d1b807c8f00e881170e",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-12T11:51:44.328Z",
+      "approvedAt": "2026-02-12T11:54:04.561Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": ""
+    },
+    {
+      "id": "u_d3d7fde04866159b0310373f",
+      "email": "marnusw13@gmail.com",
+      "name": "James Whelan",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "d5222c511ef5282f72ca217063c64c94",
+        "hash": "bf6190fd50ab917dfbac3e61ee6684bfdcf32bd0869bf6fe3a933ad3b9a4afb3cf875703ee027f1afa5c47a37cea15afd31f561e99b77883319e3936fdbb1609",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-17T13:20:55.855Z",
+      "approvedAt": "2026-02-17T13:21:24.503Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": ""
+    },
+    {
+      "id": "u_727f3eda3dabfc616d270f5b",
+      "email": "pieter@collabrisk.co.za",
+      "name": "Pieter Verwey",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "28e71ace3dcee8a85e7ac0408fe83efe",
+        "hash": "99907ccac6a058d9240c72e87564768425f064b6fe8b860b33511e2851097f0abd0296e4f8633a43200141d79cb41434cc00754ac78ddb718f7c9cbc064692fe",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-17T14:08:54.383Z",
+      "approvedAt": "2026-02-17T14:09:34.616Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_727f3eda3dabfc616d270f5b_1771337572529.jpeg"
+    },
+    {
+      "id": "u_2a003d4904695d779f625ab0",
+      "email": "leteki09@gmail.com",
+      "name": "Kedumetse",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "512121479219cbc04d7d9328e72eaa4c",
+        "hash": "957bc8511166aa34b452efc390ddc938835a770c974c6c28a1d346605ca4ce0770d286b9d39412ddcc35b13cb41f5231f590b5e3be8113dbbd34ae1047637c52",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-18T09:25:13.544Z",
+      "approvedAt": "2026-02-18T09:26:59.271Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": ""
+    },
+    {
+      "id": "u_7d42195bda7e4841dc1c58c7",
+      "email": "stirling@collabrisk.co.za",
+      "name": "Stirling Evans",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "8a9d892775d0bf3ce8627a9fecee9046",
+        "hash": "60e72e571de008551826b5f75526857e4b0c78b34099ef27643cfe0fdf79ddc67c38729a4d33a433f3114ec48a4a0508bfaac71ba867709a21bc974c177274bb",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-18T09:27:37.403Z",
+      "approvedAt": "2026-02-18T09:27:45.456Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_7d42195bda7e4841dc1c58c7_1771407059205.jpeg"
+    },
+    {
+      "id": "u_8d1290e9bc6ca471501ab5c8",
+      "email": "jacques@collabrisk.co.za",
+      "name": "Jacques Lubbe",
+      "role": "L1",
+      "status": "APPROVED",
+      "password": {
+        "salt": "21b04a1a1dac0e948a96501f447c814a",
+        "hash": "1fa46fd98e3b8d6f9221efbb7859243b0e56d1257157905aecb950fee2aaf4acb0f71ff1a081d09b7b929988298693a880347344d08de72c9243e398fec7f99a",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-18T09:30:40.062Z",
+      "approvedAt": "2026-02-18T09:30:45.659Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_8d1290e9bc6ca471501ab5c8_1771407111778.jpeg"
+    },
+    {
+      "id": "u_a062cc1360381b8266b0db98",
+      "email": "jessica@collabrisk.co.za",
+      "name": "Jessica Lubbe",
+      "role": "L3",
+      "status": "APPROVED",
+      "password": {
+        "salt": "a16be7716ff5b0a64e51bc811d85972b",
+        "hash": "5bb3bb2f4de857263421696bf50224386eb61afa029a1dd833c29fa982186cd7d32ba9583b807e447b74977e5a67b5f39300dfa7c45e527648a29d7a682f2370",
+        "algo": "scrypt",
+        "keylen": 64
+      },
+      "createdAt": "2026-02-25T09:26:26.916Z",
+      "approvedAt": "2026-02-25T09:35:26.463Z",
+      "approvedBy": "mrclubbe@gmail.com",
+      "photoUrl": "/uploads/profilepics/u_a062cc1360381b8266b0db98_1772012555458.jpeg"
+    }
+  ]
+}

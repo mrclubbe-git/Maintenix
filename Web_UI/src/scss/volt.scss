@@ -1,0 +1,114 @@
+// =========================================================
+// * Volt React Dashboard
+// =========================================================
+
+// * Product Page: https://themesberg.com/product/dashboard/volt-react
+// * Copyright 2021 Themesberg (https://www.themesberg.com)
+// * Official Repository: https://github.com/themesberg/volt-react-dashboard
+// * License: MIT License (https://themesberg.com/licensing)
+
+// * Designed and coded by https://themesberg.com
+
+// =========================================================
+
+// * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. Please contact us to request a removal.
+
+// Bootstrap mixins and functions
+@import "~bootstrap/scss/functions";
+@import "~bootstrap/scss/mixins";
+
+// Change variables here
+@import "volt/variables";
+
+// Bootstrap
+@import "~bootstrap/scss/bootstrap";
+
+// Vendor
+@import "volt/vendor";
+
+// volt mixins & functions
+@import "volt/mixins";
+@import "volt/functions";
+
+// Utilities
+@import "volt/reboot";
+@import "volt/utilities";
+
+// Layout
+@import "volt/layout";
+
+// Components
+@import "volt/components";
+
+// write your custom styles here!
+
+// =========================================================
+// Reports page helpers (opt-in via classNames)
+// =========================================================
+.reports-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-left: auto; // keeps actions pushed to the right on desktop
+}
+
+.reports-search {
+  min-width: 280px; // desktop-friendly search width
+}
+
+// Keep search + refresh fully inside screen on mobile (stacked)
+@media (max-width: 575.98px) {
+  .reports-header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    margin-left: 0;
+  }
+
+  .reports-search {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .reports-header-actions .btn {
+    width: 100%;
+  }
+}
+
+// =========================================================
+// Mobile helpers (non-breaking, opt-in via classNames)
+// =========================================================
+@media (max-width: 575.98px) {
+  // Allow table cells to wrap on small screens (opt-in per table)
+  .mobile-wrap-table {
+    td,
+    th {
+      white-space: normal !important;
+      word-break: break-word;
+    }
+
+    // Slightly tighter spacing for narrow screens
+    td,
+    th {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+  }
+
+  // Stack small button-groups vertically on mobile (opt-in)
+  .mobile-stack-btn-group {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch;
+
+    .btn {
+      width: 100%;
+    }
+
+    .btn + .btn {
+      margin-left: 0 !important;
+      margin-top: 0.5rem;
+    }
+  }
+}

@@ -11,13 +11,16 @@
   <link rel="mask-icon" href="%PUBLIC_URL%/safari-pinned-tab.svg" color="#262b40">
 
   <meta name="msapplication-TileColor" content="#ff0000">
+  <meta name="msapplication-config" content="%PUBLIC_URL%/browserconfig.xml">
   <meta name="theme-color" content="#ffffff">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="description" content="Maintenix Server UI" />
 
-  <!-- Optional: keep CRA default manifest (safe/local) -->
-  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+  <script>
+    window.__MAINTENIX_API_BASE_URL__ = "%REACT_APP_API_BASE_URL%";
+  </script>
+  <script src="%PUBLIC_URL%/api-bootstrap.js"></script>
 
   <title>Maintenix Server UI</title>
 </head>

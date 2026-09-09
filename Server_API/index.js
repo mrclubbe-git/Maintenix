@@ -19,6 +19,42 @@ const standbyRoutes = require("./routes/standby");
 
 const app = express();
 
+const DEFAULT_CORS_ORIGINS = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://mrclubbe-git.github.io"
+];
+
+const allowedCorsOrigins = new Set(
+  String(process.env.CORS_ORIGINS || DEFAULT_CORS_ORIGINS.join(","))
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+);
+
+app.use((req, res, next) => {
+  const origin = String(req.headers.origin || "").trim();
+
+  if (origin && allowedCorsOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type");
+
+  if (String(req.headers["access-control-request-private-network"] || "").toLowerCase() === "true") {
+    res.setHeader("Access-Control-Allow-Private-Network", "true");
+  }
+
+  if (req.method === "OPTIONS") {
+    if (origin && !allowedCorsOrigins.has(origin)) return res.sendStatus(403);
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 /**
  * ✅ Increase request body limits for base64 uploads (profile photos, etc.)
  * Base64 inflates size, so default limits can cause 500 errors.

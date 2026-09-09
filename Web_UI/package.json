@@ -14,8 +14,8 @@
     "themesberg"
   ],
   "license": "MIT",
-  "homepage": "/",
-  "proxy": "http://100.106.40.17:5055",
+  "homepage": "https://mrclubbe-git.github.io/Maintenix",
+  "proxy": "http://localhost:5055",
   "version": "1.1.5",
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^1.2.36",
@@ -50,8 +50,11 @@
   "scripts": {
     "prestart": "node scripts/write-version.js",
     "start": "react-scripts start",
+    "api:local": "npm --prefix ../Server_API run start:all",
     "prebuild": "node scripts/write-version.js",
     "build": "react-scripts build",
+    "prebuild:github": "node scripts/write-version.js",
+    "build:github": "node scripts/build-github.js",
     "build-local": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

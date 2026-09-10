@@ -1,0 +1,29 @@
+MAINTENIX DEVELOPMENT API — BROWSER ACCESS
+===========================================
+
+API base URL
+------------
+https://dev-api.main-tenix.com
+
+GitHub Pages configuration
+--------------------------
+Repository Actions variable:
+MAINTENIX_API_BASE_URL=https://dev-api.main-tenix.com
+
+Use the base URL only. Do not add a trailing slash or "/api"; the Web UI already
+uses API routes such as /api/auth and /api/reports.
+
+Browser origin allowed by CORS
+-----------------------------
+https://mrclubbe-git.github.io
+
+Health check
+------------
+GET https://dev-api.main-tenix.com/api/health
+Expected response: {"ok":true}
+
+Notes
+-----
+- HTTPS is provided through Cloudflare Tunnel.
+- The API is development-only and uses synthetic data.
+- No API key, password, or other credential is required in this file.

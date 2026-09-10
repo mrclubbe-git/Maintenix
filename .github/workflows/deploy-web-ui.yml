@@ -42,7 +42,8 @@ jobs:
           # CRA 3 promotes lint warnings to build errors when CI=true.
           # Keep warnings visible in the log without blocking this legacy UI build.
           CI: "false"
-          REACT_APP_API_BASE_URL: ${{ vars.MAINTENIX_API_BASE_URL || 'http://localhost:5055' }}
+          # Repository variable overrides this development API fallback when needed.
+          REACT_APP_API_BASE_URL: ${{ vars.MAINTENIX_API_BASE_URL || 'https://dev-api.main-tenix.com' }}
         run: npm run build:github
 
       - name: Configure Pages

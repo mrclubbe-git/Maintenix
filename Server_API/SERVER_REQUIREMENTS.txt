@@ -3,16 +3,21 @@ MAINTENIX SERVER REQUIREMENTS
 
 Purpose
 -------
-This document describes what is required from the Linux server when the Maintenix
-Web UI is hosted on GitHub Pages and the Maintenix Server_API runs on a separate
-server for testing.
+This document describes the server-side requirements for the Maintenix development
+environment when the Web UI is hosted on GitHub Pages and Server_API runs on a
+separate Linux server.
 
-The browser will load the Web UI from:
+Current development Web UI:
     https://mrclubbe-git.github.io/Maintenix/
 
-The Web UI must then be able to reach the Server_API through a browser-accessible
-HTTPS address, for example:
-    https://api.example.com
+Current development API origin:
+    https://dev-api.main-tenix.com
+
+Current public API health check:
+    https://dev-api.main-tenix.com/api/health
+
+The development API is exposed over HTTPS through Cloudflare Tunnel and is intended
+for development/testing with synthetic data.
 
 
 1. OPERATING SYSTEM
@@ -24,10 +29,8 @@ Required:
 - Git installed.
 - curl installed for health checks.
 
-Why Linux:
-- The current server-status endpoint reads /proc/stat for CPU information.
-- It also uses the Linux "df -P" command for disk statistics.
-- Running on Linux therefore supports the complete current Server_API feature set.
+Linux is required for the complete current feature set because the server-status
+endpoint reads /proc/stat and uses the Linux "df -P" command.
 
 
 2. NODE.JS AND NPM
@@ -37,9 +40,9 @@ Required:
 - npm.
 
 Recommendation:
-- Use a currently maintained Node.js LTS release rather than the minimum version.
+- Use a currently maintained Node.js LTS release.
 
-The Server_API dependency tree contains packages that require Node.js >= 18.
+The current Server_API dependency tree includes packages requiring Node.js >= 18.
 
 
 3. APPLICATION FILES
@@ -61,7 +64,7 @@ For an existing installation:
 
 4. REQUIRED SERVER PROCESSES
 ----------------------------
-Maintenix currently has three server-side processes that must run:
+Three server-side processes are required:
 
 1. API server
    - index.js
@@ -72,16 +75,15 @@ Maintenix currently has three server-side processes that must run:
 3. Call-out worker
    - calloutWorker.js
 
-The repository includes a launcher that starts all three:
-
+Start all three with:
     npm run start:all
 
-Do not run multiple copies of the workers unless this is deliberately designed for,
-because duplicate workers could process the same application workload unexpectedly.
+Do not intentionally run duplicate worker instances unless the queue-processing
+behaviour has first been designed and tested for multiple workers.
 
 
-5. API PORT
------------
+5. INTERNAL API PORT
+--------------------
 Default internal API port:
     5055
 
@@ -91,140 +93,116 @@ The API listens on:
 The port can be overridden with the PORT environment variable, for example:
     PORT=5056 npm run start:all
 
-For a normal HTTPS deployment, port 5055 should preferably remain private and be
-accessed through a reverse proxy.
+For the current development deployment, the browser should use the HTTPS Cloudflare
+Tunnel hostname rather than connecting directly to port 5055.
 
 
-6. HTTPS IS REQUIRED FOR THE GITHUB PAGES TEST SETUP
-----------------------------------------------------
-The GitHub Pages Web UI is served over HTTPS.
+6. DEVELOPMENT HTTPS ENDPOINT
+-----------------------------
+Current browser-accessible API origin:
+    https://dev-api.main-tenix.com
 
-The API should therefore also be exposed using HTTPS, for example:
-    https://api.example.com
+Requirements:
+- HTTPS must remain valid and browser trusted.
+- Requests for /api/* and /uploads/* must reach the Maintenix Server_API service.
+- The Cloudflare Tunnel must route the development hostname to the Server_API
+  service listening on the Linux server.
+- The origin service must remain reachable by the Cloudflare Tunnel connector.
 
-Do not rely on a normal HTTP URL such as:
-    http://server-ip:5055
-
-for browser testing from GitHub Pages. Browsers can block an HTTP API requested by
-an HTTPS page as mixed content.
-
-Recommended layout:
-
-    Internet / Browser
-            |
-          HTTPS 443
-            |
-       Nginx or Caddy
-            |
-      127.0.0.1:5055
-            |
-       Maintenix API
-
-A valid, browser-trusted TLS certificate is required.
-
-Let's Encrypt is suitable for a normal public DNS hostname.
+Do not add a trailing slash or "/api" to the configured API base URL. The Web UI
+already requests paths such as /api/auth, /api/reports and /uploads/....
 
 
-7. DNS
-------
-Recommended:
-- A DNS hostname dedicated to the API, for example:
-      api.example.com
+7. CLOUDFLARE TUNNEL
+--------------------
+The current development API uses Cloudflare Tunnel for HTTPS browser access.
 
-The DNS A/AAAA record should resolve to the Linux server.
+The tunnel configuration must publish:
+    dev-api.main-tenix.com
 
-Using a hostname is strongly preferred over exposing a raw IP because HTTPS
-certificate management is much simpler and more reliable.
+and route that hostname to the Maintenix API origin service, normally:
+    http://127.0.0.1:5055
+
+or the equivalent local address used by the tunnel connector.
+
+The Node.js API itself does not need to terminate public TLS when Cloudflare Tunnel
+is providing the HTTPS edge connection.
 
 
 8. FIREWALL / NETWORK ACCESS
 ----------------------------
-Recommended externally accessible ports:
-
-- TCP 443
-  Required for the public HTTPS API.
-
-- TCP 80
-  Optional, but commonly used for HTTP-to-HTTPS redirect and Let's Encrypt
-  certificate issuance/renewal.
-
-- TCP 22
-  SSH administration only.
-  Restrict this to trusted source addresses where possible.
+With Cloudflare Tunnel, direct public exposure of TCP 5055 is not required and is
+not recommended.
 
 Recommended:
-- Do NOT expose TCP 5055 directly to the public Internet when a reverse proxy is
-  being used.
-- Bind/restrict firewall access so the reverse proxy is the normal public entry point.
+- Keep TCP 5055 restricted to the local server/private network as appropriate.
+- Permit the Cloudflare Tunnel connector to make its required outbound connections.
+- Restrict SSH administration to trusted sources where practical.
+
+If the deployment model changes away from Cloudflare Tunnel, review firewall and
+TLS requirements before exposing the API directly.
 
 
 9. CORS
 -------
-The Server_API must allow the GitHub Pages origin:
-
+The browser origin that must be allowed is:
     https://mrclubbe-git.github.io
 
-The current Maintenix Server_API already includes this origin in its default CORS
-allow-list.
+The current Maintenix Server_API includes this origin in its default CORS allow-list.
 
-If the UI is later moved to a custom domain, configure CORS_ORIGINS accordingly.
-
+If the UI later moves to another hostname, configure CORS_ORIGINS accordingly.
 Example:
     CORS_ORIGINS=https://mrclubbe-git.github.io,https://app.example.com
 
-Only origins that actually require browser access should be included.
+Only origins that genuinely require browser access should be allowed.
 
 
 10. PERSISTENT AND WRITABLE DATA
 --------------------------------
 The application uses files below:
-
     Server_API/data/
 
-The account running Maintenix must have read/write access to application data that
-the API and workers update.
+The account running Maintenix must have read/write access to the application data
+that the API and workers update.
 
-This includes generated/uploaded content and application JSON data.
+This includes generated/uploaded content, templates and the current file-based JSON
+application data.
 
 Important:
-- Preserve the Server_API/data directory during application updates.
+- Preserve Server_API/data during updates.
 - Preserve the template files used by report/document generation.
-- Ensure Server_API/data/uploads and any generated subdirectories are writable.
+- Ensure Server_API/data/uploads and generated subdirectories are writable.
 - Do not run the application from a read-only filesystem.
+
+The current development API uses synthetic data, but the same persistence rules
+still apply to preserve a stable test environment.
 
 
 11. BACKUPS
 -----------
 Back up at minimum:
-
     Server_API/data/
 
-This directory contains application state, uploaded/generated files and supporting
-data used by the current file-based backend.
-
 Recommended:
-- Automated daily backups.
+- Automated backups.
 - Multiple backup generations.
 - At least one backup copy outside the application server.
-- Test restoration periodically.
+- Periodic restore testing.
 
 
 12. SERVICE ACCOUNT
 -------------------
 Recommended:
 - Run Maintenix under a dedicated non-root Linux user.
-- The service user should own or have appropriate access to the Server_API data
-  directories.
+- Give that service account the required access to Server_API/data.
 - Do not run the Node.js application as root unless there is a specific operational
-  reason.
+  requirement.
 
 
 13. PROCESS SUPERVISION
 -----------------------
-For anything beyond a temporary terminal test, use a process supervisor such as:
-
-- systemd (preferred on most Linux servers), or
-- another suitable Node/process supervisor.
+For anything beyond a temporary terminal test, use systemd or another suitable
+process supervisor.
 
 The supervisor should:
 - Start Maintenix automatically after reboot.
@@ -233,128 +211,112 @@ The supervisor should:
 - Restart the stack if it exits unexpectedly.
 - Capture stdout/stderr logs.
 - Run as the dedicated Maintenix service account.
-- Use the Server_API directory as its working directory.
+- Use Server_API as its working directory.
+
+The Cloudflare Tunnel connector should also be configured to start automatically
+and remain supervised on the server.
 
 
-14. REVERSE PROXY
------------------
-Recommended:
-- Nginx or Caddy in front of the Node.js API.
-- Public HTTPS on port 443.
-- Proxy requests to:
-      http://127.0.0.1:5055
+14. REQUEST SIZE / UPLOADS
+--------------------------
+The API currently accepts JSON/form request bodies up to 25 MB.
 
-The proxy should preserve normal HTTP headers and support request bodies large
-enough for Maintenix uploads.
-
-The API currently accepts JSON/form request bodies up to 25 MB, so the reverse
-proxy upload/body-size limit must not be lower than the application requirement
-when those upload features are being tested.
+Any intermediary between the browser and Node.js, including tunnel/proxy policy,
+must not impose a lower request-body limit for features that require these uploads.
 
 
 15. GITHUB PAGES API CONFIGURATION
 ----------------------------------
-Once the server has a working HTTPS API hostname, set the GitHub repository
-variable:
+The GitHub repository Actions variable should be:
+    MAINTENIX_API_BASE_URL=https://dev-api.main-tenix.com
 
-    MAINTENIX_API_BASE_URL
+The Web UI build reads this value and uses it as the base for API and uploaded-file
+requests.
 
-Example value:
-    https://api.example.com
+Use the origin only:
+    https://dev-api.main-tenix.com
 
-Then rebuild/redeploy the "deploy" branch.
+Do not use:
+    https://dev-api.main-tenix.com/
+    https://dev-api.main-tenix.com/api
 
-The Web UI will use that base URL for API and uploaded-file requests.
+After changing MAINTENIX_API_BASE_URL, rebuild/redeploy the deploy branch so the
+compiled GitHub Pages UI receives the new value.
 
-Recommended:
-- Use the origin only, without a trailing path.
-- Example:
-      https://api.example.com
-- Do not include "/api" in MAINTENIX_API_BASE_URL because the Web UI already uses
-  routes such as /api/auth, /api/reports, etc.
+The project workflow and GitHub build script also use the same development API as
+their hosted-build fallback when MAINTENIX_API_BASE_URL is not defined.
 
 
 16. HEALTH CHECK
 ----------------
 The API provides:
-
     GET /api/health
 
 Expected response:
     {"ok":true}
 
-Local server test:
+Local origin test:
     curl http://127.0.0.1:5055/api/health
 
-Public HTTPS test:
-    curl https://api.example.com/api/health
+Public development test:
+    curl https://dev-api.main-tenix.com/api/health
 
-A successful public health check confirms:
-- DNS is resolving.
-- HTTPS/TLS is working.
-- The reverse proxy can reach Node.js.
-- The API process is responding.
+A successful public health check confirms that HTTPS/Tunnel routing reaches a
+responding API process.
 
 
 17. SERVER STATUS CHECK
 -----------------------
 The API also exposes:
-
     GET /api/server/status
 
 On Linux this uses:
 - /proc/stat for CPU usage.
 - df -P for filesystem statistics.
 
-This endpoint is useful for confirming that the Linux-specific system monitoring
-features work correctly.
+This endpoint is useful for validating the Linux-specific system-monitoring path.
 
 
-18. MINIMUM TEST ACCEPTANCE CHECKLIST
-------------------------------------
-Before pointing the GitHub Pages UI to the server, confirm all of the following:
-
+18. DEVELOPMENT TEST ACCEPTANCE CHECKLIST
+-----------------------------------------
 [ ] Linux server is running.
 [ ] Node.js 18+ and npm are installed.
-[ ] Maintenix repository is checked out.
+[ ] Maintenix repository is checked out and current.
 [ ] npm ci completes successfully inside Server_API.
 [ ] npm run start:all starts without errors.
 [ ] API, servicing worker and call-out worker are all running.
 [ ] http://127.0.0.1:5055/api/health returns {"ok":true}.
 [ ] Server_API/data is writable by the service account.
-[ ] Persistent data is backed up.
-[ ] HTTPS hostname resolves to the server.
-[ ] Valid TLS certificate is installed.
-[ ] HTTPS reverse proxy forwards to 127.0.0.1:5055.
-[ ] https://<api-host>/api/health returns {"ok":true}.
-[ ] Firewall exposes only the necessary ports.
-[ ] GitHub Pages origin is allowed by CORS.
-[ ] MAINTENIX_API_BASE_URL is set to the HTTPS API origin.
-[ ] The deploy branch has been rebuilt after changing MAINTENIX_API_BASE_URL.
+[ ] Persistent test data is backed up as required.
+[ ] Cloudflare Tunnel is running and supervised.
+[ ] dev-api.main-tenix.com routes to the Maintenix API.
+[ ] https://dev-api.main-tenix.com/api/health returns {"ok":true}.
+[ ] GitHub Pages origin https://mrclubbe-git.github.io is allowed by CORS.
+[ ] MAINTENIX_API_BASE_URL is https://dev-api.main-tenix.com.
+[ ] The deploy branch has been rebuilt after API configuration changes.
 [ ] Login and normal API operations work from the GitHub Pages Web UI.
+[ ] /uploads resources referenced by the application load through the HTTPS API
+    origin.
 
 
-19. CURRENT SERVER-SIDE START COMMAND
--------------------------------------
-Production/test stack:
-
+19. CURRENT START COMMAND
+-------------------------
+Development server stack:
     cd /path/to/Maintenix/Server_API
     npm ci
     npm run start:all
 
-The command starts the current API plus both background workers.
+This starts the API plus both background workers.
 
 
 SUMMARY
 -------
-The most important requirements for the GitHub Pages testing arrangement are:
+Current development browser path:
+    GitHub Pages Web UI
+        -> https://dev-api.main-tenix.com
+        -> Cloudflare Tunnel
+        -> Maintenix Server_API on Linux (default port 5055)
 
-1. Linux.
-2. Node.js 18+ and npm.
-3. A writable/persistent Server_API/data directory.
-4. API + servicing worker + call-out worker running.
-5. API available internally on port 5055 (or configured PORT).
-6. A valid HTTPS reverse proxy/domain for browser access.
-7. CORS allowing https://mrclubbe-git.github.io.
-8. GitHub MAINTENIX_API_BASE_URL pointing to that HTTPS API origin.
-9. Backups and process supervision for reliable testing.
+Key requirements are Linux, Node.js 18+, all three Maintenix server processes,
+persistent writable Server_API/data, the Cloudflare Tunnel, CORS access for the
+GitHub Pages origin, and MAINTENIX_API_BASE_URL set to the development HTTPS origin.

@@ -135,15 +135,26 @@ export default function DashboardOverview() {
 
   useEffect(() => {
     let mounted = true;
+    let pollId = null;
     const controller = new AbortController();
+    const statusPath = "/api/server/status";
+    const statusUrl =
+      typeof window.__maintenixResolveApiUrl === "function"
+        ? window.__maintenixResolveApiUrl(statusPath)
+        : statusPath;
 
     async function load() {
       try {
         setServerErr("");
-        const res = await fetch("/api/server/status", { signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const res = await fetch(statusPath, { signal: controller.signal });
 
+        if (!res.ok) {
+          const err = new Error(`HTTP ${res.status}`);
+          err.status = res.status;
+          throw err;
+        }
+
+        const data = await res.json();
         const normalized = {
           host: data.host ?? "Unknown",
           cpuUsagePercent: Number.isFinite(Number(data.cpuUsagePercent)) ? Number(data.cpuUsagePercent) : 0,
@@ -152,21 +163,34 @@ export default function DashboardOverview() {
         };
 
         if (mounted) setServerInfo(normalized);
+        return true;
       } catch (e) {
-        if (e?.name === "AbortError") return;
-        if (mounted) {
-          setServerErr("Server metrics unavailable (API not reachable).");
-          setServerInfo(null);
+        if (e?.name === "AbortError") return false;
+        if (!mounted) return false;
+
+        setServerInfo(null);
+
+        if (e?.status === 404) {
+          setServerErr(
+            `Server metrics endpoint is not available: ${statusUrl} (HTTP 404). The API may still be online.`
+          );
+          return false;
         }
+
+        setServerErr(
+          `Server metrics unavailable from ${statusUrl}${e?.status ? ` (HTTP ${e.status})` : ""}.`
+        );
+        return true;
       }
     }
 
-    load();
-    const id = setInterval(load, 10000);
+    load().then((shouldPoll) => {
+      if (mounted && shouldPoll) pollId = setInterval(load, 10000);
+    });
 
     return () => {
       mounted = false;
-      clearInterval(id);
+      if (pollId) clearInterval(pollId);
       controller.abort();
     };
   }, []);
@@ -337,7 +361,7 @@ export default function DashboardOverview() {
 
       {serverErr ? (
         <Alert variant="warning" className="mb-4">
-          {serverErr} Make sure the Linux API is running on <code>http://100.106.40.17:5055</code> and your React dev proxy is set.
+          {serverErr}
         </Alert>
       ) : null}
 

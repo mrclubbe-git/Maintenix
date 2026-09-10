@@ -1,0 +1,336 @@
+MAINTENIX DEVELOPMENT — SERVER STATUS ENDPOINT FAILURE & BACKEND REQUIREMENT
+============================================================================
+
+Purpose
+-------
+This document explains the current development failure seen by the GitHub Pages
+Web UI and the backend requirement needed to resolve it.
+
+Current Web UI:
+    https://mrclubbe-git.github.io/Maintenix/
+
+Current development API base:
+    https://dev-api.main-tenix.com
+
+Expected server metrics endpoint:
+    GET https://dev-api.main-tenix.com/api/server/status
+
+
+1. CURRENT STATUS
+-----------------
+The development API is reachable from the browser.
+
+Evidence:
+- The deployed Web UI reports the configured API base as:
+      https://dev-api.main-tenix.com
+- User authentication/login succeeds against the development API.
+- The browser is successfully sending the dashboard metrics request to:
+      https://dev-api.main-tenix.com/api/server/status
+
+Therefore the following are working sufficiently for authentication:
+- GitHub Pages deployment.
+- Browser-to-API HTTPS connectivity.
+- The configured API base URL.
+- DNS / Cloudflare Tunnel routing to the development API.
+- CORS for the GitHub Pages origin.
+
+
+2. CURRENT FAILURE
+------------------
+The dashboard request:
+
+    GET /api/server/status
+
+currently returns:
+
+    HTTP 404 Not Found
+
+Browser evidence:
+
+    GET https://dev-api.main-tenix.com/api/server/status 404 (Not Found)
+
+This is not an "API unreachable" failure.
+
+A 404 means the browser reached the development API host successfully, but the
+server currently handling requests at that host does not expose the required
+/api/server/status route.
+
+The previous UI warning that referenced:
+
+    http://100.106.40.17:5055
+
+was obsolete display text and was not the URL used by the current deployed Web UI.
+
+
+3. FRONTEND EXPECTATION
+-----------------------
+The dashboard expects this endpoint:
+
+    GET /api/server/status
+
+No authentication header is currently required by the frontend for this request.
+
+A successful response must return HTTP 200 and JSON containing:
+
+    {
+      "host": "server-hostname",
+      "cpuUsagePercent": 12.3,
+      "storageUsedPercent": 44.8,
+      "storageFreeGB": 120
+    }
+
+Field requirements:
+
+host
+    String identifying the Linux server hostname.
+
+cpuUsagePercent
+    Number representing CPU utilisation from 0 to 100.
+
+storageUsedPercent
+    Number representing disk usage from 0 to 100.
+
+storageFreeGB
+    Number representing free disk space in gigabytes.
+
+
+4. BACKEND IMPLEMENTATION ALREADY PRESENT IN THE REPOSITORY
+-----------------------------------------------------------
+The current Maintenix repository already contains an implementation of:
+
+    GET /api/server/status
+
+in:
+
+    Server_API/index.js
+
+The implementation:
+
+- Uses os.hostname() for the host value.
+- Reads /proc/stat for CPU statistics.
+- Uses "df -P /" for filesystem statistics.
+- Returns the fields expected by DashboardOverview.js.
+- Returns HTTP 500 with:
+      {"error":"Failed to read server metrics"}
+  if the metrics cannot be collected.
+
+This means a 404 from the development API strongly indicates that the running
+development backend is not using the current Server_API/index.js, or that the
+Cloudflare/backend routing is directing requests to another service/version.
+
+
+5. LINUX BACKEND REQUIREMENTS
+-----------------------------
+The server providing this endpoint must be Linux-based because the current
+implementation depends on:
+
+    /proc/stat
+
+and:
+
+    df -P /
+
+The Node.js process must have permission to:
+- Read /proc/stat.
+- Execute the "df" command.
+- Read filesystem usage information for "/".
+
+The server must run the current Maintenix Server_API code.
+
+
+6. REQUIRED SERVER UPDATE
+-------------------------
+On the Linux development server, update the Maintenix repository and restart the
+backend process that Cloudflare Tunnel is forwarding to.
+
+Typical update:
+
+    cd /path/to/Maintenix
+    git pull
+    cd Server_API
+    npm ci
+
+Then restart the existing Maintenix service/process.
+
+If the server is being run manually for testing:
+
+    npm run start:all
+
+IMPORTANT:
+Do not start a second copy if Maintenix is already managed by systemd, PM2,
+Docker, Supervisor, or another service manager. Restart the existing managed
+service instead.
+
+
+7. CLOUDFLARE TUNNEL / ROUTING REQUIREMENT
+------------------------------------------
+Cloudflare Tunnel must forward the public API hostname:
+
+    https://dev-api.main-tenix.com
+
+to the Maintenix API process that contains the current routes.
+
+The normal internal target is expected to be similar to:
+
+    http://127.0.0.1:5055
+
+or:
+
+    http://localhost:5055
+
+depending on the server configuration.
+
+The exact internal address may differ, but the public request:
+
+    https://dev-api.main-tenix.com/api/server/status
+
+must reach the same Maintenix Express application that handles authentication,
+health, presence, reports, and the other /api routes.
+
+
+8. CORS REQUIREMENT
+-------------------
+The backend must allow the GitHub Pages browser origin:
+
+    https://mrclubbe-git.github.io
+
+The current repository Server_API/index.js already includes this origin in its
+default CORS allow-list.
+
+If CORS_ORIGINS is explicitly set on the Linux server, it must also contain:
+
+    https://mrclubbe-git.github.io
+
+Otherwise an environment-specific CORS override could remove the default origin.
+
+
+9. REQUIRED VALIDATION
+----------------------
+Run these commands from a normal shell on the Linux server, macOS terminal, or
+Windows PowerShell. Do not enter curl commands into the browser JavaScript console.
+
+First confirm the API itself:
+
+    curl -i https://dev-api.main-tenix.com/api/health
+
+Expected:
+    HTTP 200
+    {"ok":true}
+
+Then confirm the metrics endpoint:
+
+    curl -i https://dev-api.main-tenix.com/api/server/status
+
+Expected:
+    HTTP 200
+
+with JSON similar to:
+
+    {
+      "host": "maintenix-dev",
+      "cpuUsagePercent": 12.3,
+      "storageUsedPercent": 44.8,
+      "storageFreeGB": 120
+    }
+
+
+10. LOCAL BACKEND VALIDATION
+----------------------------
+If the public endpoint still returns 404, test the Node.js API directly on the
+Linux server:
+
+    curl -i http://127.0.0.1:5055/api/health
+
+and:
+
+    curl -i http://127.0.0.1:5055/api/server/status
+
+Interpretation:
+
+A. Local /api/server/status returns 200, public URL returns 404
+   ------------------------------------------------------------
+   The Maintenix Node application is correct.
+   Investigate Cloudflare Tunnel, reverse-proxy routing, hostname routing, or
+   whether the public hostname is pointing at a different backend service.
+
+B. Local /api/server/status also returns 404
+   -----------------------------------------
+   The running Node backend does not contain the current server-status route.
+   Update/redeploy the Maintenix Server_API and restart the process.
+
+C. Local /api/server/status returns 500
+   ------------------------------------
+   The route exists, but Linux metrics collection is failing.
+   Check access to /proc/stat and availability/permissions of the "df" command.
+
+D. Local endpoint returns 200 but browser reports a CORS error
+   ----------------------------------------------------------
+   Check CORS_ORIGINS and ensure https://mrclubbe-git.github.io is allowed.
+
+
+11. CURRENT FRONTEND BEHAVIOUR
+------------------------------
+The dashboard has been updated so that a 404 from /api/server/status is treated as
+"metrics endpoint unavailable" rather than "API unreachable".
+
+For a confirmed 404, the UI stops repeatedly polling the missing endpoint every
+10 seconds, preventing unnecessary repeated 404 requests.
+
+Once the backend endpoint exists and returns HTTP 200, the dashboard Server Info
+card can display:
+- Hostname
+- CPU usage
+- Storage used
+- Free disk space
+
+
+12. OTHER BROWSER CONSOLE MESSAGES
+----------------------------------
+The following messages seen during testing are not the cause of the server metrics
+failure:
+
+- Password input autocomplete recommendation.
+- Service worker "Content is cached for offline use" message.
+- Browser-extension style message-channel errors.
+
+The actionable error is:
+
+    GET https://dev-api.main-tenix.com/api/server/status 404 (Not Found)
+
+
+13. ACCEPTANCE CRITERIA
+-----------------------
+The backend/server-side fix is complete when all of the following are true:
+
+[ ] https://dev-api.main-tenix.com/api/health returns HTTP 200.
+[ ] https://dev-api.main-tenix.com/api/server/status returns HTTP 200.
+[ ] /api/server/status returns JSON containing:
+      host
+      cpuUsagePercent
+      storageUsedPercent
+      storageFreeGB
+[ ] CPU and storage values are numeric.
+[ ] https://mrclubbe-git.github.io is allowed by CORS.
+[ ] The GitHub Pages dashboard loads without a server-metrics warning.
+[ ] The Server Info card displays the Linux host and metrics.
+[ ] Browser DevTools no longer shows /api/server/status 404 responses.
+
+
+SUMMARY FOR BACKEND ADMINISTRATOR
+---------------------------------
+The public development API is reachable and login works. The current failure is
+specific to one missing endpoint:
+
+    GET /api/server/status
+
+The development API currently returns HTTP 404 for this route.
+
+The current Maintenix repository already implements this endpoint in
+Server_API/index.js. The Linux development server must therefore be updated/
+restarted with the current backend code, and Cloudflare Tunnel must route
+dev-api.main-tenix.com to that updated Maintenix API process.
+
+Required public result:
+
+    GET https://dev-api.main-tenix.com/api/server/status
+    -> HTTP 200 + server metrics JSON

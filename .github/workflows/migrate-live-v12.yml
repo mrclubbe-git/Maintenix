@@ -106,10 +106,10 @@ jobs:
           rm -rf Server_API/formal-reporting/__pycache__
           find Server_API -name '*.pyc' -delete
 
-      - name: Set up Node.js 16
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 16.20.2
+          node-version: 22.16.0
           cache: npm
           cache-dependency-path: Web_UI/package-lock.json
 

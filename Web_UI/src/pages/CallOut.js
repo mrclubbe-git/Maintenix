@@ -23,6 +23,66 @@ function makeDraftKey() {
   return `callout_draft_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+function readCorrectionContextFromHash() {
+  try {
+    const hash = String(window.location.hash || "");
+    const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+    const params = new URLSearchParams(query);
+    const correctionOf = String(params.get("correctionOf") || "").trim();
+    if (!correctionOf) return null;
+    return {
+      correctionOf,
+      reason: String(params.get("reason") || "").trim()
+    };
+  } catch {
+    return null;
+  }
+}
+
+const CLIENT_MAX_PHOTO_BYTES = 15 * 1024 * 1024;
+const CLIENT_TARGET_PHOTO_BYTES = 3 * 1024 * 1024;
+const CLIENT_MAX_PHOTO_DIMENSION = 1600;
+const CLIENT_JPEG_QUALITY = 0.78;
+
+function bytesToMb(bytes) {
+  return (Number(bytes || 0) / 1024 / 1024).toFixed(1);
+}
+
+function compressImageFile(file) {
+  return new Promise((resolve) => {
+    if (!file || !String(file.type || "").startsWith("image/")) return resolve(file);
+    if (file.size && file.size <= CLIENT_TARGET_PHOTO_BYTES) return resolve(file);
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, CLIENT_MAX_PHOTO_DIMENSION / Math.max(img.width || 1, img.height || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
+        canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(file);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url);
+          if (!blob) return resolve(file);
+          const name = String(file.name || "photo.jpg").replace(/\.[^.]+$/, "") + ".jpg";
+          resolve(new File([blob], name, { type: "image/jpeg", lastModified: Date.now() }));
+        }, "image/jpeg", CLIENT_JPEG_QUALITY);
+      } catch {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
 // ---- IndexedDB helpers (mirrors Servicing approach) ----
 const DB_NAME = "maintenix";
 const STORE_CACHE = "calloutCache";
@@ -255,6 +315,7 @@ function migrateCalloutDraft(rec) {
 
 export default function CallOut() {
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const correctionContext = useMemo(() => readCorrectionContextFromHash(), []);
 
   useEffect(() => {
     const onOn = () => setOnline(true);
@@ -398,7 +459,25 @@ export default function CallOut() {
     const files = Array.from(fileList || []);
     if (!files.length) return;
 
-    const readers = files.map(
+    const preparedFiles = [];
+    for (const f of files) {
+      if (!String(f?.type || "").startsWith("image/")) {
+        setBanner({ show: true, variant: "warning", text: "Please select image files only." });
+        continue;
+      }
+      if (f.size > CLIENT_MAX_PHOTO_BYTES) {
+        setBanner({ show: true, variant: "warning", text: `Skipped ${f.name || "photo"}: too large (${bytesToMb(f.size)}MB).` });
+        continue;
+      }
+      const prepared = await compressImageFile(f);
+      if (prepared?.size > CLIENT_MAX_PHOTO_BYTES) {
+        setBanner({ show: true, variant: "warning", text: `Skipped ${f.name || "photo"}: still too large after compression (${bytesToMb(prepared.size)}MB).` });
+        continue;
+      }
+      preparedFiles.push(prepared);
+    }
+
+    const readers = preparedFiles.map(
       (f) =>
         new Promise((resolve) => {
           const r = new FileReader();
@@ -410,12 +489,13 @@ export default function CallOut() {
               dataUrl: String(r.result || ""),
               description: ""
             });
+          r.onerror = () => resolve(null);
           r.readAsDataURL(f);
         })
     );
 
-    const newOnes = await Promise.all(readers);
-    setPhotos((prev) => [...(prev || []), ...newOnes]);
+    const newOnes = (await Promise.all(readers)).filter(Boolean);
+    if (newOnes.length) setPhotos((prev) => [...(prev || []), ...newOnes]);
 
     // allow re-selecting the same file
     try {
@@ -474,6 +554,8 @@ export default function CallOut() {
       jobcardCreated: jobcardCreated || "",
       jobcardNumber: jobcardCreated === "YES" ? (jobcardNumber || "") : "",
       noJobcardReason: jobcardCreated === "NO" ? (noJobcardReason || "") : "",
+      correctionOfReport: correctionContext?.correctionOf || "",
+      correctionReason: correctionContext?.reason || "",
 
       photos: (photos || []).map(sanitizePhotoForStorage)
     };
@@ -933,6 +1015,13 @@ export default function CallOut() {
           dismissible
         >
           {banner.text}
+        </Alert>
+      ) : null}
+
+      {correctionContext ? (
+        <Alert variant="warning" className="mb-3">
+          Creating corrected follow-up for <strong>{correctionContext.correctionOf}</strong>
+          {correctionContext.reason ? <div className="mt-1">Reject reason: {correctionContext.reason}</div> : null}
         </Alert>
       ) : null}
 

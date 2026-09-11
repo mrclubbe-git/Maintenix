@@ -35,36 +35,6 @@ function toYmd(d) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function readNotifications() {
-  const raw = safeJsonParse(localStorage.getItem("appNotifications") || "[]", []);
-  return Array.isArray(raw) ? raw : [];
-}
-
-function writeNotifications(items) {
-  localStorage.setItem("appNotifications", JSON.stringify(Array.isArray(items) ? items : []));
-  window.dispatchEvent(new Event("notificationsUpdated"));
-}
-
-function makeNotificationId() {
-  return `notif_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-function addGlobalNotification(message, type = "global_notice") {
-  const text = String(message || "").trim();
-  if (!text) return;
-
-  const items = readNotifications();
-  items.unshift({
-    id: makeNotificationId(),
-    type,
-    message: text,
-    createdAt: new Date().toISOString(),
-    global: true,
-    readBy: []
-  });
-  writeNotifications(items);
-}
-
 export default function Standby() {
   const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
   const role = authUser?.role || "";
@@ -207,26 +177,9 @@ export default function Standby() {
         return;
       }
 
-      const nextConfig = data.config || null;
-      const nextSchedule = Array.isArray(data.schedule) ? data.schedule : [];
-
-      setConfig(nextConfig);
-      setSchedule(nextSchedule);
+      setConfig(data.config || null);
+      setSchedule(Array.isArray(data.schedule) ? data.schedule : []);
       setNotice("Standby schedule created.");
-
-      const todayStr = toYmd(new Date());
-      const todayEntry =
-        nextSchedule.find((r) => {
-          const s = String(r?.startDate || "");
-          const e = String(r?.endDate || "");
-          return s && e && s <= todayStr && todayStr <= e;
-        }) || nextSchedule[0] || null;
-
-      if (todayEntry?.userName) {
-        addGlobalNotification(`"${todayEntry.userName}" on standby`, "standby_changed");
-      } else {
-        addGlobalNotification("Standby rotation updated", "standby_changed");
-      }
     } finally {
       setBusy(false);
     }
@@ -251,7 +204,6 @@ export default function Standby() {
       setConfig(null);
       setSchedule([]);
       setNotice("Standby schedule cleared.");
-      addGlobalNotification("Standby rotation cleared", "standby_cleared");
     } finally {
       setBusy(false);
     }

@@ -1,0 +1,31 @@
+MAINTENIX LIVE v1.2 SOURCE MIGRATION
+====================================
+
+This migration imports the supplied live v1.2 application functionality into the
+GitHub repository while intentionally retaining the GitHub development deployment
+layer.
+
+Preserved/adapted for GitHub development:
+- GitHub Pages homepage: https://mrclubbe-git.github.io/Maintenix
+- External API bootstrap and REACT_APP_API_BASE_URL handling
+- Default development API: https://dev-api.main-tenix.com
+- Local CRA proxy: http://localhost:5055
+- GitHub Pages CORS / OPTIONS handling in Server_API/index.js
+- Current /api/server/status endpoint and improved frontend diagnostics
+- Existing startAll.js API + worker launcher
+- GitHub Pages sub-path-safe offline service worker
+
+Imported from live v1.2 source:
+- Daily Planner
+- Section / Formal Reports
+- Persistent notifications
+- Persistent sessions
+- New report storage and locking helpers
+- Newer Reports, Pictures, Servicing, Call Out, Standby and Stock Control implementations
+- Newer offline preparation/session logic
+- v1.2.0 UI version
+
+The additional template package supplied on 2026-09-10 has also been incorporated,
+including servicing/report mapping JSON and all three formal-report DOCX master
+templates. See Server_API/LIVE_V1.2_DATA_REQUIREMENTS.txt for the remaining Linux
+runtime dependencies required by Formal Reporting.

@@ -3,7 +3,6 @@ import {
   Row,
   Col,
   Card,
-  Table,
   Badge,
   Button,
   Form,
@@ -716,7 +715,7 @@ function openMove(i, type) {
 
   return (
     <>
-      <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
+      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center py-4" style={{ gap: 12 }}>
         <div>
           <h4 className="mb-0">Stock Control</h4>
           <small className="text-muted">Inventory</small>
@@ -725,10 +724,10 @@ function openMove(i, type) {
         {/* Mobile: stack controls vertically (xs) so they stay inside the screen.
             Desktop: keep inline like original (sm+). */}
         <div
-          className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center"
-          style={{ gap: 8 }}
+          className="d-flex flex-column flex-sm-row flex-wrap align-items-stretch align-items-sm-center"
+          style={{ gap: 8, maxWidth: "100%" }}
         >
-          <div style={{ width: "min(170px, 100%)" }}>
+          <div style={{ width: "100%", maxWidth: 170 }}>
               <Form.Select
                 size="sm"
                 style={{ width: "100%" }}
@@ -743,7 +742,7 @@ function openMove(i, type) {
               </Form.Select>
             </div>
 
-          <div style={{ width: "min(190px, 100%)" }}>
+          <div style={{ width: "100%", maxWidth: 190 }}>
             <Form.Select
               size="sm"
               style={{ width: "100%" }}
@@ -762,7 +761,7 @@ function openMove(i, type) {
             </Form.Select>
           </div>
 
-          <div style={{ width: "min(320px, 100%)" }}>
+          <div style={{ width: "100%", maxWidth: 320 }}>
             <InputGroup size="sm" style={{ width: "100%" }}>
               <InputGroup.Text>
                 <FontAwesomeIcon icon={faSearch} />
@@ -787,7 +786,7 @@ function openMove(i, type) {
               await loadMovements();
             }}
             disabled={loading || refreshing}
-            style={{ width: "min(100%, 160px)" }}
+            style={{ width: "100%", maxWidth: 160 }}
           >
             <FontAwesomeIcon icon={faSyncAlt} className="me-2" />
             {refreshing ? "Refreshing…" : "Refresh"}
@@ -800,7 +799,7 @@ function openMove(i, type) {
               size="sm"
               onClick={openIssueBuilder}
               disabled={loading || refreshing}
-              style={{ width: "min(100%, 120px)" }}
+              style={{ width: "100%", maxWidth: 120 }}
             >
               Issue
             </Button>
@@ -812,7 +811,7 @@ function openMove(i, type) {
               size="sm"
               onClick={() => setShowAdd(true)}
               disabled={loading || refreshing}
-              style={{ width: "min(100%, 160px)" }}
+              style={{ width: "100%", maxWidth: 160 }}
             >
               <FontAwesomeIcon icon={faPlus} className="me-2" />
               Add item
@@ -851,7 +850,7 @@ function openMove(i, type) {
       </Row>
 
       <Card border="light" className="shadow-sm">
-        <Card.Header className="d-flex justify-content-between align-items-center">
+        <Card.Header className="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center" style={{ gap: 10 }}>
           <h5 className="mb-0">Inventory Items</h5>
           <div className="d-flex align-items-center" style={{ gap: 10 }}>
               {canDownloadCsv ? (
@@ -870,77 +869,84 @@ function openMove(i, type) {
             </div>
           ) : null}
 
-          <Table responsive className="table-centered table-nowrap mb-0 rounded">
-            <thead className="thead-light">
-              <tr>
-                <th className="border-0">Item</th>
-                <th className="border-0">UOM</th>
-                <th className="border-0">Qty</th>
-                <th className="border-0">Min</th>
-                <th className="border-0">Status</th>
-                <th className="border-0">Location</th>
-                <th className="border-0 text-end">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td className="p-3 text-muted" colSpan={7}>
-                    No items found.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((i) => (
-                  <tr key={i.id}>
-                    <td className="fw-bold">{i.name}</td>
-                    <td>{i.unit || "-"}</td>
-                    <td>{Number(i.qty || 0)}</td>
-                    <td>{Number(i.minQty || 0)}</td>
-                    <td>{statusBadge(i)}</td>
-                    <td>{i.location || "-"}</td>
-                    <td className="text-end">
-                      {(canReceive || canAdjust || canEditItem || canDelete) ? (
-                        <div className="d-inline-flex" style={{ gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                          {canReceive ? (
-                          <Button size="sm" variant="outline-success" onClick={() => openMove(i, "RECEIVE")}>
-                            <FontAwesomeIcon icon={faArrowDown} className="me-2" />
-                            Receive
-                          </Button>
+          <div className="p-3">
+            {filtered.length === 0 ? (
+              <div className="text-muted py-4 text-center">No items found.</div>
+            ) : (
+              <Row className="g-3">
+                {filtered.map((i) => (
+                  <Col key={i.id} xs={12}>
+                    <Card border="light" className="shadow-sm h-100">
+                      <Card.Body>
+                        <div className="d-md-none">
+                          <div className="d-flex justify-content-between align-items-start" style={{ gap: 10 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div className="fw-bold text-break">{i.name}</div>
+                              <div className="small text-muted text-break">{i.location || "No location"} · {i.unit || "unit"}</div>
+                            </div>
+                            {statusBadge(i)}
+                          </div>
+
+                          <Row className="mt-3 text-center">
+                            <Col xs={4}>
+                              <div className="text-muted small">UOM</div>
+                              <div className="h6 mb-0 text-truncate">{i.unit || "-"}</div>
+                            </Col>
+                            <Col xs={4}>
+                              <div className="text-muted small">Min Qty</div>
+                              <div className="h5 mb-0">{Number(i.minQty || 0)}</div>
+                            </Col>
+                            <Col xs={4}>
+                              <div className="text-muted small">Qty</div>
+                              <div className="h4 mb-0">{Number(i.qty || 0)}</div>
+                            </Col>
+                          </Row>
+                        </div>
+
+                        <div className="d-none d-md-flex align-items-start" style={{ gap: 14 }}>
+                          <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                            <div className="fw-bold text-break">{i.name}</div>
+                            <div className="small text-muted text-break">{i.location || "No location"}</div>
+                          </div>
+                          <div className="d-flex align-items-start flex-wrap justify-content-end" style={{ gap: 8, flex: "0 0 auto", maxWidth: "52%" }}>
+                            <Badge bg="light" text="dark" className="px-3 py-2">UOM: {i.unit || "-"}</Badge>
+                            <Badge bg="light" text="dark" className="px-3 py-2">Min Qty: {Number(i.minQty || 0)}</Badge>
+                            <Badge bg="light" text="dark" className="px-3 py-2">Qty: {Number(i.qty || 0)}</Badge>
+                            {statusBadge(i)}
+                          </div>
+                        </div>
+
+                        {(canReceive || canAdjust || canEditItem || canDelete) ? (
+                          <div className="d-flex flex-wrap mt-3" style={{ gap: 8 }}>
+                            {canReceive ? (
+                              <Button size="sm" variant="outline-success" onClick={() => openMove(i, "RECEIVE")}>
+                                <FontAwesomeIcon icon={faArrowDown} className="me-2" />Receive
+                              </Button>
+                            ) : null}
+                            {canAdjust ? (
+                              <Button size="sm" variant="outline-primary" onClick={() => openMove(i, "ADJUST")}>
+                                <FontAwesomeIcon icon={faSlidersH} className="me-2" />Adjust
+                              </Button>
+                            ) : null}
+                            {canEditItem ? (
+                              <Button size="sm" variant="outline-secondary" onClick={() => openEdit(i)}>
+                                <FontAwesomeIcon icon={faEdit} className="me-2" />Edit
+                              </Button>
+                            ) : null}
+                            {canDelete ? (
+                              <Button size="sm" variant="outline-danger" onClick={() => deleteStockItem(i)}>
+                                <FontAwesomeIcon icon={faTrash} className="me-2" />Delete
+                              </Button>
+                            ) : null}
+                          </div>
                         ) : null}
-
-                          {/* ✅ Removed per-row "Issue" (Delivery Note is global list builder now) */}
-
-                          {canAdjust ? (
-                          <Button size="sm" variant="outline-primary" onClick={() => openMove(i, "ADJUST")}>
-                            <FontAwesomeIcon icon={faSlidersH} className="me-2" />
-                            Adjust
-                          </Button>
-                        ) : null}
-
-                          {canEditItem ? (
-                          <Button size="sm" variant="outline-secondary" onClick={() => openEdit(i)}>
-                            <FontAwesomeIcon icon={faEdit} className="me-2" />
-                            Edit
-                          </Button>
-                        ) : null}
-
-
-                          {canDelete ? (
-                            <Button size="sm" variant="outline-danger" onClick={() => deleteStockItem(i)}>
-                              <FontAwesomeIcon icon={faTrash} className="me-2" />
-                              Delete
-                            </Button>
-                          ) : null}
-</div>
-                      ) : (
-                        <span className="text-muted small">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </Table>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            )}
+          </div>
         </Card.Body>
       </Card>
 
@@ -986,45 +992,37 @@ function openMove(i, type) {
               </div>
             ) : null}
 
-            <Table responsive className="table-centered table-nowrap mb-0 rounded">
-              <thead className="thead-light">
-                <tr>
-                  <th className="border-0">When</th>
-                  <th className="border-0">Item</th>
-                  <th className="border-0">Type</th>
-                  <th className="border-0">From</th>
-                  <th className="border-0">To</th>
-                  <th className="border-0">By</th>
-                  <th className="border-0">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movements.length === 0 ? (
-                  <tr>
-                    <td className="p-3 text-muted" colSpan={7}>
-                      No movements yet.
-                    </td>
-                  </tr>
-                ) : (
-                  movements.slice(0, 30).map((m) => {
+            <div className="p-3">
+              {movements.length === 0 ? (
+                <div className="text-muted py-4 text-center">No movements yet.</div>
+              ) : (
+                <Row className="g-3">
+                  {movements.slice(0, 30).map((m) => {
                     const itemName = items.find((x) => x.id === m.itemId)?.name || m.itemId;
                     return (
-                      <tr key={m.id}>
-                        <td>{timeAgo(m.at)}</td>
-                        <td className="fw-bold">{itemName}</td>
-                        <td>{m.type || "-"}</td>
-                        <td>{Number(m.fromQty ?? 0)}</td>
-                        <td>{Number(m.toQty ?? 0)}</td>
-                        <td>{m.by || "-"}</td>
-                        <td style={{ maxWidth: 260, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {m.reason || "-"}
-                        </td>
-                      </tr>
+                      <Col key={m.id} xs={12}>
+                        <Card border="light" className="shadow-sm h-100">
+                          <Card.Body>
+                            <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <div className="fw-bold text-break">{itemName}</div>
+                                <div className="small text-muted">{timeAgo(m.at)} · {m.by || "Unknown user"}</div>
+                              </div>
+                              <Badge bg="light" text="dark">{m.type || "Movement"}</Badge>
+                            </div>
+                            <div className="d-flex flex-wrap mt-3" style={{ gap: 12 }}>
+                              <div><span className="text-muted small d-block">From</span><span className="fw-bold">{Number(m.fromQty ?? 0)}</span></div>
+                              <div><span className="text-muted small d-block">To</span><span className="fw-bold">{Number(m.toQty ?? 0)}</span></div>
+                              <div className="flex-grow-1"><span className="text-muted small d-block">Reason</span><span className="text-break">{m.reason || "-"}</span></div>
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
                     );
-                  })
-                )}
-              </tbody>
-            </Table>
+                  })}
+                </Row>
+              )}
+            </div>
           </Card.Body>
         </Card>
       ) : null}

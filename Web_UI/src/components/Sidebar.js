@@ -3,7 +3,7 @@ import SimpleBar from "simplebar-react";
 import { useLocation, Link } from "react-router-dom";
 import { CSSTransition } from "react-transition-group";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faImage, faBoxes, faChartPie, faCog, faFileAlt, faSignOutAlt, faTimes, faClipboardList, faPhoneSquare, faCalendarAlt} from "@fortawesome/free-solid-svg-icons";
+import { faImage, faBoxes, faChartPie, faCog, faFileAlt, faSignOutAlt, faTimes, faClipboardList, faPhoneSquare, faCalendarAlt, faStickyNote} from "@fortawesome/free-solid-svg-icons";
 import { Nav, Badge, Image, Button, Navbar } from "@themesberg/react-bootstrap";
 
 import { Routes } from "../routes";
@@ -121,7 +121,9 @@ export default function Sidebar(props = {}) {
               <NavItem title="Servicing" link={Routes.Servicing.path} icon={faClipboardList} />
               <NavItem title="Call Out" link={Routes.CallOut.path} icon={faPhoneSquare} />
               <NavItem title="Standby" link={Routes.Standby.path} icon={faCalendarAlt} />
+              <NavItem title="Daily Planner" link={Routes.DailyPlanner.path} icon={faStickyNote} />
               <NavItem title="Reports" link={Routes.Reports.path} icon={faFileAlt} />
+              <NavItem title="Section Reports" link={Routes.SectionReports.path} icon={faFileAlt} />
               <NavItem title="Pictures" link={Routes.Pictures.path} icon={faImage} />
               <NavItem title="Stock Control" link={Routes.StockControl.path} icon={faBoxes} />
               <NavItem title="Settings" icon={faCog} link={Routes.Settings.path} />

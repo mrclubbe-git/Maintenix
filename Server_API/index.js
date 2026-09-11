@@ -16,6 +16,9 @@ const servicingRoutes = require("./routes/servicing");
 const photosRoutes = require("./routes/photos");
 const calloutRoutes = require("./routes/callout");
 const standbyRoutes = require("./routes/standby");
+const notificationsRoutes = require("./routes/notifications");
+const dailyPlannerRoutes = require("./routes/dailyPlanner");
+const formalReportsRoutes = require("./routes/formalReports");
 
 const app = express();
 
@@ -59,8 +62,8 @@ app.use((req, res, next) => {
  * ✅ Increase request body limits for base64 uploads (profile photos, etc.)
  * Base64 inflates size, so default limits can cause 500 errors.
  */
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+app.use(express.json({ limit: "75mb" }));
+app.use(express.urlencoded({ extended: true, limit: "75mb" }));
 
 // Serve uploaded files (profile pics, report photos, reports, etc.)
 app.use("/uploads", express.static(path.join(__dirname, "data", "uploads")));
@@ -77,6 +80,9 @@ app.use("/api/servicing", servicingRoutes);
 app.use("/api/photos", photosRoutes);
 app.use("/api/callout", calloutRoutes);
 app.use("/api/standby", standbyRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/daily-planner", dailyPlannerRoutes);
+app.use("/api/formal-reports", formalReportsRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
@@ -175,6 +181,7 @@ app.get("/api/server/status", (_req, res) => {
 });
 
 const PORT = process.env.PORT || 5055;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Maintenix server API listening on 0.0.0.0:${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0";
+app.listen(PORT, HOST, () => {
+  console.log(`Maintenix server API listening on ${HOST}:${PORT}`);
 });

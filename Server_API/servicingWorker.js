@@ -73,6 +73,10 @@ function buildDownloadUrl(fileName) {
   return `/api/servicing/download/${encodeURIComponent(fileName)}`;
 }
 
+function buildDownloadUrlForPath(relativePath) {
+  return `/api/servicing/download?path=${encodeURIComponent(relativePath)}`;
+}
+
 function pickNonEmpty(...values) {
   for (const v of values) {
     const s = String(v || "").trim();
@@ -215,7 +219,7 @@ async function processOne(jobFile) {
       writeJsonFileAtomic(reportsMeta, meta);
     };
 
-    const { fileName, url } = await generateServicingDocx({
+    const { fileName, relativePath, url } = await generateServicingDocx({
       reportId,
       payload: {
         ...stored.payload,
@@ -244,9 +248,10 @@ async function processOne(jobFile) {
     // If generator still returned a fallback name, but we have an expected deterministic name,
     // rename the output file on disk and update status result accordingly.
     let finalFileName = fileName;
-    let finalUrl = url;
+    let finalRelativePath = relativePath || "";
+    let finalUrl = url || (finalRelativePath ? buildDownloadUrlForPath(finalRelativePath) : buildDownloadUrl(fileName));
 
-    if (expectedName && fileName && expectedName !== fileName) {
+    if (!finalRelativePath && expectedName && fileName && expectedName !== fileName) {
       try {
         const fromPath = path.join(stored.reportsDir, fileName);
         const toPath = path.join(stored.reportsDir, expectedName);
@@ -303,7 +308,7 @@ async function processOne(jobFile) {
     writeStatus(userKey, reportId, {
       status: "done",
       doneAt: new Date().toISOString(),
-      result: { fileName: finalFileName, url: finalUrl },
+      result: { fileName: finalFileName, relativePath: finalRelativePath, url: finalUrl },
       owner: resolvedOwner,
       ownerEmail,
       error: ""

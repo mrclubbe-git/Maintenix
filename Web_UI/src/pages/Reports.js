@@ -3,7 +3,6 @@ import {
   Col,
   Row,
   Card,
-  Table,
   Badge,
   Button,
   Dropdown,
@@ -14,7 +13,7 @@ import {
   InputGroup
 } from "@themesberg/react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDownload, faFilter, faSearch, faSyncAlt, faEye, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faDownload, faFileArchive, faFilter, faSearch, faSyncAlt, faEye, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 const RANGE = {
   ALL: "all",
@@ -36,6 +35,18 @@ const STATUS_LABEL = {
   [STATUS.PENDING]: "Pending",
   [STATUS.APPROVED]: "Approved",
   [STATUS.DENIED]: "Rejected"
+};
+
+const REPORT_TYPE = {
+  ALL: "ALL",
+  CALLOUT: "CALLOUT",
+  SERVICING: "SERVICING"
+};
+
+const REPORT_TYPE_LABEL = {
+  [REPORT_TYPE.ALL]: "All Reports",
+  [REPORT_TYPE.CALLOUT]: "Callout Reports",
+  [REPORT_TYPE.SERVICING]: "Service Reports"
 };
 
 const RANGE_LABEL = {
@@ -114,6 +125,20 @@ function extractTargetUserEmail(reportRow) {
   return String(reportRow?.owner?.email || reportRow?.ownerEmail || "").trim().toLowerCase();
 }
 
+function getReportTypeForRow(reportRow) {
+  const explicitType = String(reportRow?.reportType || reportRow?.type || "").trim().toUpperCase();
+  if (explicitType === REPORT_TYPE.SERVICING || explicitType === "SERVICE") return REPORT_TYPE.SERVICING;
+  if (explicitType === REPORT_TYPE.CALLOUT || explicitType === "CALL_OUT" || explicitType === "CALL-OUT") return REPORT_TYPE.CALLOUT;
+
+  const fileName = String(reportRow?.fileName || "").trim();
+  if (/^Service_Report_/i.test(fileName)) return REPORT_TYPE.SERVICING;
+  if (/^callout(?:_|-|\b)/i.test(fileName) || /^(?:CallOut|Callout|Call_Out|Call-Out)_Report_/i.test(fileName)) {
+    return REPORT_TYPE.CALLOUT;
+  }
+
+  return "UNKNOWN";
+}
+
 function addUserSpecificRejectedNotification(reportRow, reportDisplayName) {
   const userEmail = extractTargetUserEmail(reportRow);
   if (!userEmail) return false;
@@ -135,32 +160,6 @@ function addUserSpecificRejectedNotification(reportRow, reportDisplayName) {
   return true;
 }
 
-function sanitizeFileName(name) {
-  return String(name || "report")
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function getMonthFolderFromDate(value) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "Unknown-Month";
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-}
-
-function triggerBrowserDownload(blob, fileName) {
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
-}
-
 export default function Reports() {
   const authToken = localStorage.getItem("authToken") || "";
   const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
@@ -168,14 +167,17 @@ export default function Reports() {
   const roleKey = String(authUser?.role || "").toUpperCase().replace(/\s+/g, "");
   const canModerate = roleKey === "ADMIN" || roleKey === "L2" || roleKey === "LEVEL2" || roleKey === "LEVEL_2";
   const canDelete = roleKey === "ADMIN";
+  const canDownloadZip = roleKey === "ADMIN" || roleKey === "L3" || roleKey === "LEVEL3" || roleKey === "LEVEL_3";
 
   const [range, setRange] = useState(RANGE.ALL);
   const [statusFilter, setStatusFilter] = useState(STATUS.ALL);
+  const [reportTypeFilter, setReportTypeFilter] = useState(REPORT_TYPE.ALL);
+  const [sectionFilter, setSectionFilter] = useState("ALL");
+  const [monthFilter, setMonthFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [bulkDownloading, setBulkDownloading] = useState(false);
   const [err, setErr] = useState("");
   const [reports, setReports] = useState([]);
 
@@ -183,6 +185,7 @@ export default function Reports() {
 
   const [updatingName, setUpdatingName] = useState("");
   const [viewingName, setViewingName] = useState("");
+  const [zipDownloading, setZipDownloading] = useState(false);
 
   const windowRange = useMemo(() => getRangeWindow(range), [range]);
 
@@ -196,7 +199,7 @@ export default function Reports() {
     (r) => {
       const stored = String(r?.fileName || "");
       const mapped = displayNameMap[stored];
-      return mapped || stored;
+      return mapped || String(r?.displayFileName || "") || stored;
     },
     [displayNameMap]
   );
@@ -291,7 +294,8 @@ export default function Reports() {
     try {
       const res = await fetch(`/api/reports/${encodeURIComponent(fileName)}/approve`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Approved by reviewer." })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) setErr(data?.message || `Approve failed (HTTP ${res.status}).`);
@@ -305,12 +309,18 @@ export default function Reports() {
 
   async function denyReport(fileName) {
     if (!authToken) return;
+    const reason = String(window.prompt("Reason for rejecting this report?") || "").trim();
+    if (!reason) {
+      setErr("Reject reason is required.");
+      return;
+    }
     setUpdatingName(fileName);
     setErr("");
     try {
       const res = await fetch(`/api/reports/${encodeURIComponent(fileName)}/deny`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ reason })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -368,11 +378,26 @@ export default function Reports() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken]);
 
+  const sectionOptions = useMemo(() => {
+    return Array.from(new Set(reports.map((r) => String(r.section || "").trim()).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [reports]);
+
+  const monthOptions = useMemo(() => {
+    return Array.from(new Set(reports.map((r) => String(r.reportMonth || "").trim()).filter(Boolean))).sort((a, b) =>
+      b.localeCompare(a)
+    );
+  }, [reports]);
+
   const filteredReports = useMemo(() => {
     const from = windowRange?.from?.getTime?.() ?? null;
     const to = windowRange?.to?.getTime?.() ?? null;
     const q = String(search || "").trim().toLowerCase();
     const want = String(statusFilter || "ALL").toUpperCase();
+    const wantType = String(reportTypeFilter || REPORT_TYPE.ALL).toUpperCase();
+    const wantSection = String(sectionFilter || "ALL");
+    const wantMonth = String(monthFilter || "ALL");
 
     return reports
       .filter((r) => {
@@ -387,13 +412,21 @@ export default function Reports() {
           if (s !== want) return false;
         }
 
+        if (wantType !== REPORT_TYPE.ALL && getReportTypeForRow(r) !== wantType) return false;
+
+        if (wantSection !== "ALL" && String(r.section || "") !== wantSection) return false;
+        if (wantMonth !== "ALL" && String(r.reportMonth || "") !== wantMonth) return false;
+
         if (!q) return true;
         const stored = String(r.fileName || "").toLowerCase();
         const display = String(getDisplayNameForRow(r) || "").toLowerCase();
-        return stored.includes(q) || display.includes(q);
+        const section = String(r.section || "").toLowerCase();
+        const month = String(r.reportMonth || "").toLowerCase();
+        const area = String(r.area || "").toLowerCase();
+        return stored.includes(q) || display.includes(q) || section.includes(q) || month.includes(q) || area.includes(q);
       })
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  }, [reports, windowRange, statusFilter, search, getDisplayNameForRow]);
+  }, [reports, windowRange, statusFilter, reportTypeFilter, sectionFilter, monthFilter, search, getDisplayNameForRow]);
 
   const summary = useMemo(() => {
     const total = filteredReports.length;
@@ -417,17 +450,26 @@ export default function Reports() {
     return "warning";
   }
 
-  async function fetchReportBlob(fileName) {
-    const res = await fetch(`/api/reports/file/${encodeURIComponent(fileName)}`, {
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
+  function decisionSummary(reportRow) {
+    const decision = reportRow?.approvalDecision || {};
+    const reason = String(decision.reason || reportRow?.rejectionReason || "").trim();
+    const who = String(decision.decidedByName || decision.decidedByEmail || decision.decidedBy || "").trim();
+    const when = decision.at ? formatDateTime(new Date(decision.at)) : "";
+    return { reason, who, when, source: String(decision.source || "").trim() };
+  }
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.message || `Download failed for ${fileName} (HTTP ${res.status}).`);
-    }
+  function correctionPath(reportRow) {
+    const type = getReportTypeForRow(reportRow);
+    const base = type === REPORT_TYPE.CALLOUT ? "/CallOut" : "/Servicing";
+    const params = new URLSearchParams();
+    params.set("correctionOf", String(reportRow?.fileName || ""));
+    const reason = String(reportRow?.approvalDecision?.reason || reportRow?.rejectionReason || "").trim();
+    if (reason) params.set("reason", reason);
+    return `${base}?${params.toString()}`;
+  }
 
-    return res.blob();
+  function startCorrection(reportRow) {
+    window.location.hash = correctionPath(reportRow);
   }
 
   async function downloadReport(fileName, downloadName) {
@@ -438,56 +480,29 @@ export default function Reports() {
 
     setErr("");
     try {
-      const blob = await fetchReportBlob(fileName);
-      triggerBrowserDownload(blob, downloadName || fileName);
-    } catch (error) {
-      setErr(error?.message || "Download failed (API not reachable).");
-    }
-  }
+      const res = await fetch(`/api/reports/file/${encodeURIComponent(fileName)}`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
 
-  async function downloadApprovedAndPendingZip() {
-    if (!authToken) {
-      setErr("You are not logged in. Please sign in again.");
-      return;
-    }
-
-    const rows = reports.filter((r) => {
-      const s = String(r?.status || "").toUpperCase();
-      return s === "APPROVED" || s === "PENDING";
-    });
-
-    if (rows.length === 0) {
-      setErr("No Approved or Pending reports were found.");
-      return;
-    }
-
-    setBulkDownloading(true);
-    setErr("");
-
-    try {
-      const { default: JSZip } = await import("jszip");
-      const zip = new JSZip();
-
-      for (const row of rows) {
-        const statusKey = String(row?.status || "").toUpperCase();
-        const statusFolder = statusKey === "APPROVED" ? "Approved" : "Pending";
-        const monthFolder = getMonthFolderFromDate(row?.createdAt);
-        const displayName = sanitizeFileName(getDisplayNameForRow(row) || row?.fileName || "report");
-
-        const blob = await fetchReportBlob(row.fileName);
-
-        const monthZipFolder = zip.folder(monthFolder);
-        const statusZipFolder = monthZipFolder.folder(statusFolder);
-        statusZipFolder.file(displayName, blob);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErr(data?.message || `Download failed (HTTP ${res.status}).`);
+        return;
       }
 
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      const stamp = new Date().toISOString().slice(0, 10);
-      triggerBrowserDownload(zipBlob, `reports_by_month_${stamp}.zip`);
-    } catch (error) {
-      setErr(error?.message || "Bulk download failed.");
-    } finally {
-      setBulkDownloading(false);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = downloadName || fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setErr("Download failed (API not reachable).");
     }
   }
 
@@ -531,21 +546,62 @@ export default function Reports() {
     }
   }
 
-  const emptyColSpan = 4;
+  async function downloadFilteredZip() {
+    if (!authToken) {
+      setErr("You are not logged in. Please sign in again.");
+      return;
+    }
+    if (!canDownloadZip) return;
+    if (filteredReports.length === 0) {
+      setErr("No reports match the active filters, so there is nothing to ZIP.");
+      return;
+    }
+
+    setZipDownloading(true);
+    setErr("");
+    try {
+      const files = filteredReports.map((r) => String(r.fileName || "")).filter(Boolean);
+      const res = await fetch("/api/reports/zip", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ files })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErr(data?.message || `ZIP download failed (HTTP ${res.status}).`);
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `maintenix-reports-${stamp}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setErr("ZIP download failed (API not reachable).");
+    } finally {
+      setZipDownloading(false);
+    }
+  }
 
   return (
     <>
-      <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
+      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center py-4" style={{ gap: 12 }}>
         <div>
           <h4 className="mb-0">Reports</h4>
           <small className="text-muted">
-            Server folder: <span className="fw-bold">data/uploads/reports</span>
+            Server folder: <span className="fw-bold">data/uploads/reports/&lt;section&gt;/&lt;month&gt;</span>
           </small>
         </div>
 
-        <ButtonGroup>
-          <Dropdown className="btn-toolbar me-2">
-            <Dropdown.Toggle as={Button} variant="outline-primary" size="sm">
+        <div className="reports-filter-actions">
+          <Dropdown className="btn-toolbar reports-filter-control">
+            <Dropdown.Toggle as={Button} variant="outline-primary" size="sm" className="w-100">
               <FontAwesomeIcon icon={faFilter} className="me-2" />
               {RANGE_LABEL[range]}
             </Dropdown.Toggle>
@@ -558,8 +614,8 @@ export default function Reports() {
             </Dropdown.Menu>
           </Dropdown>
 
-          <Dropdown className="btn-toolbar">
-            <Dropdown.Toggle as={Button} variant="outline-secondary" size="sm">
+          <Dropdown className="btn-toolbar reports-filter-control">
+            <Dropdown.Toggle as={Button} variant="outline-secondary" size="sm" className="w-100">
               Status: {STATUS_LABEL[statusFilter]}
             </Dropdown.Toggle>
             <Dropdown.Menu className="dashboard-dropdown dropdown-menu-end">
@@ -570,7 +626,52 @@ export default function Reports() {
               ))}
             </Dropdown.Menu>
           </Dropdown>
-        </ButtonGroup>
+
+          <Dropdown className="btn-toolbar reports-filter-control">
+            <Dropdown.Toggle as={Button} variant="outline-secondary" size="sm" className="w-100">
+              {REPORT_TYPE_LABEL[reportTypeFilter]}
+            </Dropdown.Toggle>
+            <Dropdown.Menu className="dashboard-dropdown dropdown-menu-end">
+              {Object.values(REPORT_TYPE).map((key) => (
+                <Dropdown.Item key={key} active={key === reportTypeFilter} onClick={() => setReportTypeFilter(key)}>
+                  {REPORT_TYPE_LABEL[key]}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown>
+
+          <Dropdown className="btn-toolbar reports-filter-control">
+            <Dropdown.Toggle as={Button} variant="outline-secondary" size="sm" className="w-100 text-truncate">
+              Section: {sectionFilter === "ALL" ? "All" : sectionFilter}
+            </Dropdown.Toggle>
+            <Dropdown.Menu className="dashboard-dropdown dropdown-menu-end">
+              <Dropdown.Item active={sectionFilter === "ALL"} onClick={() => setSectionFilter("ALL")}>
+                All sections
+              </Dropdown.Item>
+              {sectionOptions.map((section) => (
+                <Dropdown.Item key={section} active={section === sectionFilter} onClick={() => setSectionFilter(section)}>
+                  {section}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown>
+
+          <Dropdown className="btn-toolbar reports-filter-control">
+            <Dropdown.Toggle as={Button} variant="outline-secondary" size="sm" className="w-100">
+              Month: {monthFilter === "ALL" ? "All" : monthFilter}
+            </Dropdown.Toggle>
+            <Dropdown.Menu className="dashboard-dropdown dropdown-menu-end">
+              <Dropdown.Item active={monthFilter === "ALL"} onClick={() => setMonthFilter("ALL")}>
+                All months
+              </Dropdown.Item>
+              {monthOptions.map((month) => (
+                <Dropdown.Item key={month} active={month === monthFilter} onClick={() => setMonthFilter(month)}>
+                  {month}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown>
+        </div>
       </div>
 
       {err ? <Alert variant="danger">{err}</Alert> : null}
@@ -625,7 +726,7 @@ export default function Reports() {
       <Row>
         <Col xs={12}>
           <Card border="light" className="shadow-sm">
-            <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 8 }}>
+            <Card.Header className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center" style={{ gap: 10 }}>
               <h5 className="mb-0">Report Files</h5>
 
               <div
@@ -638,40 +739,33 @@ export default function Reports() {
                       <FontAwesomeIcon icon={faSearch} />
                     </InputGroup.Text>
                     <Form.Control
-                      placeholder="Search filename…"
+                      placeholder="Search filename, section, month, or area…"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      disabled={loading || refreshing || bulkDownloading}
+                      disabled={loading || refreshing}
                     />
                   </InputGroup>
                 </div>
 
-                <Button
-                  variant="outline-success"
-                  size="sm"
-                  onClick={downloadApprovedAndPendingZip}
-                  disabled={loading || refreshing || bulkDownloading}
-                  title="Download all Approved and Pending reports into month folders"
-                  style={{ width: "min(100%, 280px)" }}
-                >
-                  {bulkDownloading ? (
-                    <>
-                      <Spinner size="sm" className="me-2" />
-                      Building ZIP…
-                    </>
-                  ) : (
-                    <>
-                      <FontAwesomeIcon icon={faDownload} className="me-2" />
-                      Download Approved + Pending ZIP
-                    </>
-                  )}
-                </Button>
+                {canDownloadZip ? (
+                  <Button
+                    variant="outline-success"
+                    size="sm"
+                    onClick={downloadFilteredZip}
+                    disabled={loading || refreshing || zipDownloading || filteredReports.length === 0}
+                    title="Download currently filtered reports as a ZIP with section/month folders"
+                    style={{ width: "min(100%, 190px)" }}
+                  >
+                    <FontAwesomeIcon icon={faFileArchive} className="me-2" />
+                    {zipDownloading ? "Preparing ZIP…" : `Download ZIP (${filteredReports.length})`}
+                  </Button>
+                ) : null}
 
                 <Button
                   variant="outline-primary"
                   size="sm"
                   onClick={() => loadReports({ isManual: true })}
-                  disabled={loading || refreshing || bulkDownloading}
+                  disabled={loading || refreshing}
                   title="Refresh list"
                   style={{ width: "min(100%, 160px)" }}
                 >
@@ -688,150 +782,97 @@ export default function Reports() {
                 </div>
               ) : null}
 
-              <Table responsive className="table-centered table-nowrap mb-0 rounded">
-                <thead className="thead-light">
-                  <tr>
-                    <th className="border-0">Report</th>
-                    <th className="border-0">Date</th>
-                    <th className="border-0">Approval status</th>
-                    <th className="border-0 text-end">Actions</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredReports.length === 0 ? (
-                    <tr>
-                      <td colSpan={emptyColSpan} className="text-center text-muted py-4">
-                        No reports found for this filter selection.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredReports.map((r) => {
+              <div className="p-3">
+                {filteredReports.length === 0 ? (
+                  <div className="text-center text-muted py-4">No reports found for this filter selection.</div>
+                ) : (
+                  <Row className="g-3">
+                    {filteredReports.map((r) => {
                       const statusKey = String(r.status || "").toUpperCase();
                       const busy = updatingName === r.fileName;
                       const isViewingThis = viewingName === r.fileName;
+                      const decision = decisionSummary(r);
 
                       return (
-                        <tr key={r.fileName}>
-                          <td className="fw-bold" title={r.fileName}>
-                            {getDisplayNameForRow(r)}
-                          </td>
-                          <td>{formatDateTime(new Date(r.createdAt))}</td>
+                        <Col key={r.fileName} xs={12}>
+                          <Card border="light" className="shadow-sm h-100">
+                            <Card.Body>
+                              <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
+                                <div style={{ minWidth: 0, flex: "1 1 280px" }}>
+                                  <div className="fw-bold text-break" title={r.fileName}>{getDisplayNameForRow(r)}</div>
+                                  <div className="d-flex flex-wrap mt-2" style={{ gap: 6 }}>
+                                    <Badge bg="secondary">{r.section || "No section"}</Badge>
+                                    {decision.source ? <Badge bg="light" text="dark">Decision: {decision.source}</Badge> : null}
+                                    {r.correctionOfReport ? <Badge bg="info">Correction</Badge> : null}
+                                  </div>
+                                  {r.correctionOfReport ? (
+                                    <div className="mt-2 small text-muted text-break">
+                                      Corrects: {r.correctionOfReport}
+                                    </div>
+                                  ) : null}
+                                  {(decision.when || decision.who || decision.reason) ? (
+                                    <div className="mt-2 small text-muted">
+                                      {decision.when || decision.who ? (
+                                        <div>
+                                          Last decision{decision.who ? ` by ${decision.who}` : ""}{decision.when ? ` on ${decision.when}` : ""}
+                                        </div>
+                                      ) : null}
+                                      {decision.reason ? <div className="text-break">Reason: {decision.reason}</div> : null}
+                                    </div>
+                                  ) : null}
+                                </div>
 
-                          <td>
-                            {canModerate ? (
-                              <Dropdown as={ButtonGroup} size="sm">
-                                <Button variant={approvalVariant(r.status)} disabled={busy || bulkDownloading}>
-                                  {approvalLabel(r.status)}
-                                </Button>
-                                <Dropdown.Toggle split variant={approvalVariant(r.status)} disabled={busy || bulkDownloading} />
-                                <Dropdown.Menu className="dashboard-dropdown dropdown-menu-end">
-                                  <Dropdown.Item
-                                    disabled={statusKey === "APPROVED"}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      approveReport(r.fileName);
-                                    }}
-                                  >
-                                    <span role="img" aria-label="approve" className="me-2">
-                                      ✅
-                                    </span>
-                                    Approve
-                                  </Dropdown.Item>
+                                <div className="text-muted small text-end" style={{ flex: "0 0 auto" }}>
+                                  {formatDateTime(new Date(r.createdAt))}
+                                </div>
+                              </div>
 
-                                  <Dropdown.Item
-                                    disabled={statusKey === "DENIED"}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      denyReport(r.fileName);
-                                    }}
-                                  >
-                                    <span role="img" aria-label="reject" className="me-2">
-                                      ❌
-                                    </span>
-                                    Reject
-                                  </Dropdown.Item>
-                                </Dropdown.Menu>
-                              </Dropdown>
-                            ) : (
-                              <Badge bg={approvalVariant(r.status)}>{approvalLabel(r.status)}</Badge>
-                            )}
+                              <div className="d-flex justify-content-between align-items-center flex-wrap mt-3" style={{ gap: 8 }}>
+                                <div>
+                                  {canModerate ? (
+                                    <Dropdown as={ButtonGroup} size="sm">
+                                      <Button variant={approvalVariant(r.status)} disabled={busy}>{approvalLabel(r.status)}</Button>
+                                      <Dropdown.Toggle split variant={approvalVariant(r.status)} disabled={busy} />
+                                      <Dropdown.Menu className="dashboard-dropdown dropdown-menu-end">
+                                        <Dropdown.Item disabled={statusKey === "APPROVED"} onClick={(e) => { e.preventDefault(); e.stopPropagation(); approveReport(r.fileName); }}>
+                                          <span role="img" aria-label="approve" className="me-2">✅</span>Approve
+                                        </Dropdown.Item>
+                                        <Dropdown.Item disabled={statusKey === "DENIED"} onClick={(e) => { e.preventDefault(); e.stopPropagation(); denyReport(r.fileName); }}>
+                                          <span role="img" aria-label="reject" className="me-2">❌</span>Reject
+                                        </Dropdown.Item>
+                                      </Dropdown.Menu>
+                                    </Dropdown>
+                                  ) : null}
+                                  {busy ? <span className="ms-2 text-muted small"><Spinner size="sm" className="me-1" />Updating…</span> : null}
+                                </div>
 
-                            {busy ? (
-                              <span className="ms-2 text-muted">
-                                <Spinner size="sm" className="me-1" />
-                                Updating…
-                              </span>
-                            ) : null}
-                          </td>
-
-                          <td className="text-end">
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              className="me-2"
-                              title="View"
-                              disabled={!!viewingName || bulkDownloading}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                viewReport(r.fileName);
-                              }}
-                            >
-                              {isViewingThis ? (
-                                <>
-                                  <Spinner size="sm" className="me-2" />
-                                  Generating…
-                                </>
-                              ) : (
-                                <>
-                                  <FontAwesomeIcon icon={faEye} className="me-2" />
-                                  View
-                                </>
-                              )}
-                            </Button>
-
-                            {canDelete ? (
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                className="me-2"
-                                title="Delete (Admin only)"
-                                disabled={busy || isViewingThis || bulkDownloading}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  deleteReport(r.fileName, getDisplayNameForRow(r));
-                                }}
-                              >
-                                <FontAwesomeIcon icon={faTrash} className="me-2" />
-                                Delete
-                              </Button>
-                            ) : null}
-
-                            <Button
-                              variant="outline-primary"
-                              size="sm"
-                              title="Download"
-                              disabled={isViewingThis || bulkDownloading}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                downloadReport(r.fileName, getDisplayNameForRow(r));
-                              }}
-                            >
-                              <FontAwesomeIcon icon={faDownload} className="me-2" />
-                              Download
-                            </Button>
-                          </td>
-                        </tr>
+                                <div className="d-flex flex-wrap justify-content-end" style={{ gap: 8 }}>
+                                  <Button variant="outline-secondary" size="sm" title="View" disabled={!!viewingName} onClick={(e) => { e.preventDefault(); e.stopPropagation(); viewReport(r.fileName); }}>
+                                    {isViewingThis ? <><Spinner size="sm" className="me-2" />Generating…</> : <><FontAwesomeIcon icon={faEye} className="me-2" />View</>}
+                                  </Button>
+                                  <Button variant="outline-primary" size="sm" title="Download" disabled={isViewingThis} onClick={(e) => { e.preventDefault(); e.stopPropagation(); downloadReport(r.fileName, getDisplayNameForRow(r)); }}>
+                                    <FontAwesomeIcon icon={faDownload} className="me-2" />Download
+                                  </Button>
+                                  {statusKey === "DENIED" ? (
+                                    <Button variant="outline-warning" size="sm" title="Create corrected follow-up" disabled={busy || isViewingThis} onClick={(e) => { e.preventDefault(); e.stopPropagation(); startCorrection(r); }}>
+                                      <FontAwesomeIcon icon={faSyncAlt} className="me-2" />Correct
+                                    </Button>
+                                  ) : null}
+                                  {canDelete ? (
+                                    <Button variant="outline-danger" size="sm" title="Delete (Admin only)" disabled={busy || isViewingThis} onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteReport(r.fileName, getDisplayNameForRow(r)); }}>
+                                      <FontAwesomeIcon icon={faTrash} className="me-2" />Delete
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </Card.Body>
+                          </Card>
+                        </Col>
                       );
-                    })
-                  )}
-                </tbody>
-              </Table>
+                    })}
+                  </Row>
+                )}
+              </div>
 
               <div className="p-3 text-muted small">
                 Logged in as: <span className="fw-bold">{authUser?.email || "unknown"}</span>

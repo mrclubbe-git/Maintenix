@@ -5,6 +5,7 @@ const path = require("path");
 
 const { getSession, extractBearer } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
+const { createNotification, userLabel } = require("../lib/notifications");
 
 const router = express.Router();
 
@@ -211,6 +212,24 @@ router.post("/schedule", requireAdminOrL3, (req, res) => {
 
     writeDb({ config, schedule: out.schedule });
 
+    try {
+      const first = out.schedule[0];
+      const last = out.schedule[out.schedule.length - 1];
+      createNotification({
+        type: "STANDBY_CHANGE",
+        scope: "GLOBAL",
+        title: "Standby rotation updated",
+        message: `Standby rotation was updated by ${userLabel(req.user)} for ${config.startDate} to ${config.endDate}. Current first rotation: ${first?.userName || "—"}${first ? ` (${first.startDate} to ${first.endDate})` : ""}.`,
+        severity: "info",
+        createdByUserId: req.user?.id || "",
+        createdByEmail: req.user?.email || "",
+        createdByName: userLabel(req.user),
+        relatedEntityType: "standby",
+        relatedEntityId: `${config.startDate}:${config.endDate}`,
+        actionUrl: "#/standby"
+      });
+    } catch {}
+
     return res.json({ ok: true, config, schedule: out.schedule });
   } catch {
     return res.status(500).json({ ok: false, message: "Failed to create standby schedule." });
@@ -219,9 +238,24 @@ router.post("/schedule", requireAdminOrL3, (req, res) => {
 
 // DELETE /api/standby/schedule (Admin/L3 only)
 // Clears the current standby config + schedule.
-router.delete("/schedule", requireAdminOrL3, (_req, res) => {
+router.delete("/schedule", requireAdminOrL3, (req, res) => {
   try {
     writeDb({ config: null, schedule: [] });
+    try {
+      createNotification({
+        type: "STANDBY_CHANGE",
+        scope: "GLOBAL",
+        title: "Standby rotation cleared",
+        message: `Standby rotation was cleared by ${userLabel(req.user)}.`,
+        severity: "warning",
+        createdByUserId: req.user?.id || "",
+        createdByEmail: req.user?.email || "",
+        createdByName: userLabel(req.user),
+        relatedEntityType: "standby",
+        relatedEntityId: "cleared",
+        actionUrl: "#/standby"
+      });
+    } catch {}
     return res.json({ ok: true, message: "Standby schedule cleared." });
   } catch {
     return res.status(500).json({ ok: false, message: "Failed to clear standby schedule." });

@@ -33,9 +33,15 @@ function main() {
 
   const outDir = path.join(root, "src");
   const outPath = path.join(outDir, "appVersion.js");
+  const publicDir = path.join(root, "public");
+  const publicVersionPath = path.join(publicDir, "version.json");
 
   if (!fs.existsSync(outDir)) {
     console.error("ERROR: src/ folder not found. Expected:", outDir);
+    process.exit(1);
+  }
+  if (!fs.existsSync(publicDir)) {
+    console.error("ERROR: public/ folder not found. Expected:", publicDir);
     process.exit(1);
   }
 
@@ -49,6 +55,14 @@ function main() {
 
   fs.writeFileSync(outPath, contents, "utf8");
   console.log("Wrote version file:", outPath);
+
+  const publicVersion = {
+    version,
+    gitSha,
+    buildTime
+  };
+  fs.writeFileSync(publicVersionPath, `${JSON.stringify(publicVersion, null, 2)}\n`, "utf8");
+  console.log("Wrote public version file:", publicVersionPath);
 }
 
 main();

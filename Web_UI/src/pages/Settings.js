@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { Routes } from "../routes";
 import Profile3 from "../assets/img/team/profile-picture-3.jpg";
+import { clearOfflineModeCache, notifyOfflineTokenLoaded, storeOfflineSession, warmOfflineMode } from "../offlineMode";
 
 function safeJsonParse(str, fallback = null) {
   try {
@@ -29,9 +30,12 @@ export default function Settings() {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingPhoto, setSavingPhoto] = useState(false);
+  const [warmingOffline, setWarmingOffline] = useState(false);
+  const [clearingOfflineCache, setClearingOfflineCache] = useState(false);
 
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
+  const [offlineMsg, setOfflineMsg] = useState("");
 
   const [profile, setProfile] = useState({
     name: storedUser?.name || "",
@@ -213,6 +217,55 @@ export default function Settings() {
     }
   }
 
+  async function prepareOfflineMode() {
+    if (!authToken) {
+      setErr("Not logged in.");
+      return;
+    }
+
+    setWarmingOffline(true);
+    setErr("");
+    setOkMsg("");
+    setOfflineMsg("");
+
+    try {
+      const summary = await warmOfflineMode(authToken);
+      const currentUser = safeJsonParse(localStorage.getItem("authUser") || "null", storedUser || {});
+      const ttlMs = 7 * 24 * 60 * 60 * 1000;
+      storeOfflineSession(authToken, currentUser, ttlMs);
+      notifyOfflineTokenLoaded(currentUser);
+
+      const cached = summary.cached.length ? summary.cached.join(", ") : "offline data";
+      const failed = summary.failed.length ? ` Some items could not be refreshed: ${summary.failed.join(", ")}.` : "";
+      setOfflineMsg(`Offline mode prepared. Cached: ${cached}.${failed}`);
+    } catch (e) {
+      setErr(String(e?.message || "Failed to prepare offline mode."));
+    } finally {
+      setWarmingOffline(false);
+    }
+  }
+
+  async function clearOfflineCache() {
+    const confirmed = window.confirm(
+      "Clear offline cache on this device?\n\nThis removes prepared offline data and the 7 day offline token, but keeps queued jobs."
+    );
+    if (!confirmed) return;
+
+    setClearingOfflineCache(true);
+    setErr("");
+    setOkMsg("");
+    setOfflineMsg("");
+
+    try {
+      const cleared = await clearOfflineModeCache();
+      setOfflineMsg(`Offline cache cleared: ${cleared.join(", ")}.`);
+    } catch (e) {
+      setErr(String(e?.message || "Failed to clear offline cache."));
+    } finally {
+      setClearingOfflineCache(false);
+    }
+  }
+
   // ------------------------------------------------------------
   // Admin widget: user management
   // ------------------------------------------------------------
@@ -357,8 +410,9 @@ export default function Settings() {
 
       {err ? <Alert variant="danger">{err}</Alert> : null}
       {okMsg ? <Alert variant="success">{okMsg}</Alert> : null}
+      {offlineMsg ? <Alert variant="success">{offlineMsg}</Alert> : null}
 
-      <Row>
+      <Row className="g-4">
         <Col xs={12} xl={4}>
           <Card border="light" className="shadow-sm mb-4">
             <Card.Body className="text-center">
@@ -370,9 +424,9 @@ export default function Settings() {
                 className="user-avatar xl-avatar mb-3 rounded-circle"
               />
 
-              <h5 className="mb-1">{safeProfile.name || safeProfile.email || "User"}</h5>
+              <h5 className="mb-1 text-break">{safeProfile.name || safeProfile.email || "User"}</h5>
 
-              <div className="text-muted small">
+              <div className="text-muted small text-break">
                 {safeProfile.role ? String(safeProfile.role).toUpperCase() : "USER"}
                 {safeProfile.status ? ` • ${safeProfile.status}` : ""}
               </div>
@@ -400,11 +454,42 @@ export default function Settings() {
               <div className="text-muted small mt-2">PNG / JPG / WEBP • Max 2MB</div>
             </Card.Body>
           </Card>
+
+          <Card border="light" className="shadow-sm mb-4">
+            <Card.Header>
+              <h5 className="mb-0">Offline Mode</h5>
+            </Card.Header>
+            <Card.Body>
+              <p className="text-muted small mb-3">
+                Cache servicing areas, services, and checklists on this device before going onsite.
+              </p>
+              <div className="d-flex flex-wrap gap-2">
+                <Button variant="outline-primary" size="sm" onClick={prepareOfflineMode} disabled={warmingOffline || loadingProfile}>
+                  {warmingOffline ? (
+                    <>
+                      <Spinner size="sm" className="me-2" /> Preparing…
+                    </>
+                  ) : (
+                    "Prepare Offline Mode"
+                  )}
+                </Button>
+                <Button variant="outline-danger" size="sm" onClick={clearOfflineCache} disabled={clearingOfflineCache || warmingOffline}>
+                  {clearingOfflineCache ? (
+                    <>
+                      <Spinner size="sm" className="me-2" /> Clearing…
+                    </>
+                  ) : (
+                    "Clear Offline Cache"
+                  )}
+                </Button>
+              </div>
+            </Card.Body>
+          </Card>
         </Col>
 
         <Col xs={12} xl={8}>
           <Card border="light" className="shadow-sm mb-4">
-            <Card.Header className="d-flex justify-content-between align-items-center">
+            <Card.Header className="d-flex flex-wrap justify-content-between align-items-center gap-2">
               <h5 className="mb-0">Profile</h5>
 
               <Button as={Link} to={Routes.ResetPassword.path} variant="outline-primary" size="sm">
@@ -473,14 +558,14 @@ export default function Settings() {
           {/* ✅ Admin-only User Management widget */}
           {isAdmin ? (
             <Card border="light" className="shadow-sm mb-4">
-              <Card.Header className="d-flex justify-content-between align-items-center">
-                <div>
+              <Card.Header className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div className="min-w-0">
                   <h5 className="mb-0">User Management</h5>
                   <small className="text-muted">Admins can change roles and remove users</small>
                 </div>
 
-                <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                  <InputGroup size="sm" style={{ width: 260 }}>
+                <div className="d-flex flex-wrap align-items-center justify-content-end gap-2" style={{ minWidth: 0 }}>
+                  <InputGroup size="sm" style={{ width: "min(260px, 100%)" }}>
                     <Form.Control
                       placeholder="Search name or email…"
                       value={adminQuery}
@@ -505,7 +590,7 @@ export default function Settings() {
                 {adminErr ? <Alert variant="warning" className="m-3 mb-0">{adminErr}</Alert> : null}
                 {adminOk ? <Alert variant="success" className="m-3 mb-0">{adminOk}</Alert> : null}
 
-                <Table responsive className="table-centered table-nowrap mb-0 rounded">
+                <Table responsive className="table-centered mb-0 rounded">
                   <thead className="thead-light">
                     <tr>
                       <th className="border-0">Name</th>
@@ -530,8 +615,8 @@ export default function Settings() {
 
                         return (
                           <tr key={u.id}>
-                            <td className="fw-bold">{u.name || "-"}</td>
-                            <td>{u.email || "-"}</td>
+                            <td className="fw-bold text-break">{u.name || "-"}</td>
+                            <td className="text-break">{u.email || "-"}</td>
                             <td>{String(u.status || "").toUpperCase()}</td>
                             <td style={{ minWidth: 140 }}>
                               <Form.Select

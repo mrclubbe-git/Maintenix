@@ -25,6 +25,11 @@ const CALLOUT_PHOTOS_DIR = path.join(UPLOADS_DIR, "calloutphotos");
 
 // Reports output folder (same as servicing so Reports page can list them later)
 const REPORTS_OUT_DIR = path.join(UPLOADS_DIR, "reports");
+const MAX_TOTAL_UPLOAD_BYTES = 45 * 1024 * 1024;
+
+function totalUploadBytes(files) {
+  return (Array.isArray(files) ? files : []).reduce((sum, f) => sum + Number(f?.size || f?.buffer?.length || 0), 0);
+}
 
 function safeBasename(name) {
   return path.basename(String(name || "")).replace(/[^\w.\-]/g, "_");
@@ -113,6 +118,15 @@ const upload = multer({
  */
 router.post("/submit-payload", requireAuth, upload.array("photo", 50), async (req, res) => {
   try {
+    const uploadedBytes = totalUploadBytes(req.files);
+    if (uploadedBytes > MAX_TOTAL_UPLOAD_BYTES) {
+      return res.status(413).json({
+        ok: false,
+        message: "Selected photos are too large as a group. Please reduce photo size/count and try again.",
+        maxTotalMB: Math.round(MAX_TOTAL_UPLOAD_BYTES / 1024 / 1024)
+      });
+    }
+
     const userKey = userKeyFromReq(req);
     const owner = ownerFromReq(req);
 

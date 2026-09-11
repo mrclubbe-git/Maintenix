@@ -13,6 +13,22 @@ function safeJsonParse(s, fallback = null) {
   }
 }
 
+function readCorrectionContextFromHash() {
+  try {
+    const hash = String(window.location.hash || "");
+    const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+    const params = new URLSearchParams(query);
+    const correctionOf = String(params.get("correctionOf") || "").trim();
+    if (!correctionOf) return null;
+    return {
+      correctionOf,
+      reason: String(params.get("reason") || "").trim()
+    };
+  } catch {
+    return null;
+  }
+}
+
 function normalizeServiceToFreqKey(serviceLabel) {
   const s = String(serviceLabel || "").trim().toLowerCase();
   if (s === "weekly") return "weekly";
@@ -38,6 +54,38 @@ function mergeQuestions(checklist, frequencyKey, standards) {
 
   const general = checklist?.general?.general;
   out.General = Array.isArray(general) ? general : [];
+  return out;
+}
+
+function getChecklistPayload(data) {
+  return data?.checklist && typeof data.checklist === "object" ? data.checklist : data;
+}
+
+function getAvailableStandards(checklist) {
+  const set = new Set();
+  if (!checklist || typeof checklist !== "object") return [];
+  Object.keys(checklist).forEach((freq) => {
+    if (freq === "general") return;
+    const group = checklist[freq];
+    if (!group || typeof group !== "object" || Array.isArray(group)) return;
+    Object.keys(group).forEach((std) => {
+      if (Array.isArray(group[std])) set.add(std);
+    });
+  });
+  return Array.from(set).sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function defaultStandardsForChecklist(checklist) {
+  return getAvailableStandards(checklist);
+}
+
+function standardsFromDraftValue(v) {
+  if (Array.isArray(v?.selectedStandards)) return v.selectedStandards.filter(Boolean);
+
+  // Backward compatibility for older drafts saved before dynamic standards.
+  const out = [];
+  if (v?.nfpa72) out.push("NFPA 72");
+  if (v?.nfpa2001) out.push("NFPA 2001");
   return out;
 }
 
@@ -178,6 +226,50 @@ function blobFromDataUrl(dataUrl) {
   }
 }
 
+const CLIENT_MAX_PHOTO_BYTES = 12 * 1024 * 1024;
+const CLIENT_TARGET_PHOTO_BYTES = 3 * 1024 * 1024;
+const CLIENT_MAX_PHOTO_DIMENSION = 1600;
+const CLIENT_JPEG_QUALITY = 0.78;
+
+function bytesToMb(bytes) {
+  return (Number(bytes || 0) / 1024 / 1024).toFixed(1);
+}
+
+function compressImageFile(file) {
+  return new Promise((resolve) => {
+    if (!file || !String(file.type || "").startsWith("image/")) return resolve(file);
+    if (file.size && file.size <= CLIENT_TARGET_PHOTO_BYTES) return resolve(file);
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, CLIENT_MAX_PHOTO_DIMENSION / Math.max(img.width || 1, img.height || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
+        canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(file);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          URL.revokeObjectURL(url);
+          if (!blob) return resolve(file);
+          const name = String(file.name || "photo.jpg").replace(/\.[^.]+$/, "") + ".jpg";
+          resolve(new File([blob], name, { type: "image/jpeg", lastModified: Date.now() }));
+        }, "image/jpeg", CLIENT_JPEG_QUALITY);
+      } catch {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
 function makeJobId() {
   return `job_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
@@ -255,6 +347,7 @@ export default function Servicing() {
   const authToken = localStorage.getItem("authToken") || "";
   const roleKey = safeRole(authUser?.role);
   const topRef = useRef(null);
+  const correctionContext = useMemo(() => readCorrectionContextFromHash(), []);
 
   const canAccess = ["ADMIN", "L1", "L2", "L3"].includes(roleKey);
 
@@ -277,8 +370,9 @@ export default function Servicing() {
   const areaInputRef = useRef(null); // ✅ focus/select behavior
   const areaCloseTimerRef = useRef(null); // ✅ blur delay to allow click
   const [serviceType, setServiceType] = useState("");
-  const [nfpa72, setNfpa72] = useState(true);
-  const [nfpa2001, setNfpa2001] = useState(false);
+  const [systemType, setSystemType] = useState("substation");
+  const [selectedStandardsState, setSelectedStandardsState] = useState([]);
+  // Legacy draft booleans are still read by standardsFromDraftValue().
 
   // Loaded lists
   const [areaOptions, setAreaOptions] = useState([]);
@@ -371,12 +465,12 @@ export default function Servicing() {
     return filtered;
   }, [areaOptions, areaSearch, area]);
 
+  const availableStandards = useMemo(() => getAvailableStandards(checklist), [checklist]);
+
   const selectedStandards = useMemo(() => {
-    const s = [];
-    if (nfpa72) s.push("NFPA 72");
-    if (nfpa2001) s.push("NFPA 2001");
-    return s;
-  }, [nfpa72, nfpa2001]);
+    const allowed = new Set(availableStandards);
+    return (selectedStandardsState || []).filter((std) => allowed.has(std));
+  }, [selectedStandardsState, availableStandards]);
 
   const frequencyKey = useMemo(() => normalizeServiceToFreqKey(serviceType), [serviceType]);
 
@@ -385,6 +479,15 @@ export default function Servicing() {
     if (!selectedStandards.length) return null;
     return mergeQuestions(checklist, frequencyKey, selectedStandards);
   }, [checklist, frequencyKey, selectedStandards]);
+
+  useEffect(() => {
+    if (!checklist) return;
+    setSelectedStandardsState((prev) => {
+      const allowed = getAvailableStandards(checklist);
+      const kept = (prev || []).filter((std) => allowed.includes(std));
+      return kept.length ? kept : defaultStandardsForChecklist(checklist);
+    });
+  }, [checklist]);
 
   const questionRows = useMemo(() => {
     if (!merged) return [];
@@ -443,6 +546,60 @@ export default function Servicing() {
     return rec?.value ?? null;
   }
 
+  async function apiJson(path, options = {}) {
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${authToken}`
+    };
+    if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+
+    const res = await fetch(path, { ...options, headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.message || `Request failed (HTTP ${res.status})`);
+    }
+    return data;
+  }
+
+  async function listServerDrafts() {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    const data = await apiJson("/api/servicing/drafts");
+    return Array.isArray(data?.drafts) ? data.drafts : [];
+  }
+
+  async function saveServerDraft(rec) {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    const data = await apiJson("/api/servicing/drafts", {
+      method: "POST",
+      body: JSON.stringify(rec)
+    });
+    return data?.draft || rec;
+  }
+
+  async function getServerDraft(key) {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    const data = await apiJson(`/api/servicing/drafts/${encodeURIComponent(key)}`);
+    return data?.draft || null;
+  }
+
+  async function deleteServerDraft(key) {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    await apiJson(`/api/servicing/drafts/${encodeURIComponent(key)}`, { method: "DELETE" });
+  }
+
+  async function getDraftRecord(key) {
+    if (authToken && navigator.onLine) {
+      try {
+        const serverRec = await getServerDraft(key);
+        if (serverRec) return serverRec;
+      } catch {
+        // fall back to local mirror
+      }
+    }
+    if (!dbRef.current) return null;
+    return await idbGet(dbRef.current, "servicingCache", key);
+  }
+
   async function refreshJobs() {
     if (!dbRef.current) return;
     setLoadingJobs(true);
@@ -466,6 +623,22 @@ export default function Servicing() {
       const onlyDrafts = (all || [])
         .filter((x) => x && typeof x.key === "string" && x.key.startsWith("servicing_draft_"))
         .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+
+      if (authToken && navigator.onLine) {
+        try {
+          const serverDrafts = await listServerDrafts();
+          const byKey = new Map();
+          serverDrafts.forEach((d) => byKey.set(d.key, d));
+          onlyDrafts.forEach((d) => {
+            if (!byKey.has(d.key)) byKey.set(d.key, d);
+          });
+          setDrafts(Array.from(byKey.values()).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))));
+          return;
+        } catch {
+          // use local fallback below
+        }
+      }
+
       setDrafts(onlyDrafts);
     } catch {
       // ignore
@@ -496,7 +669,7 @@ export default function Servicing() {
       const [areasRes, servicesRes, checklistRes] = await Promise.allSettled([
         fetchJson("/api/servicing/areas"),
         fetchJson("/api/servicing/services"),
-        fetchJson("/api/servicing/checklist")
+        fetchJson(`/api/servicing/checklist?type=${encodeURIComponent(systemType)}`)
       ]);
 
       if (areasRes.status === "fulfilled") {
@@ -531,10 +704,11 @@ export default function Servicing() {
       }
 
       if (checklistRes.status === "fulfilled") {
-        setChecklist(checklistRes.value);
-        await cacheSet("checklist", checklistRes.value);
+        const loadedChecklist = getChecklistPayload(checklistRes.value);
+        setChecklist(loadedChecklist);
+        await cacheSet(`checklist_${systemType}`, loadedChecklist);
       } else {
-        const cached = await cacheGet("checklist");
+        const cached = await cacheGet(`checklist_${systemType}`) || await cacheGet("checklist");
         if (cached) {
           setChecklist(cached);
           setInfo((prev) => (prev ? prev : "Offline: loaded cached checklist."));
@@ -552,9 +726,11 @@ export default function Servicing() {
   }
 
   useEffect(() => {
-    if (canAccess) loadListsAndChecklist();
+    // Online can fetch immediately; offline must wait for IndexedDB so cached checklists can load.
+    const isOnlineNow = typeof navigator === "undefined" ? true : navigator.onLine;
+    if (canAccess && (isOnlineNow || dbReady)) loadListsAndChecklist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [systemType, dbReady, canAccess]);
 
   useEffect(() => {
     if (dbReady) refreshJobs();
@@ -571,7 +747,7 @@ export default function Servicing() {
   function validatePreStart() {
     if (!area) return "Please select an Area.";
     if (!serviceType) return "Please select a Service Type.";
-    if (!nfpa72 && !nfpa2001) return "Please select at least Detection (NFPA 72) or Suppression (NFPA 2001).";
+    if (!selectedStandards.length) return "Please select at least one standard.";
     if (!checklist) return "Checklist is not loaded yet.";
     return "";
   }
@@ -596,13 +772,29 @@ export default function Servicing() {
   // ---- Photos (per question) ----
   const isMobile = useMemo(() => isMobileDevice(), []);
 
-  const onPhotoSelected = (qid, file) => {
+  const onPhotoSelected = async (qid, file) => {
     if (!file) return;
+    if (!String(file.type || "").startsWith("image/")) {
+      setErr("Please select an image file.");
+      return;
+    }
+    if (file.size > CLIENT_MAX_PHOTO_BYTES) {
+      setErr(`Photo is too large (${bytesToMb(file.size)}MB). Please choose a smaller image.`);
+      return;
+    }
+
+    const prepared = await compressImageFile(file);
+    if (prepared?.size > CLIENT_MAX_PHOTO_BYTES) {
+      setErr(`Photo is still too large after compression (${bytesToMb(prepared.size)}MB). Please choose a smaller image.`);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
-      updateAnswer(qid, { photoDataUrl: String(reader.result || ""), photoFile: file });
+      updateAnswer(qid, { photoDataUrl: String(reader.result || ""), photoFile: prepared });
     };
-    reader.readAsDataURL(file);
+    reader.onerror = () => setErr("Failed to read selected photo.");
+    reader.readAsDataURL(prepared);
   };
 
   const clearPhoto = (qid) => {
@@ -912,6 +1104,8 @@ export default function Servicing() {
     // Avoid multiple tabs processing at once
     if (!acquireRunnerLock(8000)) return;
 
+    let job = null;
+
     try {
       const all = await idbGetAll(dbRef.current, "servicingJobs");
       const jobsAll = Array.isArray(all) ? all : [];
@@ -923,7 +1117,7 @@ export default function Servicing() {
 
       if (!pick) return;
 
-      const job = { ...pick };
+      job = { ...pick };
 
       // 1) Submit if queued
       if (job.status === "queued") {
@@ -974,6 +1168,19 @@ export default function Servicing() {
           };
           // Remove payload + attachments after success
           const cleaned = stripPayloadOnSuccess(job);
+          if (cleaned.draftKey) {
+            try {
+              await deleteServerDraft(cleaned.draftKey);
+            } catch (e) {
+              console.warn("Failed to delete completed server draft.", e);
+            }
+            try {
+              await idbDelete(dbRef.current, "servicingCache", cleaned.draftKey);
+            } catch (e) {
+              console.warn("Failed to delete completed browser draft.", e);
+            }
+            await refreshDrafts();
+          }
           await idbPut(dbRef.current, "servicingJobs", cleaned);
           emitJobsEvent();
           return;
@@ -995,7 +1202,20 @@ export default function Servicing() {
         emitJobsEvent();
       }
     } catch (e) {
-      // If something fails mid-run, mark the picked job error is handled by next loop; keep it simple here
+      if (job?.id && dbRef.current) {
+        const message = String(e?.message || "Job could not be processed.");
+        const isMissingServerJob = /job not found|status failed \(http 404\)|http 404/i.test(message);
+        const next = {
+          ...job,
+          status: "error",
+          error: isMissingServerJob
+            ? "This saved job is no longer available on the server. Please clear it and submit the report again if needed."
+            : message,
+          lastUpdateAt: new Date().toISOString()
+        };
+        await idbPut(dbRef.current, "servicingJobs", next);
+        emitJobsEvent();
+      }
     } finally {
       releaseRunnerLock();
     }
@@ -1042,8 +1262,10 @@ export default function Servicing() {
       step,
       area,
       serviceType,
-      nfpa72,
-      nfpa2001,
+      systemType,
+      selectedStandards,
+      nfpa72: selectedStandards.includes("NFPA 72"),
+      nfpa2001: selectedStandards.includes("NFPA 2001"),
       areaSearch,
       answers: cleanAnswers,
       signatureDataUrl: signatureDataUrl || "",
@@ -1061,8 +1283,9 @@ export default function Servicing() {
     const v = value || {};
     setArea(v.area || "");
     setServiceType(v.serviceType || "");
-    setNfpa72(typeof v.nfpa72 === "boolean" ? v.nfpa72 : true);
-    setNfpa2001(typeof v.nfpa2001 === "boolean" ? v.nfpa2001 : false);
+    setSystemType(v.systemType === "conveyor" ? "conveyor" : "substation");
+    const draftStandards = standardsFromDraftValue(v);
+    setSelectedStandardsState(draftStandards);
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
@@ -1098,9 +1321,18 @@ export default function Servicing() {
       value
     };
 
-    await idbPut(dbRef.current, "servicingCache", rec);
+    let saved = rec;
+    if (authToken && navigator.onLine) {
+      try {
+        saved = await saveServerDraft(rec);
+      } catch (e) {
+        console.warn("Failed to save draft on server; keeping browser fallback.", e);
+      }
+    }
+
+    await idbPut(dbRef.current, "servicingCache", saved);
     await refreshDrafts();
-    return key;
+    return saved.key || key;
   }
 
   async function loadDraft(draftKey) {
@@ -1109,7 +1341,7 @@ export default function Servicing() {
     if (!dbRef.current) return;
 
     try {
-      const rec = await idbGet(dbRef.current, "servicingCache", draftKey);
+      const rec = await getDraftRecord(draftKey);
       if (!rec || !rec.value) {
         setErr("Draft not found.");
         return;
@@ -1133,16 +1365,24 @@ export default function Servicing() {
     if (!dbRef.current) return;
 
     try {
-      const rec = await idbGet(dbRef.current, "servicingCache", draftKey);
+      const rec = await getDraftRecord(draftKey);
       if (!rec) {
         setErr("Draft not found.");
         return;
       }
-      await idbPut(dbRef.current, "servicingCache", {
+      let updated = {
         ...rec,
         name,
         updatedAt: new Date().toISOString()
-      });
+      };
+      if (authToken && navigator.onLine) {
+        try {
+          updated = await saveServerDraft(updated);
+        } catch (e) {
+          console.warn("Failed to rename draft on server; keeping browser fallback.", e);
+        }
+      }
+      await idbPut(dbRef.current, "servicingCache", updated);
       await refreshDrafts();
       setInfo("Draft renamed.");
     } catch (e) {
@@ -1159,6 +1399,13 @@ export default function Servicing() {
     if (!dbRef.current) return;
 
     try {
+      if (authToken && navigator.onLine) {
+        try {
+          await deleteServerDraft(draftKey);
+        } catch (e) {
+          console.warn("Failed to delete draft on server; removing browser copy.", e);
+        }
+      }
       await idbDelete(dbRef.current, "servicingCache", draftKey);
       await refreshDrafts();
       setInfo("Draft deleted.");
@@ -1168,10 +1415,7 @@ export default function Servicing() {
   }
 
   function makeSelectedStandardsFromValue(v) {
-    const out = [];
-    if (v?.nfpa72) out.push("NFPA 72");
-    if (v?.nfpa2001) out.push("NFPA 2001");
-    return out;
+    return standardsFromDraftValue(v);
   }
 
   function buildQuestionRowsForDraftValue(v) {
@@ -1235,7 +1479,7 @@ export default function Servicing() {
     return "";
   }
 
-  async function enqueueServicingJobFromValue(draftValue, nameHint) {
+  async function enqueueServicingJobFromValue(draftValue, nameHint, draftKey = "") {
     setErr("");
     setInfo("");
 
@@ -1271,9 +1515,13 @@ export default function Servicing() {
         technician: authUser?.name || authUser?.email || "Unknown",
         area: v.area,
         service: v.serviceType,
+        systemType: v.systemType || "substation",
+        checklistType: v.systemType || "substation",
         frequencyKey: draftFrequencyKey,
         standards,
         createdAt,
+        correctionOfReport: correctionContext?.correctionOf || "",
+        correctionReason: correctionContext?.reason || "",
         svcNumber: reportId,
         serverFileName,
         signatureDataUrl: v.signatureDataUrl || "",
@@ -1330,6 +1578,7 @@ export default function Servicing() {
           serviceType: v.serviceType,
           technician: authUser?.name || authUser?.email || "Unknown"
         },
+        draftKey: String(draftKey || ""),
         payload,
         attachments,
         result: { fileName: "", url: "" },
@@ -1389,13 +1638,13 @@ export default function Servicing() {
     if (!dbRef.current) return;
 
     try {
-      const rec = await idbGet(dbRef.current, "servicingCache", draftKey);
+      const rec = await getDraftRecord(draftKey);
       if (!rec || !rec.value) {
         setErr("Draft not found.");
         return;
       }
 
-      await enqueueServicingJobFromValue(rec.value, rec.name || "");
+      await enqueueServicingJobFromValue(rec.value, rec.name || "", rec.key || draftKey);
     } catch (e) {
       setErr(String(e?.message || "Failed to generate from draft."));
     }
@@ -1427,8 +1676,7 @@ export default function Servicing() {
     setAreaSearch("");
     setAreaOpen(false);
     setServiceType("");
-    setNfpa72(true);
-    setNfpa2001(false);
+    setSelectedStandardsState(defaultStandardsForChecklist(checklist));
     setAnswers({});
     setHighlightMissing(false);
     setHighlightMissingPhotos(false);
@@ -1499,6 +1747,12 @@ export default function Servicing() {
           <div ref={topRef} />
 
           {err ? <Alert variant="danger" className="mb-2">{err}</Alert> : null}
+          {correctionContext ? (
+            <Alert variant="warning" className="mb-2">
+              Creating corrected follow-up for <strong>{correctionContext.correctionOf}</strong>
+              {correctionContext.reason ? <div className="mt-1">Reject reason: {correctionContext.reason}</div> : null}
+            </Alert>
+          ) : null}
           {info ? <Alert variant="info" className="mb-0">{info}</Alert> : null}
         </Card.Body>
       </Card>
@@ -1621,6 +1875,27 @@ export default function Servicing() {
           </Card.Header>
           <Card.Body>
             <Row className="g-3">
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>System Type</Form.Label>
+                  <Form.Select
+                    value={systemType}
+                    onChange={(e) => {
+                      const next = e.target.value === "conveyor" ? "conveyor" : "substation";
+                      setSystemType(next);
+                      setChecklist(null);
+                      setAnswers({});
+                      setSelectedStandardsState([]);
+                      setStep(0);
+                    }}
+                    disabled={loadingChecklist}
+                  >
+                    <option value="substation">Substation</option>
+                    <option value="conveyor">Conveyor</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+
               <Col md={6}>
                 <Form.Group>
                   <Form.Label>Area</Form.Label>
@@ -1739,18 +2014,27 @@ export default function Servicing() {
               <Col md={12}>
                 <Form.Label>Standards</Form.Label>
                 <div className="d-flex flex-wrap" style={{ gap: 14 }}>
-                  <Form.Check
-                    type="checkbox"
-                    label="Detection (NFPA 72)"
-                    checked={nfpa72}
-                    onChange={(e) => setNfpa72(e.target.checked)}
-                  />
-                  <Form.Check
-                    type="checkbox"
-                    label="Suppression (NFPA 2001)"
-                    checked={nfpa2001}
-                    onChange={(e) => setNfpa2001(e.target.checked)}
-                  />
+                  {availableStandards.length ? (
+                    availableStandards.map((std) => (
+                      <Form.Check
+                        key={std}
+                        type="checkbox"
+                        label={std}
+                        checked={selectedStandards.includes(std)}
+                        onChange={(e) => {
+                          const checked = !!e.target.checked;
+                          setSelectedStandardsState((prev) => {
+                            const cur = new Set(prev || []);
+                            if (checked) cur.add(std);
+                            else cur.delete(std);
+                            return Array.from(cur);
+                          });
+                        }}
+                      />
+                    ))
+                  ) : (
+                    <span className="text-muted small">Standards load from the selected checklist.</span>
+                  )}
                 </div>
               </Col>
 
@@ -1761,7 +2045,7 @@ export default function Servicing() {
                   </Alert>
                 ) : (
                   <Alert variant="success" className="mb-0">
-                    Checklist loaded.
+                    Checklist loaded for {systemType === "conveyor" ? "Conveyor" : "Substation"}.
                   </Alert>
                 )}
               </Col>
@@ -1775,7 +2059,7 @@ export default function Servicing() {
         <Card border="light" className="shadow-sm">
           <Card.Header className="d-flex justify-content-between align-items-center">
             <h5 className="mb-0">Questionnaire</h5>
-            <small className="text-muted">{area} • {serviceType} • Unanswered: {unansweredCount} • Photos missing: {photoMissingCount}</small>
+            <small className="text-muted">{systemType === "conveyor" ? "Conveyor" : "Substation"} • {area} • {serviceType} • Unanswered: {unansweredCount} • Photos missing: {photoMissingCount}</small>
           </Card.Header>
           <Card.Body>
             {!questionRows.length ? (
@@ -1840,12 +2124,13 @@ export default function Servicing() {
                               {(a.photoDataUrl || a.photoFile) ? <Badge bg="success">Captured</Badge> : <Badge bg="secondary">Not captured</Badge>}
 
                               {(a.photoDataUrl || a.photoFile) ? (
-                                <Button variant="outline-secondary" size="sm" onClick={() => clearPhoto(q.id)}>
+                                <Button type="button" variant="outline-secondary" size="sm" onClick={() => clearPhoto(q.id)}>
                                   Clear
                                 </Button>
                               ) : null}
 
                               <Button
+                                type="button"
                                 variant={(!a.photoDataUrl && !a.photoFile) ? "primary" : "outline-primary"}
                                 size="sm"
                                 onClick={() => triggerPhotoPicker(q.id)}
@@ -1906,13 +2191,11 @@ export default function Servicing() {
             <Alert variant="info">Review screen before saving the draft.</Alert>
 
             <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
+            <div className="mb-2"><strong>System Type:</strong> {systemType === "conveyor" ? "Conveyor" : "Substation"}</div>
             <div className="mb-2"><strong>Area:</strong> {area}</div>
             <div className="mb-2"><strong>Service Type:</strong> {serviceType}</div>
             <div className="mb-3">
-              <strong>Standards:</strong>{" "}
-              {nfpa72 ? "NFPA 72 " : ""}
-              {nfpa2001 ? "NFPA 2001" : ""}
-              {!nfpa72 && !nfpa2001 ? "-" : ""}
+              <strong>Standards:</strong> {selectedStandards.length ? selectedStandards.join(", ") : "-"}
             </div>
 
             <hr />

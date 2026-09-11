@@ -20,6 +20,12 @@
     "express": "^5.2.1",
     "image-size": "^2.0.2",
     "multer": "^2.0.2",
-    "pizzip": "^3.2.0"
+    "pizzip": "^3.2.0",
+    "xmldom": "npm:@xmldom/xmldom@^0.9.10"
+  },
+  "overrides": {
+    "docxtemplater-image-module-free": {
+      "xmldom": "npm:@xmldom/xmldom@^0.9.10"
+    }
   }
 }

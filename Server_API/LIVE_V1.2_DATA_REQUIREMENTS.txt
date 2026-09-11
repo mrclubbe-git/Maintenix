@@ -1,0 +1,32 @@
+MAINTENIX LIVE v1.2 DATA / RUNTIME REQUIREMENTS
+==============================================
+
+The live v1.2 application source and the additional template package supplied for
+this migration now include the backend templates required by the migrated features.
+
+Included servicing data:
+- Server_API/data/templates/conveyor_system_checklist_questions.json
+
+Included report section mapping:
+- Server_API/data/templates/area-sections.json
+
+Included Formal / Section Reports data:
+- Server_API/data/templates/service-report-systems.json
+- Server_API/data/templates/formal-reports/CRA_Conveyor_Fire_Service_Report_Master_Template.docx
+- Server_API/data/templates/formal-reports/CRA_Server_Room_Fire_Service_Report_Master_Template.docx
+- Server_API/data/templates/formal-reports/CRA_Substation_Fire_Service_Report_Master_Template.docx
+
+Formal reporting runtime requirements remain:
+- Linux server
+- python3
+- python-docx (provides the Python `docx` module)
+- LibreOffice available to the report worker for DOCX -> PDF conversion
+
+The following v1.2 state files are created/maintained by the application and do
+not need to be seeded from production for a fresh development environment:
+- Server_API/data/sessions.json
+- Server_API/data/notifications.json
+- Server_API/data/daily-planner.json
+
+Do not copy production user/session/report data into the development environment
+unless that is explicitly intended.

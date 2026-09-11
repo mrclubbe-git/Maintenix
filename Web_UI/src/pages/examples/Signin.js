@@ -6,38 +6,20 @@ import { Link } from "react-router-dom";
 
 import { Routes } from "../../routes";
 import BgImage from "../../assets/img/illustrations/signin.svg";
-
-function safeJsonParse(str, fallback = null) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return fallback;
-  }
-}
-
-function nowMs() {
-  return Date.now();
-}
-
-function isExpired(expiresAtIso) {
-  if (!expiresAtIso) return true;
-  const t = new Date(expiresAtIso).getTime();
-  if (!Number.isFinite(t)) return true;
-  return t <= nowMs();
-}
+import {
+  clearOfflineSession,
+  getOfflineSession,
+  isExpired,
+  notifyOfflineTokenLoaded,
+  safeJsonParse,
+  storeOfflineSession,
+  warmOfflineMode
+} from "../../offlineMode";
 
 function readOfflineSession() {
-  const offlineToken = localStorage.getItem("offlineAuthToken") || "";
-  const offlineUser = safeJsonParse(localStorage.getItem("offlineAuthUser") || "null", null);
-  const offlineExpiresAt = localStorage.getItem("offlineAuthExpiresAt") || "";
-  if (!offlineToken || !offlineUser?.email || isExpired(offlineExpiresAt)) return null;
-  return { token: offlineToken, user: offlineUser, expiresAt: offlineExpiresAt };
-}
-
-function clearOfflineSession() {
-  localStorage.removeItem("offlineAuthToken");
-  localStorage.removeItem("offlineAuthUser");
-  localStorage.removeItem("offlineAuthExpiresAt");
+  const sess = getOfflineSession();
+  if (!sess.token || !sess.user?.email || isExpired(sess.expiresAt)) return null;
+  return sess;
 }
 
 export default function Signin() {
@@ -134,13 +116,13 @@ export default function Signin() {
       window.dispatchEvent(new Event("authUserUpdated"));
 
       const ttlMs = remember ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-      const expiresAt = new Date(Date.now() + ttlMs).toISOString();
-      localStorage.setItem("offlineAuthToken", data.token);
-      localStorage.setItem("offlineAuthUser", JSON.stringify(data.user));
-      localStorage.setItem("offlineAuthExpiresAt", expiresAt);
+      const expiresAt = storeOfflineSession(data.token, data.user, ttlMs);
+      notifyOfflineTokenLoaded(data.user);
 
       setOfflineAvailable(true);
       setOfflineInfo({ email: data.user?.email || "", role: data.user?.role || "", expiresAt });
+
+      await warmOfflineMode(data.token).catch(() => null);
 
       setSuccessMsg(`Logged in as ${data.user.email} (${data.user.role}).`);
       setLoading(false);
@@ -230,6 +212,7 @@ export default function Signin() {
                         autoFocus
                         required
                         type="email"
+                        autoComplete="email"
                         placeholder="example@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -247,6 +230,7 @@ export default function Signin() {
                       <Form.Control
                         required
                         type="password"
+                        autoComplete="current-password"
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}

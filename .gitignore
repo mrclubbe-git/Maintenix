@@ -1,0 +1,5 @@
+Web_UI/node_modules/
+Web_UI/build/
+Server_API/node_modules/
+**/__pycache__/
+*.pyc

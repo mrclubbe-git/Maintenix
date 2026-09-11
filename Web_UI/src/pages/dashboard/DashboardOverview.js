@@ -361,7 +361,7 @@ export default function DashboardOverview() {
 
       {serverErr ? (
         <Alert variant="warning" className="mb-4">
-          {serverErr}
+          {serverErr} Make sure the Maintenix API is running and reachable via <code>/api</code>. In local development, use the React dev proxy.
         </Alert>
       ) : null}
 

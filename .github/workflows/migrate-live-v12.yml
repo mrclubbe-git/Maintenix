@@ -113,17 +113,32 @@ jobs:
           cache: npm
           cache-dependency-path: Web_UI/package-lock.json
 
-      - name: Validate backend JavaScript
+      - name: Validate backend JavaScript and hosted configuration
         shell: bash
         run: |
           set -euo pipefail
-          find Server_API -type f -name '*.js' -print0 | xargs -0 -n1 node --check
-          test -z "$(grep -RIl '100\.106\.40\.17' Server_API Web_UI/src Web_UI/public 2>/dev/null || true)"
-          grep -q '/api/server/status' Server_API/index.js
-          grep -q 'https://mrclubbe-git.github.io' Server_API/index.js
-          grep -q '/api/daily-planner' Server_API/index.js
-          grep -q '/api/formal-reports' Server_API/index.js
-          grep -q '/api/notifications' Server_API/index.js
+          while IFS= read -r -d '' file; do
+            echo "Checking JS syntax: $file"
+            node --check "$file"
+          done < <(find Server_API -type f -name '*.js' -print0)
+
+          if grep -RIl '100\.106\.40\.17' Server_API Web_UI/src Web_UI/public 2>/dev/null; then
+            echo 'Obsolete private API URL remains in active source.'
+            exit 1
+          fi
+
+          for expected in \
+            '/api/server/status' \
+            'https://mrclubbe-git.github.io' \
+            '/api/daily-planner' \
+            '/api/formal-reports' \
+            '/api/notifications'; do
+            echo "Checking Server_API/index.js for: $expected"
+            grep -Fq "$expected" Server_API/index.js || {
+              echo "Missing required server configuration: $expected"
+              exit 1
+            }
+          done
 
       - name: Install Web UI dependencies
         working-directory: Web_UI

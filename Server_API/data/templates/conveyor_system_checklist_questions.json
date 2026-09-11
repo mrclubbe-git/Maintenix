@@ -1,0 +1,610 @@
+{
+    "weekly": {
+        "NFPA 72": [
+            {
+                "question": "Fire alarm / releasing panel(s) show NORMAL; no fire, supervisory or trouble condition.",
+                "extra": null
+            },
+            {
+                "question": "No unexplained isolations, inhibits or disabled functions are present.",
+                "extra": null
+            },
+            {
+                "question": "FiberSystem 8000 linear heat detection controller healthy; no channel / fibre fault indication.",
+                "extra": null
+            },
+            {
+                "question": "Flame detectors clean, unobstructed and correctly aimed at the protected belt / structure.",
+                "extra": null
+            },
+            {
+                "question": "COBRA air purge panel healthy; compressor / purge air available; no purge fault.",
+                "extra": null
+            },
+            {
+                "question": "Manual call points / manual release stations accessible, intact and clearly labelled.",
+                "extra": null
+            },
+            {
+                "question": "Sounders / beacons / local annunciation devices intact and unobstructed.",
+                "extra": null
+            },
+            {
+                "question": "Accessible field cables, glands, conduit and junction boxes visually sound.",
+                "extra": null
+            },
+            {
+                "question": "Housekeeping, signage and access to equipment satisfactory.",
+                "extra": null
+            }
+        ],
+        "NFPA 25": [
+            {
+                "question": "Deluge / water spray control valve and trim are in the correct normal set position; no visible leakage.",
+                "extra": null
+            },
+            {
+                "question": "Water / air pressure gauges (where provided) are in the normal operating range.",
+                "extra": "pressure"
+            },
+            {
+                "question": "Water supply isolation valves are open and secured / supervised.",
+                "extra": null
+            },
+            {
+                "question": "Accessible pipework, fittings, hangers and supports show no leakage, impact damage or severe corrosion.",
+                "extra": null
+            },
+            {
+                "question": "Open spray nozzles are correctly aligned and free from obstruction, paint or damage.",
+                "extra": null
+            },
+            {
+                "question": "Strainers, drains and test connections are externally sound; no visible leakage.",
+                "extra": null
+            },
+            {
+                "question": "Protected belt and support structure areas show no new obstructions that could block spray coverage.",
+                "extra": null
+            }
+        ]
+    },
+    "monthly": {
+        "NFPA 72": [
+            {
+                "question": "Fire alarm / releasing panel(s) show NORMAL; no unresolved fire, supervisory or trouble condition.",
+                "extra": null
+            },
+            {
+                "question": "Review panel, controller and HMI event history since the last inspection.",
+                "extra": "text"
+            },
+            {
+                "question": "Panel / controller time and date are correct.",
+                "extra": null
+            },
+            {
+                "question": "No unexpected isolations, bypasses or inhibits are present.",
+                "extra": null
+            },
+            {
+                "question": "Mains AC supply healthy; charger / PSU indication normal.",
+                "extra": null
+            },
+            {
+                "question": "Battery condition satisfactory; no swelling, leakage or terminal corrosion.",
+                "extra": "voltage"
+            },
+            {
+                "question": "FiberSystem 8000 controller healthy; no relay, communication or fibre channel fault.",
+                "extra": null
+            },
+            {
+                "question": "Accessible fibre optic sensor cable route, supports and protection intact.",
+                "extra": null
+            },
+            {
+                "question": "Flame detector windows clean; detectors unobstructed and aimed correctly.",
+                "extra": null
+            },
+            {
+                "question": "COBRA air purge panel status normal; compressor operation acceptable.",
+                "extra": null
+            },
+            {
+                "question": "Purge intake filters, regulator and tubing visually satisfactory.",
+                "extra": null
+            },
+            {
+                "question": "Detector brackets / mounts secure; no unauthorised field-of-view changes.",
+                "extra": null
+            },
+            {
+                "question": "Manual call points / manual release stations accessible, labelled and intact.",
+                "extra": null
+            },
+            {
+                "question": "Sounders, beacons and annunciators intact and unobstructed.",
+                "extra": null
+            },
+            {
+                "question": "Apollo loop interfaces / switch monitors / output units show normal status.",
+                "extra": null
+            },
+            {
+                "question": "Functional test one representative initiating device / zone input and verify alarm response.",
+                "extra": null
+            },
+            {
+                "question": "Test one representative MCP / manual release or monitored interface input (no unwanted discharge).",
+                "extra": null
+            },
+            {
+                "question": "Verify sampled cause-and-effect outputs, annunciation and shutdown interfaces operate correctly.",
+                "extra": null
+            },
+            {
+                "question": "Housekeeping, signage, legends and access to equipment satisfactory.",
+                "extra": null
+            }
+        ],
+        "NFPA 25": [
+            {
+                "question": "Control valves are in the correct position and secured / electrically supervised.",
+                "extra": null
+            },
+            {
+                "question": "Deluge valve and external trim are clean, intact and free of leakage.",
+                "extra": null
+            },
+            {
+                "question": "System pressure gauges are in the normal range.",
+                "extra": "pressure"
+            },
+            {
+                "question": "Water supply condition satisfactory; monitored supply status normal where provided.",
+                "extra": null
+            },
+            {
+                "question": "Accessible pipework and fittings show no leakage, impact damage or unacceptable corrosion.",
+                "extra": null
+            },
+            {
+                "question": "Hangers, braces and pipe supports are secure.",
+                "extra": null
+            },
+            {
+                "question": "Open spray nozzles are correctly aligned and unobstructed.",
+                "extra": null
+            },
+            {
+                "question": "Nozzle blow-off caps / shields intact where fitted.",
+                "extra": null
+            },
+            {
+                "question": "Strainers, drains and test connections externally sound.",
+                "extra": null
+            },
+            {
+                "question": "Flow / tamper / pressure supervisory devices visually intact.",
+                "extra": null
+            },
+            {
+                "question": "Local manual release and emergency isolate interfaces accessible and labelled.",
+                "extra": null
+            },
+            {
+                "question": "Release solenoids, pilot lines and associated actuators visually sound.",
+                "extra": null
+            },
+            {
+                "question": "Check for plant / structural changes that could obstruct designed spray coverage.",
+                "extra": null
+            },
+            {
+                "question": "Test one representative supervisory / alarm input associated with the water spray / deluge system.",
+                "extra": null
+            },
+            {
+                "question": "Record defects, impairments and corrective actions required.",
+                "extra": "text"
+            }
+        ]
+    },
+    "quarterly": {
+        "NFPA 72": [
+            {
+                "question": "Fire alarm / releasing panel(s) show NORMAL; no unresolved trouble condition.",
+                "extra": null
+            },
+            {
+                "question": "Review alarm, supervisory and trouble history since the previous quarter.",
+                "extra": "text"
+            },
+            {
+                "question": "Verify panel / controller time-date and communication links are correct.",
+                "extra": null
+            },
+            {
+                "question": "Mains AC supply healthy; charger / PSU indication normal.",
+                "extra": null
+            },
+            {
+                "question": "Measure and record battery float voltage.",
+                "extra": "voltage"
+            },
+            {
+                "question": "Panel enclosure, labels, legends, drawings and access controls satisfactory.",
+                "extra": null
+            },
+            {
+                "question": "FiberSystem 8000 controller healthy; review channel readings / trend information.",
+                "extra": "text"
+            },
+            {
+                "question": "Accessible fibre optic sensor cable, junctions and supports show no damage.",
+                "extra": null
+            },
+            {
+                "question": "Verify fibre controller zone mapping and alarm / trouble relay outputs.",
+                "extra": null
+            },
+            {
+                "question": "Flame detectors clean, unobstructed and aimed correctly.",
+                "extra": null
+            },
+            {
+                "question": "Perform OEM built-in test or approved functional test on representative flame detectors per zone.",
+                "extra": null
+            },
+            {
+                "question": "Detector fault / dirty-optics supervision normal or verified during testing.",
+                "extra": null
+            },
+            {
+                "question": "COBRA enclosure, compressor, purge tubing and fittings satisfactory.",
+                "extra": null
+            },
+            {
+                "question": "Purge filters serviced / cleaned as required; airflow / pressure acceptable.",
+                "extra": "pressure"
+            },
+            {
+                "question": "Apollo loop modules, switch monitors and output units identified and healthy.",
+                "extra": null
+            },
+            {
+                "question": "Test representative monitor / output unit operation and feedback.",
+                "extra": null
+            },
+            {
+                "question": "Test representative sounders / beacons / annunciation devices.",
+                "extra": null
+            },
+            {
+                "question": "Test representative manual call point / manual release stations.",
+                "extra": null
+            },
+            {
+                "question": "Verify sampled inputs and outputs report correctly at panel / HMI / SCADA.",
+                "extra": null
+            },
+            {
+                "question": "Accessible field cables, glands, JB seals and earthing / bonding visually sound.",
+                "extra": null
+            },
+            {
+                "question": "Release inhibit / test mode procedures used correctly and fully reinstated.",
+                "extra": null
+            },
+            {
+                "question": "Housekeeping, signage and log book satisfactory.",
+                "extra": null
+            },
+            {
+                "question": "All sampled devices restored and the system returned to NORMAL.",
+                "extra": null
+            }
+        ],
+        "NFPA 25": [
+            {
+                "question": "Inspect control valves, locks, seals and electrical supervision.",
+                "extra": null
+            },
+            {
+                "question": "Inspect deluge valve trim, releasing trim, solenoids and pilot lines.",
+                "extra": null
+            },
+            {
+                "question": "Record and compare water / air pressures with previous logs.",
+                "extra": "pressure"
+            },
+            {
+                "question": "Carry out main drain / alarm line test where the system arrangement permits.",
+                "extra": null
+            },
+            {
+                "question": "Conduct a partial trip or release test of a selected zone using approved test arrangements.",
+                "extra": null
+            },
+            {
+                "question": "Verify waterflow / alarm / supervisory signals at the fire panel / SCADA.",
+                "extra": null
+            },
+            {
+                "question": "Accessible pipework, fittings, hangers and supports are sound.",
+                "extra": null
+            },
+            {
+                "question": "Inspect nozzles for damage, corrosion, blockage and alignment.",
+                "extra": null
+            },
+            {
+                "question": "Verify spray coverage paths to belt, drives, idlers and structure remain unobstructed.",
+                "extra": null
+            },
+            {
+                "question": "Inspect strainers, drains and test valves externally.",
+                "extra": null
+            },
+            {
+                "question": "Inspect manual release stations and local release cabinets.",
+                "extra": null
+            },
+            {
+                "question": "Verify release output circuits, solenoids and monitored feedback during testing.",
+                "extra": null
+            },
+            {
+                "question": "Valve rooms / cabinets / enclosures are clean, dry and serviceable.",
+                "extra": null
+            },
+            {
+                "question": "Signage, valve tags and identification labels are present and legible.",
+                "extra": null
+            },
+            {
+                "question": "Review impairments, previous defects and pressure trends.",
+                "extra": "text"
+            },
+            {
+                "question": "Check availability of critical spare nozzles / seals / tools where site standard requires.",
+                "extra": null
+            },
+            {
+                "question": "Reinstate all release devices, isolations and supervisory functions after testing.",
+                "extra": null
+            },
+            {
+                "question": "Record defects, recommendations and corrective maintenance required.",
+                "extra": "text"
+            }
+        ]
+    },
+    "annual": {
+        "NFPA 72": [
+            {
+                "question": "Review latest drawings, zone charts, cause-and-effect matrix and previous service reports.",
+                "extra": "text"
+            },
+            {
+                "question": "Fire alarm / releasing panel(s) show NORMAL; no unresolved trouble condition.",
+                "extra": null
+            },
+            {
+                "question": "Verify panel indicators, controls, legends and operator functions.",
+                "extra": null
+            },
+            {
+                "question": "Mains AC supply and charger / PSU operation satisfactory.",
+                "extra": null
+            },
+            {
+                "question": "Perform battery test in accordance with OEM / NFPA 72 requirements.",
+                "extra": "text"
+            },
+            {
+                "question": "Inspect and clean panel cabinet, terminations and internal condition as required.",
+                "extra": null
+            },
+            {
+                "question": "Verify configuration records, firmware versions and current backup information.",
+                "extra": "text"
+            },
+            {
+                "question": "Test communication paths to remote annunciation / SCADA / BMS / fire control room where used.",
+                "extra": null
+            },
+            {
+                "question": "Carry out FiberSystem 8000 annual functional checks in accordance with OEM guidance.",
+                "extra": null
+            },
+            {
+                "question": "Review fibre system event history, temperature trends and recorded faults.",
+                "extra": "text"
+            },
+            {
+                "question": "Inspect accessible fibre optic cable route, supports and physical protection along the conveyor system.",
+                "extra": null
+            },
+            {
+                "question": "Test fibre controller alarm, pre-alarm and trouble outputs.",
+                "extra": null
+            },
+            {
+                "question": "Test 100% of installed flame detectors by approved annual method / OEM self-test.",
+                "extra": null
+            },
+            {
+                "question": "Clean detector windows / optics and verify aiming / field of view.",
+                "extra": null
+            },
+            {
+                "question": "Verify flame detector fault / dirty-optics supervision.",
+                "extra": null
+            },
+            {
+                "question": "Service COBRA air purge panels: filters, compressor operation, tubing, enclosure and PSU/battery condition where fitted.",
+                "extra": null
+            },
+            {
+                "question": "Test 100% of manual call points and manual release stations.",
+                "extra": null
+            },
+            {
+                "question": "Test 100% of monitored input / output modules used for release, flow, tamper and shutdown functions.",
+                "extra": null
+            },
+            {
+                "question": "Test 100% of sounders, beacons and local annunciation devices.",
+                "extra": null
+            },
+            {
+                "question": "Verify each tested initiating device produces the correct text, alarm sequence and cause-and-effect response.",
+                "extra": null
+            },
+            {
+                "question": "Verify release inhibit, test mode, shutdown and restoration logic.",
+                "extra": null
+            },
+            {
+                "question": "Inspect accessible field cables, terminations, gland seals and earthing / bonding.",
+                "extra": null
+            },
+            {
+                "question": "Confirm signage, labels and drawings reflect the installed system.",
+                "extra": null
+            },
+            {
+                "question": "Review false alarms, unwanted trips and outstanding defects for trend analysis.",
+                "extra": "text"
+            },
+            {
+                "question": "Confirm required spares, tools and specialist test equipment availability.",
+                "extra": null
+            },
+            {
+                "question": "Restore all tested devices, clear logs and return the system to NORMAL.",
+                "extra": null
+            },
+            {
+                "question": "Handover outstanding defects / recommendations to site representative.",
+                "extra": "text"
+            }
+        ],
+        "NFPA 25": [
+            {
+                "question": "Inspect control valves and supervisory devices; verify correct position and operation.",
+                "extra": null
+            },
+            {
+                "question": "Inspect deluge valve externally and internally during outage / annual service where included in the maintenance plan.",
+                "extra": null
+            },
+            {
+                "question": "Inspect and clean strainers, filters and orifices as applicable.",
+                "extra": null
+            },
+            {
+                "question": "Perform full trip test of each deluge / releasing zone using controlled discharge or approved test arrangement.",
+                "extra": null
+            },
+            {
+                "question": "Verify waterflow alarms, release outputs and shutdown interlocks operate correctly.",
+                "extra": null
+            },
+            {
+                "question": "Measure and record static and residual pressures at test points.",
+                "extra": "pressure"
+            },
+            {
+                "question": "Inspect water supply pipework, feed lines and sectional isolations.",
+                "extra": null
+            },
+            {
+                "question": "Inspect open spray nozzles for obstruction, damage, corrosion and correct type / location.",
+                "extra": null
+            },
+            {
+                "question": "Verify nozzle alignment and spray coverage to belt, head / tail / drive areas and supporting structure.",
+                "extra": null
+            },
+            {
+                "question": "Inspect hangers, braces, supports and signs of mechanical damage.",
+                "extra": null
+            },
+            {
+                "question": "Inspect drains, test headers and relief / drip points.",
+                "extra": null
+            },
+            {
+                "question": "Inspect manual release devices and local release cabinets.",
+                "extra": null
+            },
+            {
+                "question": "Inspect solenoids, pilot / releasing lines and trim components.",
+                "extra": null
+            },
+            {
+                "question": "Inspect corrosion, scale or leakage at valves and fittings.",
+                "extra": null
+            },
+            {
+                "question": "Verify valve signage, identification and operating instructions.",
+                "extra": null
+            },
+            {
+                "question": "Review system impairments, leaks and pressure trends over the last year.",
+                "extra": "text"
+            },
+            {
+                "question": "Verify spare nozzles, wrenches and trim kits are available where required.",
+                "extra": null
+            },
+            {
+                "question": "Confirm post-test drainage / drying and corrosion prevention controls where applicable.",
+                "extra": null
+            },
+            {
+                "question": "Check interfaces to monitored water supply equipment / pump start signals where provided.",
+                "extra": null
+            },
+            {
+                "question": "Confirm protected areas have not changed in a way that compromises spray coverage.",
+                "extra": null
+            },
+            {
+                "question": "Restore all valves, trips and supervisory devices to their normal state.",
+                "extra": null
+            },
+            {
+                "question": "Record defects, corrective actions and recommendations.",
+                "extra": "text"
+            }
+        ]
+    },
+    "general": {
+        "general": [
+            {
+                "question": "Is the service label signed and current?",
+                "extra": "photo"
+            },
+            {
+                "question": "Is the service log book / maintenance record updated?",
+                "extra": "photo"
+            },
+            {
+                "question": "Is the fire protection system restored to the required AUTO / NORMAL state?",
+                "extra": "photo"
+            },
+            {
+                "question": "Are access ways, pull stations and valve stations unobstructed?",
+                "extra": "photo"
+            },
+            {
+                "question": "Have all defects / impairments been reported for corrective action?",
+                "extra": "photo"
+            }
+        ]
+    }
+}

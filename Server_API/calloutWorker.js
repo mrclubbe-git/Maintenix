@@ -1,6 +1,8 @@
 const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
+const { writeJsonAtomicSync: atomicWriteJsonSync, updateJsonWithLockSync } = require("./lib/lockedJson");
+const { findOldestQueuedJobSync, claimJobSync } = require("./lib/jobQueue");
 
 // These deps are typically already present because Servicing uses docxtemplater.
 // If image module isn't present, we generate without embedded photos.
@@ -51,14 +53,7 @@ async function readJson(p) {
 }
 
 async function writeJson(p, obj) {
-  await fsp.writeFile(p, JSON.stringify(obj, null, 2), "utf8");
-}
-
-function writeJsonAtomicSync(p, obj) {
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  const tmp = `${p}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), "utf8");
-  fs.renameSync(tmp, p);
+  atomicWriteJsonSync(p, obj);
 }
 
 function safeBasename(name) {
@@ -133,71 +128,46 @@ function readReportsMetaCompat() {
 }
 
 function upsertReportMeta(fileName, fields) {
-  const meta = readReportsMetaCompat();
-  meta.reports = meta.reports || {};
+  updateJsonWithLockSync(REPORTS_META, { reports: {} }, (meta) => {
+    if (!meta || typeof meta !== "object" || Array.isArray(meta)) meta = { reports: {} };
+    if (!meta.reports || typeof meta.reports !== "object" || Array.isArray(meta.reports)) meta.reports = {};
 
-  const existing = meta.reports[fileName] || {};
-  const existingStatus = String(existing.status || "").toUpperCase();
+    const existing = meta.reports[fileName] || {};
+    const existingStatus = String(existing.status || "").toUpperCase();
 
-  const mergedOwner =
-    normalizeOwner(fields?.owner) ||
-    normalizeOwner(existing?.owner) ||
-    normalizeOwner({
-      email: fields?.ownerEmail || existing?.ownerEmail || existing?.by || "",
-      name: fields?.technician || existing?.technician || "",
-      role: ""
-    });
+    const mergedOwner =
+      normalizeOwner(fields?.owner) ||
+      normalizeOwner(existing?.owner) ||
+      normalizeOwner({
+        email: fields?.ownerEmail || existing?.ownerEmail || existing?.by || "",
+        name: fields?.technician || existing?.technician || "",
+        role: ""
+      });
 
-  meta.reports[fileName] = {
-    ...existing,
-    ...fields,
-    owner: mergedOwner || existing.owner || undefined,
-    ownerEmail: fields?.ownerEmail || mergedOwner?.email || existing.ownerEmail || existing.by || "",
-    by: fields?.by || existing.by || mergedOwner?.email || "",
-    status: existingStatus || "PENDING",
-    updatedAt: existing.updatedAt || null,
-    updatedBy: existing.updatedBy || null
-  };
+    meta.reports[fileName] = {
+      ...existing,
+      ...fields,
+      owner: mergedOwner || existing.owner || undefined,
+      ownerEmail: fields?.ownerEmail || mergedOwner?.email || existing.ownerEmail || existing.by || "",
+      by: fields?.by || existing.by || mergedOwner?.email || "",
+      status: existingStatus || "PENDING",
+      updatedAt: existing.updatedAt || null,
+      updatedBy: existing.updatedBy || null
+    };
 
-  writeJsonAtomicSync(REPORTS_META, meta);
+    return meta;
+  });
 }
 
 // Walk one level: data/callout-queue/<userKey>/*.job.json
 async function listQueuedJobs() {
-  const jobs = [];
-  let userDirs = [];
-  try {
-    userDirs = await fsp.readdir(CALLOUT_QUEUE_DIR, { withFileTypes: true });
-  } catch {
-    return jobs;
-  }
-
-  for (const d of userDirs) {
-    if (!d.isDirectory()) continue;
-    const userKey = d.name;
-    const userPath = path.join(CALLOUT_QUEUE_DIR, userKey);
-
-    let files = [];
-    try {
-      files = await fsp.readdir(userPath, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-
-    for (const f of files) {
-      if (!f.isFile()) continue;
-      if (!f.name.endsWith(".job.json")) continue;
-      jobs.push({
-        userKey,
-        jobPath: path.join(userPath, f.name),
-        name: f.name
-      });
-    }
-  }
-
-  // oldest-first by filename timestamp-ish; good enough
-  jobs.sort((a, b) => a.name.localeCompare(b.name));
-  return jobs;
+  const jobPath = findOldestQueuedJobSync(CALLOUT_QUEUE_DIR, (name) => name.endsWith(".job.json"));
+  if (!jobPath) return [];
+  return [{
+    userKey: path.basename(path.dirname(jobPath)),
+    jobPath,
+    name: path.basename(jobPath)
+  }];
 }
 
 function statusPathFor(userKey, reportId) {
@@ -398,6 +368,8 @@ async function processOneJob(jobEntry) {
       owner: resolvedOwner,
       ownerEmail,
       by: ownerEmail || "",
+      correctionOfReport: payload?.correctionOfReport || "",
+      correctionReason: payload?.correctionReason || "",
       status: "PENDING"
     });
 
@@ -436,17 +408,27 @@ async function mainLoop() {
   // eslint-disable-next-line no-console
   console.log("CallOut worker running...");
 
+  let tickRunning = false;
+
   // Poll loop
   // (Same model as servicingWorker; simple and robust)
   // One job per tick
   setInterval(async () => {
-    const jobs = await listQueuedJobs();
-    if (!jobs.length) return;
+    if (tickRunning) return;
+    tickRunning = true;
 
     try {
-      await processOneJob(jobs[0]);
+      const jobs = await listQueuedJobs();
+      if (!jobs.length) return;
+
+      const claimedJobPath = claimJobSync(jobs[0].jobPath);
+      if (!claimedJobPath) return;
+
+      await processOneJob({ ...jobs[0], jobPath: claimedJobPath });
     } catch {
       // swallow; status gets updated inside
+    } finally {
+      tickRunning = false;
     }
   }, 2000);
 }

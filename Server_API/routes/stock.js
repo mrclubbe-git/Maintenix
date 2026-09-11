@@ -428,6 +428,29 @@ function canIssue(role) {
   return r === "ADMIN" || r === "L2";
 }
 
+
+/**
+ * GET /api/stock/delivery-note/:filename
+ * Authenticated delivery note download. Replaces direct /uploads/delivery_notes access.
+ */
+router.get("/delivery-note/:filename", requireAuth, (req, res) => {
+  if (!canIssue(req.user?.role)) return res.status(403).json({ ok: false, message: "Admin/L2 only." });
+
+  const filename = path.basename(String(req.params.filename || ""));
+  if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+    return res.status(400).json({ ok: false, message: "Invalid filename." });
+  }
+
+  const full = path.join(OUT_DIR, filename);
+  if (!full.startsWith(OUT_DIR) || !fs.existsSync(full)) {
+    return res.status(404).json({ ok: false, message: "Delivery note not found." });
+  }
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename.replace(/"/g, "")}"`);
+  fs.createReadStream(full).pipe(res);
+});
+
 /**
  * POST /api/stock/issue-note  (Admin/L2)
  * Body:
@@ -564,7 +587,7 @@ router.post("/issue-note", requireAuth, (req, res) => {
       ok: true,
       noteNo,
       filename,
-      url: `/uploads/delivery_notes/${encodeURIComponent(filename)}`
+      url: `/api/stock/delivery-note/${encodeURIComponent(filename)}`
     });
   } catch (e) {
     return res.status(500).json({

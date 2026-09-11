@@ -1,0 +1,935 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "section": "Section A1",
+      "systems": [
+        {
+          "system": "DMS Primary Stockpile Substation 380V",
+          "f": 893,
+          "g": 2200
+        },
+        {
+          "system": "DMS Tertiary Substation 11kV",
+          "f": 893,
+          "g": 2000
+        },
+        {
+          "system": "DMS Tertiary Substation 380V",
+          "f": 895,
+          "g": 2000
+        },
+        {
+          "system": "DMS Pre/Sec crushing Substation 380V",
+          "f": 895,
+          "g": 1600
+        },
+        {
+          "system": "Inpit Stockpile Substation",
+          "f": 894,
+          "g": 1800
+        },
+        {
+          "system": "Conveyor",
+          "f": 881,
+          "g": 1100
+        },
+        {
+          "system": "Conveyor",
+          "f": 881,
+          "g": 1200
+        },
+        {
+          "system": "Conveyor",
+          "f": 881,
+          "g": 2300
+        }
+      ]
+    },
+    {
+      "section": "Section A2",
+      "systems": [
+        {
+          "system": "Clarified water pump house Substation 3.3kV",
+          "f": 894,
+          "g": 2400
+        },
+        {
+          "system": "Clarified water pump house Substation 380V",
+          "f": 895,
+          "g": 2400
+        },
+        {
+          "system": "Clarified water pump house Substation 11kV",
+          "f": 893,
+          "g": 2400
+        },
+        {
+          "system": "Booster pump house Substation 380V",
+          "f": 895,
+          "g": 2500
+        },
+        {
+          "system": "Hopper Substation 11kV",
+          "f": 893,
+          "g": 6400
+        },
+        {
+          "system": "Hopper Substation 380V",
+          "f": 895,
+          "g": 6400
+        },
+        {
+          "system": "Generator Room (BPH)",
+          "f": 897,
+          "g": 9300
+        },
+        {
+          "system": "UCC Substation 380V",
+          "f": 895,
+          "g": 9000
+        },
+        {
+          "system": "Conveyor",
+          "f": 881,
+          "g": 3100
+        }
+      ]
+    },
+    {
+      "section": "Section B",
+      "systems": [
+        {
+          "system": "Drum plant Substation 11kV",
+          "f": 893,
+          "g": 2800
+        },
+        {
+          "system": "Drum plant Substation 3.3 kV",
+          "f": 894,
+          "g": 2800
+        },
+        {
+          "system": "Drum plant Substation 380V",
+          "f": 895,
+          "g": 2800
+        },
+        {
+          "system": "Cyclone plant Substation 11kV",
+          "f": 893,
+          "g": 3200
+        },
+        {
+          "system": "Cyclone Plant Substation 3.3kV",
+          "f": 894,
+          "g": 3200
+        },
+        {
+          "system": "Cyclone plant Substation 380V",
+          "f": 894,
+          "g": 3200
+        },
+        {
+          "system": "Cyclone plant Substation 380V Top",
+          "f": 894,
+          "g": 3200
+        },
+        {
+          "system": "Waste bottom Substation 11kV",
+          "f": 893,
+          "g": 4800
+        },
+        {
+          "system": "Waste bottom Substation 380V",
+          "f": 895,
+          "g": 4800
+        },
+        {
+          "system": "DMS North Plant Main Substation 11KV  Cable room",
+          "f": 893,
+          "g": 1100
+        },
+        {
+          "system": "DMS North Plant Main Substation Cable Room",
+          "f": 893,
+          "g": 1100
+        },
+        {
+          "system": "Waste Handling Top Substation 11kV",
+          "f": 893,
+          "g": 5000
+        },
+        {
+          "system": "Waste Handling Top Substation 380V",
+          "f": 895,
+          "g": 5000
+        },
+        {
+          "system": "Robot Room",
+          "f": "J222",
+          "g": null
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 1100
+        },
+        {
+          "system": "Taster Plant (DMS) Substation S1",
+          "f": 893,
+          "g": 7000
+        },
+        {
+          "system": "Taster Plant (DMS) Substation S2",
+          "f": 893,
+          "g": 7000
+        },
+        {
+          "system": "JIG Main Lab Substation",
+          "f": 543,
+          "g": 4600
+        }
+      ]
+    },
+    {
+      "section": "Section C",
+      "systems": [
+        {
+          "system": "Quaternary Crusher Substation",
+          "f": 894,
+          "g": 4000
+        },
+        {
+          "system": "Quaternary Screening Substation 11kV",
+          "f": 893,
+          "g": 3600
+        },
+        {
+          "system": "Quaternary Screening Substation 380V",
+          "f": 894,
+          "g": 3600
+        },
+        {
+          "system": "Blending bed north Substation 380kV",
+          "f": 895,
+          "g": 8200
+        },
+        {
+          "system": "Blending bed north Substation 11kV",
+          "f": 893,
+          "g": 8200
+        },
+        {
+          "system": "Blending bed south Substation 380V",
+          "f": 894,
+          "g": 8000
+        },
+        {
+          "system": "Blending bed south Substation 11kV",
+          "f": 893,
+          "g": 8000
+        },
+        {
+          "system": "South Fine Substation 380V",
+          "f": 895,
+          "g": 8400
+        },
+        {
+          "system": "Stacker E - House",
+          "f": 771,
+          "g": 6100
+        },
+        {
+          "system": "Stacker E - House",
+          "f": 772,
+          "g": 6100
+        },
+        {
+          "system": "Stacker E - House",
+          "f": 773,
+          "g": 6100
+        },
+        {
+          "system": "Stacker E - House",
+          "f": 774,
+          "g": 6100
+        },
+        {
+          "system": "Stacker/Reclaimer E - House",
+          "f": 851,
+          "g": 6100
+        },
+        {
+          "system": "Load out 3 Substation 380V",
+          "f": 895,
+          "g": 8600
+        },
+        {
+          "system": "Load out 1&2 Substation 380V",
+          "f": 895,
+          "g": 4500
+        },
+        {
+          "system": "Reclaimer E - House",
+          "f": 847,
+          "g": 6300
+        },
+        {
+          "system": "Reclaimer E - House",
+          "f": 775,
+          "g": 6300
+        },
+        {
+          "system": "Reclaimer E - House",
+          "f": 421,
+          "g": 1000
+        },
+        {
+          "system": "Reclaimer E - House",
+          "f": 411,
+          "g": 1000
+        },
+        {
+          "system": "Direct Reduction Plant Substation",
+          "f": 893,
+          "g": 7800
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 1200
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 1300
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 2300
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 4700
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 4900
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 9700
+        },
+        {
+          "system": "Conveyor",
+          "f": 883,
+          "g": 6100
+        }
+      ]
+    },
+    {
+      "section": "IIT & IT",
+      "systems": [
+        {
+          "system": "Telemetry server room",
+          "f": 450,
+          "g": 3500
+        },
+        {
+          "system": "Server Load-out 1&2 UPS room",
+          "f": 638,
+          "g": 3224
+        },
+        {
+          "system": "Server Load-out 1&2 PLC room",
+          "f": 638,
+          "g": 3224
+        },
+        {
+          "system": "Server room Load-out 1&2",
+          "f": 638,
+          "g": 3224
+        },
+        {
+          "system": "Server B&C UPS room",
+          "f": 638,
+          "g": 3223
+        },
+        {
+          "system": "Server room B&C",
+          "f": 638,
+          "g": 3223
+        },
+        {
+          "system": "Server room KGB",
+          "f": 638,
+          "g": 3129
+        },
+        {
+          "system": "Server room KGB UPS",
+          "f": 638,
+          "g": 3129
+        },
+        {
+          "system": "Tertiary UPS rooms",
+          "f": 895,
+          "g": 2027
+        },
+        {
+          "system": "Tertiary server rooms",
+          "f": 895,
+          "g": 2027
+        },
+        {
+          "system": "Finance Archive",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "PMR Container",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "MSR Container",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "MOIC Building Control room",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "IMSO Building Offices",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "GSS (Finance) Server room",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "Jig Beneficiation Server",
+          "f": null,
+          "g": null
+        }
+      ]
+    },
+    {
+      "section": "HT Engineering HV",
+      "systems": [
+        {
+          "system": "Main Sub G10 11kV",
+          "f": 891,
+          "g": 1000
+        },
+        {
+          "system": "Main Sub G10 BTU",
+          "f": 891,
+          "g": 1000
+        },
+        {
+          "system": "Main Sub G10 66kV",
+          "f": 891,
+          "g": 1000
+        },
+        {
+          "system": "Tyre Workshop Sub",
+          "f": 893,
+          "g": 5600
+        },
+        {
+          "system": "Finance Sub",
+          "f": 893,
+          "g": 1900
+        },
+        {
+          "system": "Mikom Sub",
+          "f": 893,
+          "g": 2100
+        },
+        {
+          "system": "Bucket & Bowl Sub",
+          "f": 893,
+          "g": 5801
+        },
+        {
+          "system": "Life of Mine Sub",
+          "f": 893,
+          "g": 5701
+        },
+        {
+          "system": "Pitsub 1",
+          "f": 891,
+          "g": 1200
+        },
+        {
+          "system": "Pitsub 2",
+          "f": 891,
+          "g": 1400
+        },
+        {
+          "system": "Pitsub 5",
+          "f": 541,
+          "g": 1300
+        },
+        {
+          "system": "Pitsub 4",
+          "f": 891,
+          "g": 1700
+        },
+        {
+          "system": "Bruce Sub",
+          "f": 891,
+          "g": 1500
+        },
+        {
+          "system": "Tshipi Sub",
+          "f": 606,
+          "g": 500
+        },
+        {
+          "system": "Occupational Health Sub",
+          "f": 606,
+          "g": 600
+        },
+        {
+          "system": "Export Pipeline Sub",
+          "f": 893,
+          "g": 6700
+        }
+      ]
+    },
+    {
+      "section": "HT Engineering LV",
+      "systems": [
+        {
+          "system": "Tshipi Sub",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "Occupational Health Sub",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "Nooitgedacht Sub",
+          "f": 895,
+          "g": 6511
+        },
+        {
+          "system": "MTS Archive Room",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "Life of Mine Sub",
+          "f": 893,
+          "g": 5700
+        },
+        {
+          "system": "Life of Mine PLC",
+          "f": 893,
+          "g": 5700
+        },
+        {
+          "system": "Bucket & Bowl Sub",
+          "f": 895,
+          "g": 5800
+        }
+      ]
+    },
+    {
+      "section": "JIG Beneficiation",
+      "systems": [
+        {
+          "system": "Feed Bunkers Substation",
+          "f": "J542",
+          "g": 2800
+        },
+        {
+          "system": "Jig Beneficiation Substation Cable Room",
+          "f": "J542",
+          "g": 3000
+        },
+        {
+          "system": "Jig Beneficiation Substation 525V",
+          "f": "J543",
+          "g": 3000
+        },
+        {
+          "system": "Jig Beneficiation Substation 3.3kV",
+          "f": "J542",
+          "g": 3000
+        },
+        {
+          "system": "Jig Beneficiation Substation 11kV",
+          "f": "J542",
+          "g": 3000
+        },
+        {
+          "system": "JIG G10 Main Substation",
+          "f": "J893",
+          "g": 1000
+        },
+        {
+          "system": "SEB 1 B Substation 525V",
+          "f": "J543",
+          "g": 3402
+        },
+        {
+          "system": "SEB 1 B Substation Cable room",
+          "f": "J543",
+          "g": 3402
+        },
+        {
+          "system": "JIG Control Room",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "JIG Training Centre",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "JIG Workshop Tool store",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3905
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3907
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3901
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3909
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3902
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3904
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3908
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 542,
+          "g": 3901
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 542,
+          "g": 3902
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 542,
+          "g": 3905
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 542,
+          "g": 3910
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 542,
+          "g": 3903
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3903
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 542,
+          "g": 3904
+        },
+        {
+          "system": "DMS Modular Plant Substation",
+          "f": 543,
+          "g": 3906
+        },
+        {
+          "system": "De-Watering Plant Substation",
+          "f": 543,
+          "g": 3600
+        }
+      ]
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "systems": [
+        {
+          "system": "JIG Primary Secondary Crusher Substation",
+          "f": "J542",
+          "g": 5100
+        },
+        {
+          "system": "JIG Tertiary Crusher Substation 525V",
+          "f": "J543",
+          "g": 2400
+        },
+        {
+          "system": "JIG Tertiary Crusher Substation 11kV",
+          "f": "J542",
+          "g": 2400
+        },
+        {
+          "system": "Pit Substation 5",
+          "f": "J891",
+          "g": 1400
+        },
+        {
+          "system": "Rom Substation",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "JIG Primary Control Room",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "Inpit Tripper",
+          "f": 894,
+          "g": 7500
+        },
+        {
+          "system": "Inpit Stacker",
+          "f": 894,
+          "g": 7600
+        },
+        {
+          "system": "Inpit Stacker",
+          "f": 894,
+          "g": 7600
+        },
+        {
+          "system": "Inpit Stacker",
+          "f": 893,
+          "g": 7400
+        },
+        {
+          "system": "Conveyor S1",
+          "f": 151,
+          "g": 1100
+        },
+        {
+          "system": "Conveyor S2",
+          "f": 151,
+          "g": 1100
+        },
+        {
+          "system": "Conveyor S3",
+          "f": 151,
+          "g": 1100
+        },
+        {
+          "system": "Conveyor",
+          "f": 152,
+          "g": 1200
+        },
+        {
+          "system": "Conveyor",
+          "f": 152,
+          "g": 1300
+        },
+        {
+          "system": "Conveyor S1",
+          "f": 152,
+          "g": 1400
+        },
+        {
+          "system": "Conveyor S2",
+          "f": 152,
+          "g": 1400
+        },
+        {
+          "system": "Conveyor S1",
+          "f": 153,
+          "g": 2100
+        },
+        {
+          "system": "Conveyor S2",
+          "f": 153,
+          "g": 2100
+        },
+        {
+          "system": "Conveyor S3",
+          "f": 153,
+          "g": 2100
+        },
+        {
+          "system": "Conveyor S1",
+          "f": 153,
+          "g": 2200
+        },
+        {
+          "system": "Conveyor S2",
+          "f": 153,
+          "g": 2200
+        },
+        {
+          "system": "Conveyor S1",
+          "f": 153,
+          "g": 2300
+        },
+        {
+          "system": "Conveyor S2",
+          "f": 153,
+          "g": 2300
+        },
+        {
+          "system": "Conveyor S1",
+          "f": 154,
+          "g": 2700
+        },
+        {
+          "system": "Conveyor S2",
+          "f": 154,
+          "g": 2700
+        },
+        {
+          "system": "Conveyor",
+          "f": 154,
+          "g": 2800
+        },
+        {
+          "system": "Conveyor",
+          "f": 154,
+          "g": 2900
+        },
+        {
+          "system": "Conveyor S1",
+          "f": 154,
+          "g": 3000
+        },
+        {
+          "system": "Conveyor S2",
+          "f": 154,
+          "g": 3000
+        }
+      ]
+    },
+    {
+      "section": "JIG Outside Services",
+      "systems": [
+        {
+          "system": "JIG Process Water Substation S1",
+          "f": 542,
+          "g": 3200
+        },
+        {
+          "system": "JIG Process Water Substation S2",
+          "f": 542,
+          "g": 3200
+        },
+        {
+          "system": "JIG Slimes Feed Substation S1",
+          "f": 542,
+          "g": 3400
+        },
+        {
+          "system": "JIG Slimes Feed Substation S2",
+          "f": 542,
+          "g": 3400
+        },
+        {
+          "system": "Hopper VSD Substation",
+          "f": 893,
+          "g": 6400
+        },
+        {
+          "system": "JIG Thickener Substation",
+          "f": 543,
+          "g": 3403
+        },
+        {
+          "system": "JIG Reclaimer E - House",
+          "f": 211,
+          "g": 1000
+        },
+        {
+          "system": "JIG Product Stacker Lump E-house",
+          "f": 410,
+          "g": 1000
+        },
+        {
+          "system": "JIG Product Stacker E-house",
+          "f": 210,
+          "g": 1000
+        },
+        {
+          "system": "JIG Product Stacker Fine E-house",
+          "f": 420,
+          "g": 1000
+        },
+        {
+          "system": "Waste Pivot Top Substation",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "Final Product Handling Substation",
+          "f": null,
+          "g": null
+        }
+      ]
+    },
+    {
+      "section": "MOIC",
+      "systems": [
+        {
+          "system": "Addressable Detection",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "Roof Void Suppression",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "PC Room Suppression",
+          "f": null,
+          "g": null
+        },
+        {
+          "system": "UPS Suppression",
+          "f": null,
+          "g": null
+        }
+      ]
+    }
+  ]
+}

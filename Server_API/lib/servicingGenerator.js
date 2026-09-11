@@ -1,5 +1,12 @@
 const fs = require("fs");
 const path = require("path");
+const {
+  monthStamp,
+  reportRelativePath,
+  resolveSectionForArea,
+  resolveUnder,
+  ensureDir: ensureReportDir
+} = require("./reportStorage");
 
 // DOCX templating
 let PizZip = null;
@@ -361,14 +368,24 @@ async function generateServicingDocx(opts) {
   }
 
   const generatedFileName = chosen;
-  const generatedPath = path.join(reportsDir, generatedFileName);
+  const sectionInfo = resolveSectionForArea(data.area);
+  const reportMonth = monthStamp(data.createdAt || payload?.dateCreated || payload?.createdAt || createdIso);
+  const relativePath = reportRelativePath(sectionInfo.section, reportMonth, generatedFileName).replace(/\\/g, "/");
+  const generatedPath = resolveUnder(reportsDir, relativePath);
+  if (!generatedPath) throw new Error("Invalid generated report path.");
+  ensureReportDir(path.dirname(generatedPath));
   fs.writeFileSync(generatedPath, outBuf);
 
   if (typeof upsertReportMeta === "function") {
-    upsertReportMeta(generatedFileName, {
+    upsertReportMeta(relativePath, {
       id: reportId,
       type: "SERVICING",
       fileName: generatedFileName,
+      relativePath,
+      section: sectionInfo.section,
+      sectionMatch: sectionInfo.matched ? sectionInfo.reason : "missing",
+      sectionMatchedArea: sectionInfo.matchedArea || "",
+      reportMonth,
       area: data.area,
       service: data.service,
       technician: data.technician,
@@ -377,6 +394,8 @@ async function generateServicingDocx(opts) {
       signatureFile: signatureFileName,
       signaturePath,
       photos: savedPhotos || [],
+      correctionOfReport: payload?.correctionOfReport || "",
+      correctionReason: payload?.correctionReason || "",
       owner: resolvedOwner,
       ownerEmail,
       by: ownerEmail || user?.email || user?.id || "unknown"
@@ -385,7 +404,10 @@ async function generateServicingDocx(opts) {
 
   return {
     fileName: generatedFileName,
-    url: `/api/servicing/download/${encodeURIComponent(generatedFileName)}`,
+    relativePath,
+    section: sectionInfo.section,
+    reportMonth,
+    url: `/api/servicing/download?path=${encodeURIComponent(relativePath)}`,
     signatureFileName,
     signaturePath
   };

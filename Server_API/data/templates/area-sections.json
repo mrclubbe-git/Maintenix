@@ -1,0 +1,1942 @@
+{
+  "version": 1,
+  "generatedFrom": "Kumba Service List workbook",
+  "areaCount": 188,
+  "sections": {
+    "Section A1": [
+      "DMS Primary Stockpile Substation 380V 893 - 2200",
+      "DMS Tertiary Substation 11kV 893 - 2000",
+      "DMS Tertiary Substation 380V 895 - 2000",
+      "DMS Pre/Sec crushing Substation 380V 895 - 1600",
+      "Inpit Stockpile Substation 894 - 1800",
+      "Conveyor 881 - 1100",
+      "Conveyor 881 - 1200",
+      "883 1100"
+    ],
+    "Section A2": [
+      "Clarified water pump house Substation 3.3kV 894 - 2400",
+      "Clarified water pump house Substation 380V 895 - 2400",
+      "Clarified water pump house Substation 11kV 893 - 2400",
+      "Booster pump house Substation 380V 895 - 2500",
+      "Hopper Substation 11kV 893 - 6400",
+      "Hopper Substation 380V 895 - 6400",
+      "Generator Room (BPH) 897 - 9300",
+      "UCC Substation 380V 895 - 9000",
+      "Conveyor 881 - 3100"
+    ],
+    "Section B": [
+      "Drum plant Substation 11kV 893 - 2800",
+      "Drum plant Substation 3.3 kV 894 - 2800",
+      "Drum plant Substation 380V 895 - 2800",
+      "Cyclone plant Substation 11kV 893 - 3200",
+      "Cyclone Plant Substation 3.3kV 894 - 3200",
+      "Cyclone plant Substation 380V 894 - 3200",
+      "Cyclone plant Substation 380V Top 894 - 3200",
+      "Waste bottom Substation 11kV 893 - 4800",
+      "Waste bottom Substation 380V 895 - 4800",
+      "DMS North Plant Main Substation 11KV Cable room 893 - 1100",
+      "DMS North Plant Main Substation Cable Room 893 - 1100",
+      "Waste Handling Top Substation 11kV 893 - 5000",
+      "Waste Handling Top Substation 380V 895 - 5000",
+      "Robot Room J222 -",
+      "Conveyor 883 - 1100",
+      "Taster Plant (DMS) Substation S1 893 - 7000",
+      "Taster Plant (DMS) Substation S2 893 - 7000",
+      "JIG Main Lab Substation 543 - 4600",
+      "Drum 3.3",
+      "Drum 380"
+    ],
+    "Section C": [
+      "Quaternary Crusher Substation 894 - 4000",
+      "Quaternary Screening Substation 11kV 893 - 3600",
+      "Quaternary Screening Substation 380V 894 - 3600",
+      "Blending bed north Substation 380kV 895 - 8200",
+      "Blending bed north Substation 11kV 893 - 8200",
+      "Blending bed south Substation 380V 894 - 8000",
+      "Blending bed south Substation 11kV 893 - 8000",
+      "South Fine Substation 380V 895 - 8400",
+      "Stacker E - House 771 - 6100",
+      "Stacker E - House 772 - 6100",
+      "Stacker E - House 773 - 6100",
+      "Stacker E - House 774 - 6100",
+      "Stacker/Reclaimer E - House 851 - 6100",
+      "Load out 3 Substation 380V 895 - 8600",
+      "Load out 1&2 Substation 380V 895 - 4500",
+      "Reclaimer E - House 847 - 6300",
+      "Reclaimer E - House 775 - 6300",
+      "Reclaimer E - House 421 - 1000",
+      "Reclaimer E - House 411 - 1000",
+      "Direct Reduction Plant Substation 893 - 7800",
+      "Load out 1 lube room F850-G8500",
+      "Load out 3 lube room F780-G8500"
+    ],
+    "IIT & IT": [
+      "Telemetry server room 450 - 3500",
+      "Server Load-out 1&2 UPS room 638 - 3224",
+      "Server Load-out 1&2 PLC room 638 - 3224",
+      "Server room Load-out 1&2 638 - 3224",
+      "Server B&C UPS room 638 - 3223",
+      "Server room B&C 638 - 3223",
+      "Server room KGB 638 - 3129",
+      "Server room KGB UPS 638 - 3129",
+      "Tertiary UPS rooms 895 - 2027",
+      "Tertiary server rooms 895 - 2027",
+      "Finance Archive  -",
+      "PMR Container  -",
+      "MSR Container  -",
+      "MOIC Building Control room  -",
+      "IMSO Building Offices  -",
+      "GSS (Finance) Server room  -",
+      "Jig Beneficiation Server  -",
+      "IM LOM Server room -",
+      "PSR Container F638-G3272"
+    ],
+    "HT Engineering": [
+      "G10 Substation 11kV 891 - 1000",
+      "G10 Substation UPS Room 891 - 1000",
+      "G10 Substation 66kV 891 - 1000",
+      "Central Workshop Substation 11kV 893 - 1900",
+      "Tyre Workshop Substation 11kV 893 - 1800",
+      "Mikon Workshop Substation 11kV 893 - 2100",
+      "Pit Substation 1 893 - 1200",
+      "Pit Substation 2 541 - 1300",
+      "Pit Substation 3 891 - 1500",
+      "Pit Substation 4 891 - 1700",
+      "Pit Substation 5  -",
+      "Tshipi Substation  -",
+      "Onboarding Substation  -",
+      "Nooitgedacht Substation 380V 895 - 6511",
+      "MTS Archive Room  -",
+      "LOM Haul Truck Workshop Substation S1 893 - 5700",
+      "LOM Haul Truck Workshop Substation S2 893 - 5700",
+      "LOM Haul Truck Workshop Substation S3 893 - 5700",
+      "Bucket & Bowl Substation S1 893 - 5800",
+      "Bucket & Bowl Substation S2 895 - 5800",
+      "LOM Haul Truck Workshop PLC room F895-G5700",
+      "On Boarding Centre subs F606-G0600",
+      "Total subsation F895-G5900",
+      "Tshipi Training subs F606-G0500"
+    ],
+    "JIG Beneficiation": [
+      "Feed Bunkers Substation J542 - 2800",
+      "Jig Beneficiation Substation Cable Room J542 - 3000",
+      "Jig Beneficiation Substation 525V J543 - 3000",
+      "Jig Beneficiation Substation 3.3kV J542 - 3000",
+      "Jig Beneficiation Substation 11kV J542 - 3000",
+      "JIG G10 Main Substation J893 - 1000",
+      "SEB 1 B Substation 525V J543 - 3402",
+      "SEB 1 B Substation Cable room J543 - 3402",
+      "JIG Control Room  -",
+      "JIG Training Centre  -",
+      "JIG Workshop Tool store  -",
+      "DMS Modular Plant Substation 543 - 3905",
+      "DMS Modular Plant Substation 543 - 3907",
+      "DMS Modular Plant Substation 543 - 3901",
+      "DMS Modular Plant Substation 543 - 3909",
+      "DMS Modular Plant Substation 543 - 3902",
+      "DMS Modular Plant Substation 543 - 3904",
+      "DMS Modular Plant Substation 543 - 3908",
+      "DMS Modular Plant Substation 542 - 3901",
+      "DMS Modular Plant Substation 542 - 3902",
+      "DMS Modular Plant Substation 542 - 3905",
+      "DMS Modular Plant Substation 542 - 3910",
+      "DMS Modular Plant Substation 542 - 3903",
+      "DMS Modular Plant Substation 543 - 3903",
+      "DMS Modular Plant Substation 542 - 3904",
+      "DMS Modular Plant Substation 543 - 3906",
+      "De-Watering Plant Substation 543 - 3600",
+      "Jib Ben 525v",
+      "Jig Beneficiation Control server J544-G3402",
+      "Modular J543-3906"
+    ],
+    "JIG Primary & Secondary": [
+      "JIG Primary Secondary Crusher Substation J542 - 5100",
+      "JIG Tertiary Crusher Substation 525V J543 - 2400",
+      "JIG Tertiary Crusher Substation 11kV J542 - 2400",
+      "Pit Substation 5 J891 - 1400",
+      "Rom Substation  -",
+      "JIG Primary Control Room  -",
+      "Inpit Tripper 894 - 7500",
+      "Inpit Stacker 894 - 7600",
+      "Inpit Stacker 894 - 7600",
+      "Inpit Stacker 893 - 7400",
+      "Conveyor S1 151 - 1100",
+      "Conveyor S2 151 - 1100",
+      "Conveyor S3 151 - 1100",
+      "Conveyor 152 - 1200",
+      "Conveyor 152 - 1300",
+      "Conveyor S1 152 - 1400",
+      "Conveyor S2 152 - 1400",
+      "Conveyor S1 153 - 2100",
+      "Conveyor S2 153 - 2100",
+      "Conveyor S3 153 - 2100",
+      "Conveyor S1 153 - 2200",
+      "Conveyor S2 153 - 2200",
+      "Conveyor S1 153 - 2300",
+      "Conveyor S2 153 - 2300",
+      "Conveyor S1 154 - 2700",
+      "Conveyor S2 154 - 2700",
+      "Conveyor 154 - 2800",
+      "Conveyor 154 - 2900",
+      "Conveyor S1 154 - 3000",
+      "Conveyor S2 154 - 3000",
+      "Primary Secondary Crusher J542-G2000"
+    ],
+    "JIG Outside Services": [
+      "JIG Process Water Substation S1 542 - 3200",
+      "JIG Process Water Substation S2 542 - 3200",
+      "JIG Slimes Feed Substation S1 542 - 3400",
+      "JIG Slimes Feed Substation S2 542 - 3400",
+      "Hopper VSD Substation 893 - 6400",
+      "JIG Thickener Substation 543 - 3403",
+      "JIG Reclaimer E - House 211 - 1000",
+      "JIG Product Stacker Lump E-house 410 - 1000",
+      "JIG Product Stacker E-house 210 - 1000",
+      "JIG Product Stacker Fine E-house 420 - 1000",
+      "Waste Pivot Top Substation  -",
+      "Final Product Handling Substation  -",
+      "J410",
+      "Jig Product Beds sub/Final Product Handeling J542-G3800",
+      "Return Water sub J543-G4000",
+      "Return water Substation 543 - 4000",
+      "VSD 525V Hopper substation F525-G",
+      "Waste Pivot sub J543-G4400"
+    ],
+    "Warranty Conveyors": [
+      "Conveyor 881 - 2300",
+      "Conveyor 883 - 1200",
+      "Conveyor 883 - 1300",
+      "Conveyor 883 - 2300",
+      "Conveyor 883 - 4700",
+      "Conveyor 883 - 4900",
+      "Conveyor 883 - 9700",
+      "Conveyor 883 - 6100"
+    ]
+  },
+  "areas": [
+    {
+      "section": "Section A1",
+      "area": "DMS Primary Stockpile Substation 380V 893 - 2200",
+      "baseArea": "DMS Primary Stockpile Substation 380V",
+      "first": "893",
+      "second": "2200",
+      "workbookRow": 2
+    },
+    {
+      "section": "Section A1",
+      "area": "DMS Tertiary Substation 11kV 893 - 2000",
+      "baseArea": "DMS Tertiary Substation 11kV",
+      "first": "893",
+      "second": "2000",
+      "workbookRow": 3
+    },
+    {
+      "section": "Section A1",
+      "area": "DMS Tertiary Substation 380V 895 - 2000",
+      "baseArea": "DMS Tertiary Substation 380V",
+      "first": "895",
+      "second": "2000",
+      "workbookRow": 4
+    },
+    {
+      "section": "Section A1",
+      "area": "DMS Pre/Sec crushing Substation 380V 895 - 1600",
+      "baseArea": "DMS Pre/Sec crushing Substation 380V",
+      "first": "895",
+      "second": "1600",
+      "workbookRow": 5
+    },
+    {
+      "section": "Section A1",
+      "area": "Inpit Stockpile Substation 894 - 1800",
+      "baseArea": "Inpit Stockpile Substation",
+      "first": "894",
+      "second": "1800",
+      "workbookRow": 6
+    },
+    {
+      "section": "Section A1",
+      "area": "Conveyor 881 - 1100",
+      "baseArea": "Conveyor",
+      "first": "881",
+      "second": "1100",
+      "workbookRow": 7
+    },
+    {
+      "section": "Section A1",
+      "area": "Conveyor 881 - 1200",
+      "baseArea": "Conveyor",
+      "first": "881",
+      "second": "1200",
+      "workbookRow": 8
+    },
+    {
+      "section": "Section A2",
+      "area": "Clarified water pump house Substation 3.3kV 894 - 2400",
+      "baseArea": "Clarified water pump house Substation 3.3kV",
+      "first": "894",
+      "second": "2400",
+      "workbookRow": 2
+    },
+    {
+      "section": "Section A2",
+      "area": "Clarified water pump house Substation 380V 895 - 2400",
+      "baseArea": "Clarified water pump house Substation 380V",
+      "first": "895",
+      "second": "2400",
+      "workbookRow": 3
+    },
+    {
+      "section": "Section A2",
+      "area": "Clarified water pump house Substation 11kV 893 - 2400",
+      "baseArea": "Clarified water pump house Substation 11kV",
+      "first": "893",
+      "second": "2400",
+      "workbookRow": 4
+    },
+    {
+      "section": "Section A2",
+      "area": "Booster pump house Substation 380V 895 - 2500",
+      "baseArea": "Booster pump house Substation 380V",
+      "first": "895",
+      "second": "2500",
+      "workbookRow": 5
+    },
+    {
+      "section": "Section A2",
+      "area": "Hopper Substation 11kV 893 - 6400",
+      "baseArea": "Hopper Substation 11kV",
+      "first": "893",
+      "second": "6400",
+      "workbookRow": 6
+    },
+    {
+      "section": "Section A2",
+      "area": "Hopper Substation 380V 895 - 6400",
+      "baseArea": "Hopper Substation 380V",
+      "first": "895",
+      "second": "6400",
+      "workbookRow": 7
+    },
+    {
+      "section": "Section A2",
+      "area": "Generator Room (BPH) 897 - 9300",
+      "baseArea": "Generator Room (BPH)",
+      "first": "897",
+      "second": "9300",
+      "workbookRow": 8
+    },
+    {
+      "section": "Section A2",
+      "area": "UCC Substation 380V 895 - 9000",
+      "baseArea": "UCC Substation 380V",
+      "first": "895",
+      "second": "9000",
+      "workbookRow": 9
+    },
+    {
+      "section": "Section A2",
+      "area": "Conveyor 881 - 3100",
+      "baseArea": "Conveyor",
+      "first": "881",
+      "second": "3100",
+      "workbookRow": 10
+    },
+    {
+      "section": "Section B",
+      "area": "Drum plant Substation 11kV 893 - 2800",
+      "baseArea": "Drum plant Substation 11kV",
+      "first": "893",
+      "second": "2800",
+      "workbookRow": 2
+    },
+    {
+      "section": "Section B",
+      "area": "Drum plant Substation 3.3 kV 894 - 2800",
+      "baseArea": "Drum plant Substation 3.3 kV",
+      "first": "894",
+      "second": "2800",
+      "workbookRow": 3
+    },
+    {
+      "section": "Section B",
+      "area": "Drum plant Substation 380V 895 - 2800",
+      "baseArea": "Drum plant Substation 380V",
+      "first": "895",
+      "second": "2800",
+      "workbookRow": 4
+    },
+    {
+      "section": "Section B",
+      "area": "Cyclone plant Substation 11kV 893 - 3200",
+      "baseArea": "Cyclone plant Substation 11kV",
+      "first": "893",
+      "second": "3200",
+      "workbookRow": 5
+    },
+    {
+      "section": "Section B",
+      "area": "Cyclone Plant Substation 3.3kV 894 - 3200",
+      "baseArea": "Cyclone Plant Substation 3.3kV",
+      "first": "894",
+      "second": "3200",
+      "workbookRow": 6
+    },
+    {
+      "section": "Section B",
+      "area": "Cyclone plant Substation 380V 894 - 3200",
+      "baseArea": "Cyclone plant Substation 380V",
+      "first": "894",
+      "second": "3200",
+      "workbookRow": 7
+    },
+    {
+      "section": "Section B",
+      "area": "Cyclone plant Substation 380V Top 894 - 3200",
+      "baseArea": "Cyclone plant Substation 380V Top",
+      "first": "894",
+      "second": "3200",
+      "workbookRow": 8
+    },
+    {
+      "section": "Section B",
+      "area": "Waste bottom Substation 11kV 893 - 4800",
+      "baseArea": "Waste bottom Substation 11kV",
+      "first": "893",
+      "second": "4800",
+      "workbookRow": 9
+    },
+    {
+      "section": "Section B",
+      "area": "Waste bottom Substation 380V 895 - 4800",
+      "baseArea": "Waste bottom Substation 380V",
+      "first": "895",
+      "second": "4800",
+      "workbookRow": 10
+    },
+    {
+      "section": "Section B",
+      "area": "DMS North Plant Main Substation 11KV Cable room 893 - 1100",
+      "baseArea": "DMS North Plant Main Substation 11KV Cable room",
+      "first": "893",
+      "second": "1100",
+      "workbookRow": 11
+    },
+    {
+      "section": "Section B",
+      "area": "DMS North Plant Main Substation Cable Room 893 - 1100",
+      "baseArea": "DMS North Plant Main Substation Cable Room",
+      "first": "893",
+      "second": "1100",
+      "workbookRow": 12
+    },
+    {
+      "section": "Section B",
+      "area": "Waste Handling Top Substation 11kV 893 - 5000",
+      "baseArea": "Waste Handling Top Substation 11kV",
+      "first": "893",
+      "second": "5000",
+      "workbookRow": 13
+    },
+    {
+      "section": "Section B",
+      "area": "Waste Handling Top Substation 380V 895 - 5000",
+      "baseArea": "Waste Handling Top Substation 380V",
+      "first": "895",
+      "second": "5000",
+      "workbookRow": 14
+    },
+    {
+      "section": "Section B",
+      "area": "Robot Room J222 -",
+      "baseArea": "Robot Room",
+      "first": "J222",
+      "second": "",
+      "workbookRow": 15
+    },
+    {
+      "section": "Section B",
+      "area": "Conveyor 883 - 1100",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "1100",
+      "workbookRow": 16
+    },
+    {
+      "section": "Section B",
+      "area": "Taster Plant (DMS) Substation S1 893 - 7000",
+      "baseArea": "Taster Plant (DMS) Substation S1",
+      "first": "893",
+      "second": "7000",
+      "workbookRow": 17
+    },
+    {
+      "section": "Section B",
+      "area": "Taster Plant (DMS) Substation S2 893 - 7000",
+      "baseArea": "Taster Plant (DMS) Substation S2",
+      "first": "893",
+      "second": "7000",
+      "workbookRow": 18
+    },
+    {
+      "section": "Section B",
+      "area": "JIG Main Lab Substation 543 - 4600",
+      "baseArea": "JIG Main Lab Substation",
+      "first": "543",
+      "second": "4600",
+      "workbookRow": 19
+    },
+    {
+      "section": "Section C",
+      "area": "Quaternary Crusher Substation 894 - 4000",
+      "baseArea": "Quaternary Crusher Substation",
+      "first": "894",
+      "second": "4000",
+      "workbookRow": 2
+    },
+    {
+      "section": "Section C",
+      "area": "Quaternary Screening Substation 11kV 893 - 3600",
+      "baseArea": "Quaternary Screening Substation 11kV",
+      "first": "893",
+      "second": "3600",
+      "workbookRow": 3
+    },
+    {
+      "section": "Section C",
+      "area": "Quaternary Screening Substation 380V 894 - 3600",
+      "baseArea": "Quaternary Screening Substation 380V",
+      "first": "894",
+      "second": "3600",
+      "workbookRow": 4
+    },
+    {
+      "section": "Section C",
+      "area": "Blending bed north Substation 380kV 895 - 8200",
+      "baseArea": "Blending bed north Substation 380kV",
+      "first": "895",
+      "second": "8200",
+      "workbookRow": 5
+    },
+    {
+      "section": "Section C",
+      "area": "Blending bed north Substation 11kV 893 - 8200",
+      "baseArea": "Blending bed north Substation 11kV",
+      "first": "893",
+      "second": "8200",
+      "workbookRow": 6
+    },
+    {
+      "section": "Section C",
+      "area": "Blending bed south Substation 380V 894 - 8000",
+      "baseArea": "Blending bed south Substation 380V",
+      "first": "894",
+      "second": "8000",
+      "workbookRow": 7
+    },
+    {
+      "section": "Section C",
+      "area": "Blending bed south Substation 11kV 893 - 8000",
+      "baseArea": "Blending bed south Substation 11kV",
+      "first": "893",
+      "second": "8000",
+      "workbookRow": 8
+    },
+    {
+      "section": "Section C",
+      "area": "South Fine Substation 380V 895 - 8400",
+      "baseArea": "South Fine Substation 380V",
+      "first": "895",
+      "second": "8400",
+      "workbookRow": 9
+    },
+    {
+      "section": "Section C",
+      "area": "Stacker E - House 771 - 6100",
+      "baseArea": "Stacker E - House",
+      "first": "771",
+      "second": "6100",
+      "workbookRow": 10
+    },
+    {
+      "section": "Section C",
+      "area": "Stacker E - House 772 - 6100",
+      "baseArea": "Stacker E - House",
+      "first": "772",
+      "second": "6100",
+      "workbookRow": 11
+    },
+    {
+      "section": "Section C",
+      "area": "Stacker E - House 773 - 6100",
+      "baseArea": "Stacker E - House",
+      "first": "773",
+      "second": "6100",
+      "workbookRow": 12
+    },
+    {
+      "section": "Section C",
+      "area": "Stacker E - House 774 - 6100",
+      "baseArea": "Stacker E - House",
+      "first": "774",
+      "second": "6100",
+      "workbookRow": 13
+    },
+    {
+      "section": "Section C",
+      "area": "Stacker/Reclaimer E - House 851 - 6100",
+      "baseArea": "Stacker/Reclaimer E - House",
+      "first": "851",
+      "second": "6100",
+      "workbookRow": 14
+    },
+    {
+      "section": "Section C",
+      "area": "Load out 3 Substation 380V 895 - 8600",
+      "baseArea": "Load out 3 Substation 380V",
+      "first": "895",
+      "second": "8600",
+      "workbookRow": 15
+    },
+    {
+      "section": "Section C",
+      "area": "Load out 1&2 Substation 380V 895 - 4500",
+      "baseArea": "Load out 1&2 Substation 380V",
+      "first": "895",
+      "second": "4500",
+      "workbookRow": 16
+    },
+    {
+      "section": "Section C",
+      "area": "Reclaimer E - House 847 - 6300",
+      "baseArea": "Reclaimer E - House",
+      "first": "847",
+      "second": "6300",
+      "workbookRow": 17
+    },
+    {
+      "section": "Section C",
+      "area": "Reclaimer E - House 775 - 6300",
+      "baseArea": "Reclaimer E - House",
+      "first": "775",
+      "second": "6300",
+      "workbookRow": 18
+    },
+    {
+      "section": "Section C",
+      "area": "Reclaimer E - House 421 - 1000",
+      "baseArea": "Reclaimer E - House",
+      "first": "421",
+      "second": "1000",
+      "workbookRow": 19
+    },
+    {
+      "section": "Section C",
+      "area": "Reclaimer E - House 411 - 1000",
+      "baseArea": "Reclaimer E - House",
+      "first": "411",
+      "second": "1000",
+      "workbookRow": 20
+    },
+    {
+      "section": "Section C",
+      "area": "Direct Reduction Plant Substation 893 - 7800",
+      "baseArea": "Direct Reduction Plant Substation",
+      "first": "893",
+      "second": "7800",
+      "workbookRow": 21
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Telemetry server room 450 - 3500",
+      "baseArea": "Telemetry server room",
+      "first": "450",
+      "second": "3500",
+      "workbookRow": 2
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Server Load-out 1&2 UPS room 638 - 3224",
+      "baseArea": "Server Load-out 1&2 UPS room",
+      "first": "638",
+      "second": "3224",
+      "workbookRow": 3
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Server Load-out 1&2 PLC room 638 - 3224",
+      "baseArea": "Server Load-out 1&2 PLC room",
+      "first": "638",
+      "second": "3224",
+      "workbookRow": 4
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Server room Load-out 1&2 638 - 3224",
+      "baseArea": "Server room Load-out 1&2",
+      "first": "638",
+      "second": "3224",
+      "workbookRow": 5
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Server B&C UPS room 638 - 3223",
+      "baseArea": "Server B&C UPS room",
+      "first": "638",
+      "second": "3223",
+      "workbookRow": 6
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Server room B&C 638 - 3223",
+      "baseArea": "Server room B&C",
+      "first": "638",
+      "second": "3223",
+      "workbookRow": 7
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Server room KGB 638 - 3129",
+      "baseArea": "Server room KGB",
+      "first": "638",
+      "second": "3129",
+      "workbookRow": 8
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Server room KGB UPS 638 - 3129",
+      "baseArea": "Server room KGB UPS",
+      "first": "638",
+      "second": "3129",
+      "workbookRow": 9
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Tertiary UPS rooms 895 - 2027",
+      "baseArea": "Tertiary UPS rooms",
+      "first": "895",
+      "second": "2027",
+      "workbookRow": 10
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Tertiary server rooms 895 - 2027",
+      "baseArea": "Tertiary server rooms",
+      "first": "895",
+      "second": "2027",
+      "workbookRow": 11
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Finance Archive  -",
+      "baseArea": "Finance Archive",
+      "first": "",
+      "second": "",
+      "workbookRow": 12
+    },
+    {
+      "section": "IIT & IT",
+      "area": "PMR Container  -",
+      "baseArea": "PMR Container",
+      "first": "",
+      "second": "",
+      "workbookRow": 13
+    },
+    {
+      "section": "IIT & IT",
+      "area": "MSR Container  -",
+      "baseArea": "MSR Container",
+      "first": "",
+      "second": "",
+      "workbookRow": 14
+    },
+    {
+      "section": "IIT & IT",
+      "area": "MOIC Building Control room  -",
+      "baseArea": "MOIC Building Control room",
+      "first": "",
+      "second": "",
+      "workbookRow": 15
+    },
+    {
+      "section": "IIT & IT",
+      "area": "IMSO Building Offices  -",
+      "baseArea": "IMSO Building Offices",
+      "first": "",
+      "second": "",
+      "workbookRow": 16
+    },
+    {
+      "section": "IIT & IT",
+      "area": "GSS (Finance) Server room  -",
+      "baseArea": "GSS (Finance) Server room",
+      "first": "",
+      "second": "",
+      "workbookRow": 17
+    },
+    {
+      "section": "IIT & IT",
+      "area": "Jig Beneficiation Server  -",
+      "baseArea": "Jig Beneficiation Server",
+      "first": "",
+      "second": "",
+      "workbookRow": 18
+    },
+    {
+      "section": "HT Engineering",
+      "area": "G10 Substation 11kV 891 - 1000",
+      "baseArea": "G10 Substation 11kV",
+      "first": "891",
+      "second": "1000",
+      "workbookRow": 2
+    },
+    {
+      "section": "HT Engineering",
+      "area": "G10 Substation UPS Room 891 - 1000",
+      "baseArea": "G10 Substation UPS Room",
+      "first": "891",
+      "second": "1000",
+      "workbookRow": 3
+    },
+    {
+      "section": "HT Engineering",
+      "area": "G10 Substation 66kV 891 - 1000",
+      "baseArea": "G10 Substation 66kV",
+      "first": "891",
+      "second": "1000",
+      "workbookRow": 4
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Central Workshop Substation 11kV 893 - 1900",
+      "baseArea": "Central Workshop Substation 11kV",
+      "first": "893",
+      "second": "1900",
+      "workbookRow": 5
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Tyre Workshop Substation 11kV 893 - 1800",
+      "baseArea": "Tyre Workshop Substation 11kV",
+      "first": "893",
+      "second": "1800",
+      "workbookRow": 6
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Mikon Workshop Substation 11kV 893 - 2100",
+      "baseArea": "Mikon Workshop Substation 11kV",
+      "first": "893",
+      "second": "2100",
+      "workbookRow": 7
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Pit Substation 1 893 - 1200",
+      "baseArea": "Pit Substation 1",
+      "first": "893",
+      "second": "1200",
+      "workbookRow": 8
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Pit Substation 2 541 - 1300",
+      "baseArea": "Pit Substation 2",
+      "first": "541",
+      "second": "1300",
+      "workbookRow": 9
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Pit Substation 3 891 - 1500",
+      "baseArea": "Pit Substation 3",
+      "first": "891",
+      "second": "1500",
+      "workbookRow": 10
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Pit Substation 4 891 - 1700",
+      "baseArea": "Pit Substation 4",
+      "first": "891",
+      "second": "1700",
+      "workbookRow": 11
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Pit Substation 5  -",
+      "baseArea": "Pit Substation 5",
+      "first": "",
+      "second": "",
+      "workbookRow": 12
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Tshipi Substation  -",
+      "baseArea": "Tshipi Substation",
+      "first": "",
+      "second": "",
+      "workbookRow": 13
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Onboarding Substation  -",
+      "baseArea": "Onboarding Substation",
+      "first": "",
+      "second": "",
+      "workbookRow": 14
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Nooitgedacht Substation 380V 895 - 6511",
+      "baseArea": "Nooitgedacht Substation 380V",
+      "first": "895",
+      "second": "6511",
+      "workbookRow": 15
+    },
+    {
+      "section": "HT Engineering",
+      "area": "MTS Archive Room  -",
+      "baseArea": "MTS Archive Room",
+      "first": "",
+      "second": "",
+      "workbookRow": 16
+    },
+    {
+      "section": "HT Engineering",
+      "area": "LOM Haul Truck Workshop Substation S1 893 - 5700",
+      "baseArea": "LOM Haul Truck Workshop Substation S1",
+      "first": "893",
+      "second": "5700",
+      "workbookRow": 17
+    },
+    {
+      "section": "HT Engineering",
+      "area": "LOM Haul Truck Workshop Substation S2 893 - 5700",
+      "baseArea": "LOM Haul Truck Workshop Substation S2",
+      "first": "893",
+      "second": "5700",
+      "workbookRow": 18
+    },
+    {
+      "section": "HT Engineering",
+      "area": "LOM Haul Truck Workshop Substation S3 893 - 5700",
+      "baseArea": "LOM Haul Truck Workshop Substation S3",
+      "first": "893",
+      "second": "5700",
+      "workbookRow": 19
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Bucket & Bowl Substation S1 893 - 5800",
+      "baseArea": "Bucket & Bowl Substation S1",
+      "first": "893",
+      "second": "5800",
+      "workbookRow": 20
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Bucket & Bowl Substation S2 895 - 5800",
+      "baseArea": "Bucket & Bowl Substation S2",
+      "first": "895",
+      "second": "5800",
+      "workbookRow": 21
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Feed Bunkers Substation J542 - 2800",
+      "baseArea": "Feed Bunkers Substation",
+      "first": "J542",
+      "second": "2800",
+      "workbookRow": 2
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Jig Beneficiation Substation Cable Room J542 - 3000",
+      "baseArea": "Jig Beneficiation Substation Cable Room",
+      "first": "J542",
+      "second": "3000",
+      "workbookRow": 3
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Jig Beneficiation Substation 525V J543 - 3000",
+      "baseArea": "Jig Beneficiation Substation 525V",
+      "first": "J543",
+      "second": "3000",
+      "workbookRow": 4
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Jig Beneficiation Substation 3.3kV J542 - 3000",
+      "baseArea": "Jig Beneficiation Substation 3.3kV",
+      "first": "J542",
+      "second": "3000",
+      "workbookRow": 5
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Jig Beneficiation Substation 11kV J542 - 3000",
+      "baseArea": "Jig Beneficiation Substation 11kV",
+      "first": "J542",
+      "second": "3000",
+      "workbookRow": 6
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "JIG G10 Main Substation J893 - 1000",
+      "baseArea": "JIG G10 Main Substation",
+      "first": "J893",
+      "second": "1000",
+      "workbookRow": 7
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "SEB 1 B Substation 525V J543 - 3402",
+      "baseArea": "SEB 1 B Substation 525V",
+      "first": "J543",
+      "second": "3402",
+      "workbookRow": 8
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "SEB 1 B Substation Cable room J543 - 3402",
+      "baseArea": "SEB 1 B Substation Cable room",
+      "first": "J543",
+      "second": "3402",
+      "workbookRow": 9
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "JIG Control Room  -",
+      "baseArea": "JIG Control Room",
+      "first": "",
+      "second": "",
+      "workbookRow": 10
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "JIG Training Centre  -",
+      "baseArea": "JIG Training Centre",
+      "first": "",
+      "second": "",
+      "workbookRow": 11
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "JIG Workshop Tool store  -",
+      "baseArea": "JIG Workshop Tool store",
+      "first": "",
+      "second": "",
+      "workbookRow": 12
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3905",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3905",
+      "workbookRow": 13
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3907",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3907",
+      "workbookRow": 14
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3901",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3901",
+      "workbookRow": 15
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3909",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3909",
+      "workbookRow": 16
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3902",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3902",
+      "workbookRow": 17
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3904",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3904",
+      "workbookRow": 18
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3908",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3908",
+      "workbookRow": 19
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 542 - 3901",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "542",
+      "second": "3901",
+      "workbookRow": 20
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 542 - 3902",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "542",
+      "second": "3902",
+      "workbookRow": 21
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 542 - 3905",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "542",
+      "second": "3905",
+      "workbookRow": 22
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 542 - 3910",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "542",
+      "second": "3910",
+      "workbookRow": 23
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 542 - 3903",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "542",
+      "second": "3903",
+      "workbookRow": 24
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3903",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3903",
+      "workbookRow": 25
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 542 - 3904",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "542",
+      "second": "3904",
+      "workbookRow": 26
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "DMS Modular Plant Substation 543 - 3906",
+      "baseArea": "DMS Modular Plant Substation",
+      "first": "543",
+      "second": "3906",
+      "workbookRow": 27
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "De-Watering Plant Substation 543 - 3600",
+      "baseArea": "De-Watering Plant Substation",
+      "first": "543",
+      "second": "3600",
+      "workbookRow": 28
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "JIG Primary Secondary Crusher Substation J542 - 5100",
+      "baseArea": "JIG Primary Secondary Crusher Substation",
+      "first": "J542",
+      "second": "5100",
+      "workbookRow": 2
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "JIG Tertiary Crusher Substation 525V J543 - 2400",
+      "baseArea": "JIG Tertiary Crusher Substation 525V",
+      "first": "J543",
+      "second": "2400",
+      "workbookRow": 3
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "JIG Tertiary Crusher Substation 11kV J542 - 2400",
+      "baseArea": "JIG Tertiary Crusher Substation 11kV",
+      "first": "J542",
+      "second": "2400",
+      "workbookRow": 4
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Pit Substation 5 J891 - 1400",
+      "baseArea": "Pit Substation 5",
+      "first": "J891",
+      "second": "1400",
+      "workbookRow": 5
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Rom Substation  -",
+      "baseArea": "Rom Substation",
+      "first": "",
+      "second": "",
+      "workbookRow": 6
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "JIG Primary Control Room  -",
+      "baseArea": "JIG Primary Control Room",
+      "first": "",
+      "second": "",
+      "workbookRow": 7
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Inpit Tripper 894 - 7500",
+      "baseArea": "Inpit Tripper",
+      "first": "894",
+      "second": "7500",
+      "workbookRow": 8
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Inpit Stacker 894 - 7600",
+      "baseArea": "Inpit Stacker",
+      "first": "894",
+      "second": "7600",
+      "workbookRow": 9
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Inpit Stacker 894 - 7600",
+      "baseArea": "Inpit Stacker",
+      "first": "894",
+      "second": "7600",
+      "workbookRow": 10
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Inpit Stacker 893 - 7400",
+      "baseArea": "Inpit Stacker",
+      "first": "893",
+      "second": "7400",
+      "workbookRow": 11
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S1 151 - 1100",
+      "baseArea": "Conveyor S1",
+      "first": "151",
+      "second": "1100",
+      "workbookRow": 12
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S2 151 - 1100",
+      "baseArea": "Conveyor S2",
+      "first": "151",
+      "second": "1100",
+      "workbookRow": 13
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S3 151 - 1100",
+      "baseArea": "Conveyor S3",
+      "first": "151",
+      "second": "1100",
+      "workbookRow": 14
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor 152 - 1200",
+      "baseArea": "Conveyor",
+      "first": "152",
+      "second": "1200",
+      "workbookRow": 15
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor 152 - 1300",
+      "baseArea": "Conveyor",
+      "first": "152",
+      "second": "1300",
+      "workbookRow": 16
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S1 152 - 1400",
+      "baseArea": "Conveyor S1",
+      "first": "152",
+      "second": "1400",
+      "workbookRow": 17
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S2 152 - 1400",
+      "baseArea": "Conveyor S2",
+      "first": "152",
+      "second": "1400",
+      "workbookRow": 18
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S1 153 - 2100",
+      "baseArea": "Conveyor S1",
+      "first": "153",
+      "second": "2100",
+      "workbookRow": 19
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S2 153 - 2100",
+      "baseArea": "Conveyor S2",
+      "first": "153",
+      "second": "2100",
+      "workbookRow": 20
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S3 153 - 2100",
+      "baseArea": "Conveyor S3",
+      "first": "153",
+      "second": "2100",
+      "workbookRow": 21
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S1 153 - 2200",
+      "baseArea": "Conveyor S1",
+      "first": "153",
+      "second": "2200",
+      "workbookRow": 22
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S2 153 - 2200",
+      "baseArea": "Conveyor S2",
+      "first": "153",
+      "second": "2200",
+      "workbookRow": 23
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S1 153 - 2300",
+      "baseArea": "Conveyor S1",
+      "first": "153",
+      "second": "2300",
+      "workbookRow": 24
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S2 153 - 2300",
+      "baseArea": "Conveyor S2",
+      "first": "153",
+      "second": "2300",
+      "workbookRow": 25
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S1 154 - 2700",
+      "baseArea": "Conveyor S1",
+      "first": "154",
+      "second": "2700",
+      "workbookRow": 26
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S2 154 - 2700",
+      "baseArea": "Conveyor S2",
+      "first": "154",
+      "second": "2700",
+      "workbookRow": 27
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor 154 - 2800",
+      "baseArea": "Conveyor",
+      "first": "154",
+      "second": "2800",
+      "workbookRow": 28
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor 154 - 2900",
+      "baseArea": "Conveyor",
+      "first": "154",
+      "second": "2900",
+      "workbookRow": 29
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S1 154 - 3000",
+      "baseArea": "Conveyor S1",
+      "first": "154",
+      "second": "3000",
+      "workbookRow": 30
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Conveyor S2 154 - 3000",
+      "baseArea": "Conveyor S2",
+      "first": "154",
+      "second": "3000",
+      "workbookRow": 31
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Process Water Substation S1 542 - 3200",
+      "baseArea": "JIG Process Water Substation S1",
+      "first": "542",
+      "second": "3200",
+      "workbookRow": 2
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Process Water Substation S2 542 - 3200",
+      "baseArea": "JIG Process Water Substation S2",
+      "first": "542",
+      "second": "3200",
+      "workbookRow": 3
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Slimes Feed Substation S1 542 - 3400",
+      "baseArea": "JIG Slimes Feed Substation S1",
+      "first": "542",
+      "second": "3400",
+      "workbookRow": 4
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Slimes Feed Substation S2 542 - 3400",
+      "baseArea": "JIG Slimes Feed Substation S2",
+      "first": "542",
+      "second": "3400",
+      "workbookRow": 5
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "Hopper VSD Substation 893 - 6400",
+      "baseArea": "Hopper VSD Substation",
+      "first": "893",
+      "second": "6400",
+      "workbookRow": 6
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Thickener Substation 543 - 3403",
+      "baseArea": "JIG Thickener Substation",
+      "first": "543",
+      "second": "3403",
+      "workbookRow": 7
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Reclaimer E - House 211 - 1000",
+      "baseArea": "JIG Reclaimer E - House",
+      "first": "211",
+      "second": "1000",
+      "workbookRow": 8
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Product Stacker Lump E-house 410 - 1000",
+      "baseArea": "JIG Product Stacker Lump E-house",
+      "first": "410",
+      "second": "1000",
+      "workbookRow": 9
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Product Stacker E-house 210 - 1000",
+      "baseArea": "JIG Product Stacker E-house",
+      "first": "210",
+      "second": "1000",
+      "workbookRow": 10
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "JIG Product Stacker Fine E-house 420 - 1000",
+      "baseArea": "JIG Product Stacker Fine E-house",
+      "first": "420",
+      "second": "1000",
+      "workbookRow": 11
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "Waste Pivot Top Substation  -",
+      "baseArea": "Waste Pivot Top Substation",
+      "first": "",
+      "second": "",
+      "workbookRow": 12
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "Final Product Handling Substation  -",
+      "baseArea": "Final Product Handling Substation",
+      "first": "",
+      "second": "",
+      "workbookRow": 13
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 881 - 2300",
+      "baseArea": "Conveyor",
+      "first": "881",
+      "second": "2300",
+      "workbookRow": 2
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 883 - 1200",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "1200",
+      "workbookRow": 3
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 883 - 1300",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "1300",
+      "workbookRow": 4
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 883 - 2300",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "2300",
+      "workbookRow": 5
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 883 - 4700",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "4700",
+      "workbookRow": 6
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 883 - 4900",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "4900",
+      "workbookRow": 7
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 883 - 9700",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "9700",
+      "workbookRow": 8
+    },
+    {
+      "section": "Warranty Conveyors",
+      "area": "Conveyor 883 - 6100",
+      "baseArea": "Conveyor",
+      "first": "883",
+      "second": "6100",
+      "workbookRow": 9
+    },
+    {
+      "section": "Section A1",
+      "area": "883 1100",
+      "baseArea": "883 1100",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "Section B",
+      "area": "Drum 3.3",
+      "baseArea": "Drum 3.3",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "Section B",
+      "area": "Drum 380",
+      "baseArea": "Drum 380",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "IIT & IT",
+      "area": "IM LOM Server room -",
+      "baseArea": "IM LOM Server room -",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "J410",
+      "baseArea": "J410",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Jib Ben 525v",
+      "baseArea": "Jib Ben 525v",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Jig Beneficiation Control server J544-G3402",
+      "baseArea": "Jig Beneficiation Control server J544-G3402",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "Jig Product Beds sub/Final Product Handeling J542-G3800",
+      "baseArea": "Jig Product Beds sub/Final Product Handeling J542-G3800",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "Section C",
+      "area": "Load out 1 lube room F850-G8500",
+      "baseArea": "Load out 1 lube room F850-G8500",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "Section C",
+      "area": "Load out 3 lube room F780-G8500",
+      "baseArea": "Load out 3 lube room F780-G8500",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "HT Engineering",
+      "area": "LOM Haul Truck Workshop PLC room F895-G5700",
+      "baseArea": "LOM Haul Truck Workshop PLC room F895-G5700",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Beneficiation",
+      "area": "Modular J543-3906",
+      "baseArea": "Modular J543-3906",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "HT Engineering",
+      "area": "On Boarding Centre subs F606-G0600",
+      "baseArea": "On Boarding Centre subs F606-G0600",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Primary & Secondary",
+      "area": "Primary Secondary Crusher J542-G2000",
+      "baseArea": "Primary Secondary Crusher J542-G2000",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "IIT & IT",
+      "area": "PSR Container F638-G3272",
+      "baseArea": "PSR Container F638-G3272",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "Return Water sub J543-G4000",
+      "baseArea": "Return Water sub J543-G4000",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "Return water Substation 543 - 4000",
+      "baseArea": "Return water Substation",
+      "first": "543",
+      "second": "4000",
+      "workbookRow": null,
+      "source": "manual-added-2026-05-20"
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Total subsation F895-G5900",
+      "baseArea": "Total subsation F895-G5900",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "HT Engineering",
+      "area": "Tshipi Training subs F606-G0500",
+      "baseArea": "Tshipi Training subs F606-G0500",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "VSD 525V Hopper substation F525-G",
+      "baseArea": "VSD 525V Hopper substation F525-G",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    },
+    {
+      "section": "JIG Outside Services",
+      "area": "Waste Pivot sub J543-G4400",
+      "baseArea": "Waste Pivot sub J543-G4400",
+      "first": "",
+      "second": "",
+      "workbookRow": null,
+      "source": "manual-unmapped-2026-05-18"
+    }
+  ],
+  "areaToSection": {
+    "DMS Primary Stockpile Substation 380V 893 - 2200": "Section A1",
+    "DMS Tertiary Substation 11kV 893 - 2000": "Section A1",
+    "DMS Tertiary Substation 380V 895 - 2000": "Section A1",
+    "DMS Pre/Sec crushing Substation 380V 895 - 1600": "Section A1",
+    "Inpit Stockpile Substation 894 - 1800": "Section A1",
+    "Conveyor 881 - 1100": "Section A1",
+    "Conveyor 881 - 1200": "Section A1",
+    "Clarified water pump house Substation 3.3kV 894 - 2400": "Section A2",
+    "Clarified water pump house Substation 380V 895 - 2400": "Section A2",
+    "Clarified water pump house Substation 11kV 893 - 2400": "Section A2",
+    "Booster pump house Substation 380V 895 - 2500": "Section A2",
+    "Hopper Substation 11kV 893 - 6400": "Section A2",
+    "Hopper Substation 380V 895 - 6400": "Section A2",
+    "Generator Room (BPH) 897 - 9300": "Section A2",
+    "UCC Substation 380V 895 - 9000": "Section A2",
+    "Conveyor 881 - 3100": "Section A2",
+    "Drum plant Substation 11kV 893 - 2800": "Section B",
+    "Drum plant Substation 3.3 kV 894 - 2800": "Section B",
+    "Drum plant Substation 380V 895 - 2800": "Section B",
+    "Cyclone plant Substation 11kV 893 - 3200": "Section B",
+    "Cyclone Plant Substation 3.3kV 894 - 3200": "Section B",
+    "Cyclone plant Substation 380V 894 - 3200": "Section B",
+    "Cyclone plant Substation 380V Top 894 - 3200": "Section B",
+    "Waste bottom Substation 11kV 893 - 4800": "Section B",
+    "Waste bottom Substation 380V 895 - 4800": "Section B",
+    "DMS North Plant Main Substation 11KV Cable room 893 - 1100": "Section B",
+    "DMS North Plant Main Substation Cable Room 893 - 1100": "Section B",
+    "Waste Handling Top Substation 11kV 893 - 5000": "Section B",
+    "Waste Handling Top Substation 380V 895 - 5000": "Section B",
+    "Robot Room J222 -": "Section B",
+    "Conveyor 883 - 1100": "Section B",
+    "Taster Plant (DMS) Substation S1 893 - 7000": "Section B",
+    "Taster Plant (DMS) Substation S2 893 - 7000": "Section B",
+    "JIG Main Lab Substation 543 - 4600": "Section B",
+    "Quaternary Crusher Substation 894 - 4000": "Section C",
+    "Quaternary Screening Substation 11kV 893 - 3600": "Section C",
+    "Quaternary Screening Substation 380V 894 - 3600": "Section C",
+    "Blending bed north Substation 380kV 895 - 8200": "Section C",
+    "Blending bed north Substation 11kV 893 - 8200": "Section C",
+    "Blending bed south Substation 380V 894 - 8000": "Section C",
+    "Blending bed south Substation 11kV 893 - 8000": "Section C",
+    "South Fine Substation 380V 895 - 8400": "Section C",
+    "Stacker E - House 771 - 6100": "Section C",
+    "Stacker E - House 772 - 6100": "Section C",
+    "Stacker E - House 773 - 6100": "Section C",
+    "Stacker E - House 774 - 6100": "Section C",
+    "Stacker/Reclaimer E - House 851 - 6100": "Section C",
+    "Load out 3 Substation 380V 895 - 8600": "Section C",
+    "Load out 1&2 Substation 380V 895 - 4500": "Section C",
+    "Reclaimer E - House 847 - 6300": "Section C",
+    "Reclaimer E - House 775 - 6300": "Section C",
+    "Reclaimer E - House 421 - 1000": "Section C",
+    "Reclaimer E - House 411 - 1000": "Section C",
+    "Direct Reduction Plant Substation 893 - 7800": "Section C",
+    "Telemetry server room 450 - 3500": "IIT & IT",
+    "Server Load-out 1&2 UPS room 638 - 3224": "IIT & IT",
+    "Server Load-out 1&2 PLC room 638 - 3224": "IIT & IT",
+    "Server room Load-out 1&2 638 - 3224": "IIT & IT",
+    "Server B&C UPS room 638 - 3223": "IIT & IT",
+    "Server room B&C 638 - 3223": "IIT & IT",
+    "Server room KGB 638 - 3129": "IIT & IT",
+    "Server room KGB UPS 638 - 3129": "IIT & IT",
+    "Tertiary UPS rooms 895 - 2027": "IIT & IT",
+    "Tertiary server rooms 895 - 2027": "IIT & IT",
+    "Finance Archive  -": "IIT & IT",
+    "PMR Container  -": "IIT & IT",
+    "MSR Container  -": "IIT & IT",
+    "MOIC Building Control room  -": "IIT & IT",
+    "IMSO Building Offices  -": "IIT & IT",
+    "GSS (Finance) Server room  -": "IIT & IT",
+    "Jig Beneficiation Server  -": "IIT & IT",
+    "G10 Substation 11kV 891 - 1000": "HT Engineering",
+    "G10 Substation UPS Room 891 - 1000": "HT Engineering",
+    "G10 Substation 66kV 891 - 1000": "HT Engineering",
+    "Central Workshop Substation 11kV 893 - 1900": "HT Engineering",
+    "Tyre Workshop Substation 11kV 893 - 1800": "HT Engineering",
+    "Mikon Workshop Substation 11kV 893 - 2100": "HT Engineering",
+    "Pit Substation 1 893 - 1200": "HT Engineering",
+    "Pit Substation 2 541 - 1300": "HT Engineering",
+    "Pit Substation 3 891 - 1500": "HT Engineering",
+    "Pit Substation 4 891 - 1700": "HT Engineering",
+    "Pit Substation 5  -": "HT Engineering",
+    "Tshipi Substation  -": "HT Engineering",
+    "Onboarding Substation  -": "HT Engineering",
+    "Nooitgedacht Substation 380V 895 - 6511": "HT Engineering",
+    "MTS Archive Room  -": "HT Engineering",
+    "LOM Haul Truck Workshop Substation S1 893 - 5700": "HT Engineering",
+    "LOM Haul Truck Workshop Substation S2 893 - 5700": "HT Engineering",
+    "LOM Haul Truck Workshop Substation S3 893 - 5700": "HT Engineering",
+    "Bucket & Bowl Substation S1 893 - 5800": "HT Engineering",
+    "Bucket & Bowl Substation S2 895 - 5800": "HT Engineering",
+    "Feed Bunkers Substation J542 - 2800": "JIG Beneficiation",
+    "Jig Beneficiation Substation Cable Room J542 - 3000": "JIG Beneficiation",
+    "Jig Beneficiation Substation 525V J543 - 3000": "JIG Beneficiation",
+    "Jig Beneficiation Substation 3.3kV J542 - 3000": "JIG Beneficiation",
+    "Jig Beneficiation Substation 11kV J542 - 3000": "JIG Beneficiation",
+    "JIG G10 Main Substation J893 - 1000": "JIG Beneficiation",
+    "SEB 1 B Substation 525V J543 - 3402": "JIG Beneficiation",
+    "SEB 1 B Substation Cable room J543 - 3402": "JIG Beneficiation",
+    "JIG Control Room  -": "JIG Beneficiation",
+    "JIG Training Centre  -": "JIG Beneficiation",
+    "JIG Workshop Tool store  -": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3905": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3907": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3901": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3909": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3902": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3904": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3908": "JIG Beneficiation",
+    "DMS Modular Plant Substation 542 - 3901": "JIG Beneficiation",
+    "DMS Modular Plant Substation 542 - 3902": "JIG Beneficiation",
+    "DMS Modular Plant Substation 542 - 3905": "JIG Beneficiation",
+    "DMS Modular Plant Substation 542 - 3910": "JIG Beneficiation",
+    "DMS Modular Plant Substation 542 - 3903": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3903": "JIG Beneficiation",
+    "DMS Modular Plant Substation 542 - 3904": "JIG Beneficiation",
+    "DMS Modular Plant Substation 543 - 3906": "JIG Beneficiation",
+    "De-Watering Plant Substation 543 - 3600": "JIG Beneficiation",
+    "JIG Primary Secondary Crusher Substation J542 - 5100": "JIG Primary & Secondary",
+    "JIG Tertiary Crusher Substation 525V J543 - 2400": "JIG Primary & Secondary",
+    "JIG Tertiary Crusher Substation 11kV J542 - 2400": "JIG Primary & Secondary",
+    "Pit Substation 5 J891 - 1400": "JIG Primary & Secondary",
+    "Rom Substation  -": "JIG Primary & Secondary",
+    "JIG Primary Control Room  -": "JIG Primary & Secondary",
+    "Inpit Tripper 894 - 7500": "JIG Primary & Secondary",
+    "Inpit Stacker 894 - 7600": "JIG Primary & Secondary",
+    "Inpit Stacker 893 - 7400": "JIG Primary & Secondary",
+    "Conveyor S1 151 - 1100": "JIG Primary & Secondary",
+    "Conveyor S2 151 - 1100": "JIG Primary & Secondary",
+    "Conveyor S3 151 - 1100": "JIG Primary & Secondary",
+    "Conveyor 152 - 1200": "JIG Primary & Secondary",
+    "Conveyor 152 - 1300": "JIG Primary & Secondary",
+    "Conveyor S1 152 - 1400": "JIG Primary & Secondary",
+    "Conveyor S2 152 - 1400": "JIG Primary & Secondary",
+    "Conveyor S1 153 - 2100": "JIG Primary & Secondary",
+    "Conveyor S2 153 - 2100": "JIG Primary & Secondary",
+    "Conveyor S3 153 - 2100": "JIG Primary & Secondary",
+    "Conveyor S1 153 - 2200": "JIG Primary & Secondary",
+    "Conveyor S2 153 - 2200": "JIG Primary & Secondary",
+    "Conveyor S1 153 - 2300": "JIG Primary & Secondary",
+    "Conveyor S2 153 - 2300": "JIG Primary & Secondary",
+    "Conveyor S1 154 - 2700": "JIG Primary & Secondary",
+    "Conveyor S2 154 - 2700": "JIG Primary & Secondary",
+    "Conveyor 154 - 2800": "JIG Primary & Secondary",
+    "Conveyor 154 - 2900": "JIG Primary & Secondary",
+    "Conveyor S1 154 - 3000": "JIG Primary & Secondary",
+    "Conveyor S2 154 - 3000": "JIG Primary & Secondary",
+    "JIG Process Water Substation S1 542 - 3200": "JIG Outside Services",
+    "JIG Process Water Substation S2 542 - 3200": "JIG Outside Services",
+    "JIG Slimes Feed Substation S1 542 - 3400": "JIG Outside Services",
+    "JIG Slimes Feed Substation S2 542 - 3400": "JIG Outside Services",
+    "Hopper VSD Substation 893 - 6400": "JIG Outside Services",
+    "JIG Thickener Substation 543 - 3403": "JIG Outside Services",
+    "JIG Reclaimer E - House 211 - 1000": "JIG Outside Services",
+    "JIG Product Stacker Lump E-house 410 - 1000": "JIG Outside Services",
+    "JIG Product Stacker E-house 210 - 1000": "JIG Outside Services",
+    "JIG Product Stacker Fine E-house 420 - 1000": "JIG Outside Services",
+    "Waste Pivot Top Substation  -": "JIG Outside Services",
+    "Final Product Handling Substation  -": "JIG Outside Services",
+    "Conveyor 881 - 2300": "Warranty Conveyors",
+    "Conveyor 883 - 1200": "Warranty Conveyors",
+    "Conveyor 883 - 1300": "Warranty Conveyors",
+    "Conveyor 883 - 2300": "Warranty Conveyors",
+    "Conveyor 883 - 4700": "Warranty Conveyors",
+    "Conveyor 883 - 4900": "Warranty Conveyors",
+    "Conveyor 883 - 9700": "Warranty Conveyors",
+    "Conveyor 883 - 6100": "Warranty Conveyors",
+    "883 1100": "Section A1",
+    "Drum 3.3": "Section B",
+    "Drum 380": "Section B",
+    "IM LOM Server room -": "IIT & IT",
+    "J410": "JIG Outside Services",
+    "Jib Ben 525v": "JIG Beneficiation",
+    "Jig Beneficiation Control server J544-G3402": "JIG Beneficiation",
+    "Jig Product Beds sub/Final Product Handeling J542-G3800": "JIG Outside Services",
+    "Load out 1 lube room F850-G8500": "Section C",
+    "Load out 3 lube room F780-G8500": "Section C",
+    "LOM Haul Truck Workshop PLC room F895-G5700": "HT Engineering",
+    "Modular J543-3906": "JIG Beneficiation",
+    "On Boarding Centre subs F606-G0600": "HT Engineering",
+    "Primary Secondary Crusher J542-G2000": "JIG Primary & Secondary",
+    "PSR Container F638-G3272": "IIT & IT",
+    "Return Water sub J543-G4000": "JIG Outside Services",
+    "Total subsation F895-G5900": "HT Engineering",
+    "Tshipi Training subs F606-G0500": "HT Engineering",
+    "VSD 525V Hopper substation F525-G": "JIG Outside Services",
+    "Waste Pivot sub J543-G4400": "JIG Outside Services",
+    "Return water Substation 543 - 4000": "JIG Outside Services"
+  },
+  "manualMappingsUpdatedAt": "2026-05-18T10:25:00.559Z"
+}

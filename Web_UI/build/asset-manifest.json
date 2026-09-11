@@ -1,0 +1,30 @@
+{
+  "files": {
+    "main.css": "/Maintenix/static/css/main.13e895b3.chunk.css",
+    "main.js": "/Maintenix/static/js/main.cdcecc5a.chunk.js",
+    "main.js.map": "/Maintenix/static/js/main.cdcecc5a.chunk.js.map",
+    "runtime-main.js": "/Maintenix/static/js/runtime-main.ed60066a.js",
+    "runtime-main.js.map": "/Maintenix/static/js/runtime-main.ed60066a.js.map",
+    "static/css/2.fea3aa44.chunk.css": "/Maintenix/static/css/2.fea3aa44.chunk.css",
+    "static/js/2.8d693083.chunk.js": "/Maintenix/static/js/2.8d693083.chunk.js",
+    "static/js/2.8d693083.chunk.js.map": "/Maintenix/static/js/2.8d693083.chunk.js.map",
+    "index.html": "/Maintenix/index.html",
+    "precache-manifest.bf2e87782dba1e3f46321b256921530d.js": "/Maintenix/precache-manifest.bf2e87782dba1e3f46321b256921530d.js",
+    "service-worker.js": "/Maintenix/service-worker.js",
+    "static/css/2.fea3aa44.chunk.css.map": "/Maintenix/static/css/2.fea3aa44.chunk.css.map",
+    "static/css/main.13e895b3.chunk.css.map": "/Maintenix/static/css/main.13e895b3.chunk.css.map",
+    "static/js/2.8d693083.chunk.js.LICENSE.txt": "/Maintenix/static/js/2.8d693083.chunk.js.LICENSE.txt",
+    "static/media/404.svg": "/Maintenix/static/media/404.85064a97.svg",
+    "static/media/500.svg": "/Maintenix/static/media/500.a0320da1.svg",
+    "static/media/maintenix_foreground.svg": "/Maintenix/static/media/maintenix_foreground.32b717b2.svg",
+    "static/media/profile-picture-3.jpg": "/Maintenix/static/media/profile-picture-3.9a250e5c.jpg",
+    "static/media/signin.svg": "/Maintenix/static/media/signin.58ee1d5a.svg"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.ed60066a.js",
+    "static/css/2.fea3aa44.chunk.css",
+    "static/js/2.8d693083.chunk.js",
+    "static/css/main.13e895b3.chunk.css",
+    "static/js/main.cdcecc5a.chunk.js"
+  ]
+}

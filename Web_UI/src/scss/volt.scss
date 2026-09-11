@@ -45,6 +45,24 @@
 // =========================================================
 // Reports page helpers (opt-in via classNames)
 // =========================================================
+.reports-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.reports-filter-control {
+  width: auto;
+  max-width: 240px;
+}
+
+.reports-filter-control .dropdown-toggle {
+  max-width: 240px;
+}
+
 .reports-header-actions {
   display: flex;
   align-items: center;
@@ -57,8 +75,20 @@
   min-width: 280px; // desktop-friendly search width
 }
 
-// Keep search + refresh fully inside screen on mobile (stacked)
+// Keep filters/search/actions fully inside screen on mobile (stacked)
 @media (max-width: 575.98px) {
+  .reports-filter-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reports-filter-control,
+  .reports-filter-control .dropdown-toggle {
+    width: 100%;
+    max-width: none;
+  }
+
   .reports-header-actions {
     width: 100%;
     flex-direction: column;
@@ -112,3 +142,85 @@
     }
   }
 }
+// Formal Reports uses the shared Volt/Bootstrap bundle. Only workflow-specific
+// layouts live here; cards, buttons, forms, typography and progress use Bootstrap.
+[data-page="section-reports"] {
+  .hidden { display: none !important; }
+  .formal-reports-content { margin-bottom: 3rem; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .field { display: grid; gap: .35rem; }
+  .field-wide { grid-column: 1 / -1; }
+  .field > span { color: $dark; font-weight: 600; }
+  .field small, .muted { color: $gray-600; }
+  .field em { color: $danger; font-size: .75rem; font-style: normal; }
+  .field input, .field select, .field textarea {
+    width: 100%; min-height: 38px; padding: .375rem .75rem;
+    color: $body-color; background: $white; border: 1px solid $input-border-color;
+    border-radius: $border-radius;
+  }
+  .field textarea { min-height: 90px; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: 0; border-color: $input-focus-border-color; box-shadow: $input-focus-box-shadow;
+  }
+  .actions, .question-nav { display: flex; justify-content: flex-end; gap: .5rem; }
+  .draft-row { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: .625rem; margin-bottom: .5rem; }
+  .draft-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+  .draft-help { margin-top: .5rem; }
+  .notice { margin-bottom: 1rem; padding: 1rem; border: 1px solid transparent; border-radius: $border-radius; }
+  .notice.success { color: darken($success, 15%); background: rgba($success, .12); border-color: rgba($success, .25); }
+  .notice.error { color: darken($danger, 20%); background: rgba($danger, .12); border-color: rgba($danger, .25); }
+  .questionnaire-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem; }
+  .progress-copy { min-width: 240px; text-align: right; color: $dark; font-size: .875rem; }
+  .progress-track { height: 20px; margin-top: .5rem; overflow: hidden; background: $gray-200; border-radius: $border-radius; }
+  .progress-track span { display: block; width: 0; height: 100%; background: $primary; transition: width .2s; }
+  .systems-list, .review-list { display: grid; gap: 1rem; }
+  .system-card { min-height: 0; scroll-margin-top: 1rem; padding: 1.25rem; }
+  .system-position, .system-reference { color: $gray-600; font-size: .875rem; }
+  .system-card h3 { margin: .25rem 0; font-size: 1rem; font-weight: 700; }
+  .system-card fieldset { margin: .75rem 0 0; padding: 0; border: 0; }
+  .system-card legend { margin-bottom: .5rem; font-size: 1rem; font-weight: 600; }
+  .choice-row { display: grid; grid-template-columns: repeat(2, minmax(120px, 200px)); gap: .5rem; }
+  .choice { cursor: pointer; }
+  .choice input { position: absolute; opacity: 0; }
+  .choice span { display: grid; place-items: center; min-height: 38px; padding: .375rem .75rem; border: 1px solid $input-border-color; border-radius: $border-radius; font-weight: 600; }
+  .no-choice input:checked + span { color: $white; border-color: $success; background: $success; }
+  .yes-choice input:checked + span { color: $white; border-color: $danger; background: $danger; }
+  .defect-fields { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid $gray-200; }
+  .defect-block { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; margin-bottom: .75rem; border: 1px solid $gray-200; border-radius: $border-radius; background: $gray-100; }
+  .defect-number { grid-column: 1 / -1; font-weight: 700; }
+  .text-button { padding: .25rem 0; border: 0; background: transparent; color: $primary; font-weight: 600; }
+  .text-button.danger { grid-column: 1 / -1; justify-self: start; color: $danger; }
+  .question-nav { margin-top: 1rem; padding-top: 1rem; justify-content: space-between; border-top: 1px solid $gray-200; }
+  .section-heading, .review-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+  .summary-grid article, .review-item { padding: 1rem; border: 1px solid rgba($dark, .125); border-radius: $border-radius; background: $white; }
+  .summary-grid article { display: grid; gap: .25rem; }
+  .summary-grid span { color: $gray-600; font-size: .875rem; }
+  .summary-grid strong { font-size: 1.5rem; }
+  .review-main { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .review-item.pending { border-color: $danger; }
+  .item-number { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; margin-right: .5rem; border-radius: 50%; background: $gray-200; font-size: .75rem; font-weight: 700; }
+  .status-pill { padding: .35em .65em; border-radius: $border-radius; font-size: .75rem; font-weight: 700; }
+  .status-no { color: $white; background: $success; }
+  .status-yes { color: $white; background: $danger; }
+  .status-pending { color: $dark; background: $warning; }
+  .review-defect { display: grid; gap: .25rem; margin: .75rem 0 .5rem 2rem; padding: .75rem; border-left: 3px solid $danger; background: $gray-100; }
+  .final-confirmation { display: flex; align-items: flex-start; gap: .75rem; margin-top: 1rem; padding: 1rem; background: $gray-100; border: 1px solid rgba($dark, .125); border-radius: $border-radius; font-weight: 600; }
+  .review-actions { margin-top: 1rem; }
+  .note { margin: .75rem 0 0; text-align: right; font-size: .875rem; }
+  .generated-files > div { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: 1rem; margin-top: .75rem; border: 1px solid rgba($dark, .125); border-radius: $border-radius; }
+  .generated-files span { margin-right: auto; color: $gray-600; font-size: .875rem; }
+
+  @media (max-width: 767.98px) {
+    .form-grid, .summary-grid, .defect-block { grid-template-columns: 1fr; }
+    .field-wide, .defect-number, .text-button.danger { grid-column: auto; }
+    .questionnaire-header, .section-heading, .review-heading { flex-direction: column; }
+    .progress-copy { width: 100%; min-width: 0; text-align: left; }
+  }
+  @media (max-width: 575.98px) {
+    .question-nav, .review-actions { flex-direction: column; }
+    .question-nav .btn, .review-actions .btn, .actions .btn { width: 100%; }
+    .note { text-align: left; }
+  }
+}
+

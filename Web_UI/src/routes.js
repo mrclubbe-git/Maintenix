@@ -9,11 +9,13 @@ export const Routes = {
   // placeholders (sidebar links - pages can be added later)
   ServerInfo: { path: "/server-info" },
   Reports: { path: "/reports" },
+  SectionReports: { path: "/section-reports" },
   Pictures: { path: "/pictures" },
   Servicing: { path: "/Servicing" },
   StockControl: { path: "/stock-control" },
   CallOut: { path: "/CallOut" },
   Standby: { path: "/standby" },
+  DailyPlanner: { path: "/daily-planner" },
 
 
   // auth / examples (no sidebar)

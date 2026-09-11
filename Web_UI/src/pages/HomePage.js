@@ -15,11 +15,13 @@ import Lock from "./examples/Lock";
 import NotFoundPage from "./examples/NotFound";
 import ServerError from "./examples/ServerError";
 import Reports from "./Reports";
+import SectionReports from "./SectionReports";
 import Servicing from "./Servicing";
 import StockControl from "./StockControl";
 import Pictures from "./Pictures";
 import CallOut from "./CallOut";
 import Standby from "./Standby";
+import DailyPlanner from "./DailyPlanner";
 
 
 // layout components (KEEP)
@@ -200,11 +202,13 @@ export default function HomePage() {
       <RouteWithSidebar exact path={Routes.DashboardOverview.path} component={DashboardOverview} />
       <RouteWithSidebar exact path={Routes.Settings.path} component={Settings} />
       <RouteWithSidebar exact path={Routes.Reports.path} component={Reports} />
+      <RouteWithSidebar exact path={Routes.SectionReports.path} component={SectionReports} />
       <RouteWithSidebar exact path={Routes.Servicing.path} component={Servicing} />
       <RouteWithSidebar exact path={Routes.StockControl.path} component={StockControl} />
       <RouteWithSidebar exact path={Routes.Pictures.path} component={Pictures} />
       <RouteWithSidebar exact path={Routes.CallOut.path} component={CallOut} />
       <RouteWithSidebar exact path={Routes.Standby.path} component={Standby} />
+      <RouteWithSidebar exact path={Routes.DailyPlanner.path} component={DailyPlanner} />
 
 
       {/* Fallback */}

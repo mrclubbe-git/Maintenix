@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nav, Navbar, Dropdown, Container, Badge } from "@themesberg/react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCog, faSignOutAlt, faBell, faCheck } from "@fortawesome/free-solid-svg-icons";
@@ -6,6 +6,12 @@ import { faUserCircle } from "@fortawesome/free-regular-svg-icons";
 import { Link } from "react-router-dom";
 
 import { Routes } from "../routes";
+import {
+  checkOfflineTokenNotifications,
+  clearVisibleLocalNotifications,
+  readVisibleLocalNotifications,
+  updateLocalNotification
+} from "../offlineMode";
 
 function safeJsonParse(str, fallback = null) {
   try {
@@ -20,13 +26,7 @@ function readAuthUser() {
 }
 
 function readNotifications() {
-  const raw = safeJsonParse(localStorage.getItem("appNotifications") || "[]", []);
-  return Array.isArray(raw) ? raw : [];
-}
-
-function writeNotifications(items) {
-  localStorage.setItem("appNotifications", JSON.stringify(Array.isArray(items) ? items : []));
-  window.dispatchEvent(new Event("notificationsUpdated"));
+  return readVisibleLocalNotifications(readAuthUser());
 }
 
 // Reuse the same initials logic as DashboardOverview.js
@@ -47,74 +47,6 @@ function formatNotificationTime(iso) {
   } catch {
     return "";
   }
-}
-
-function isNotificationVisibleToUser(notification, authUser) {
-  if (!notification || typeof notification !== "object") return false;
-
-  if (notification.global === true) return true;
-
-  const currentEmail = String(authUser?.email || "").trim().toLowerCase();
-  const targetEmail = String(notification.userEmail || "").trim().toLowerCase();
-
-  return !!currentEmail && !!targetEmail && currentEmail === targetEmail;
-}
-
-function isNotificationReadByUser(notification, authUser) {
-  const currentEmail = String(authUser?.email || "").trim().toLowerCase();
-  const readBy = Array.isArray(notification?.readBy) ? notification.readBy : [];
-  return readBy.map((x) => String(x || "").trim().toLowerCase()).includes(currentEmail);
-}
-
-function markNotificationRead(notificationId, authUser) {
-  const currentEmail = String(authUser?.email || "").trim().toLowerCase();
-  if (!currentEmail) return;
-
-  const items = readNotifications();
-  const next = items.map((n) => {
-    if (String(n?.id || "") !== String(notificationId || "")) return n;
-
-    const readBy = Array.isArray(n?.readBy) ? [...n.readBy] : [];
-    const hasAlready = readBy.map((x) => String(x || "").trim().toLowerCase()).includes(currentEmail);
-
-    if (!hasAlready) readBy.push(currentEmail);
-
-    return { ...n, readBy };
-  });
-
-  writeNotifications(next);
-}
-
-function markAllNotificationsRead(authUser) {
-  const currentEmail = String(authUser?.email || "").trim().toLowerCase();
-  if (!currentEmail) return;
-
-  const items = readNotifications();
-  const next = items.map((n) => {
-    if (!isNotificationVisibleToUser(n, authUser)) return n;
-
-    const readBy = Array.isArray(n?.readBy) ? [...n.readBy] : [];
-    const hasAlready = readBy.map((x) => String(x || "").trim().toLowerCase()).includes(currentEmail);
-
-    if (!hasAlready) readBy.push(currentEmail);
-
-    return { ...n, readBy };
-  });
-
-  writeNotifications(next);
-}
-
-function clearAllReadNotifications(authUser) {
-  const currentEmail = String(authUser?.email || "").trim().toLowerCase();
-  if (!currentEmail) return;
-
-  const items = readNotifications();
-  const next = items.filter((n) => {
-    if (!isNotificationVisibleToUser(n, authUser)) return true;
-    return !isNotificationReadByUser(n, authUser);
-  });
-
-  writeNotifications(next);
 }
 
 async function refreshAuthUserFromApi() {
@@ -146,6 +78,12 @@ export default function NavbarTop() {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [notifications, setNotifications] = useState(readNotifications);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastAck, setBroadcastAck] = useState(true);
+  const [broadcastErr, setBroadcastErr] = useState("");
+  const [broadcastSending, setBroadcastSending] = useState(false);
   const [notificationMenuStyle, setNotificationMenuStyle] = useState({
     position: "fixed",
     top: 56,
@@ -157,28 +95,58 @@ export default function NavbarTop() {
 
   const notifWrapperRef = useRef(null);
 
+  const loadNotifications = useCallback(async () => {
+    const token = localStorage.getItem("authToken") || "";
+    if (!token) {
+      setNotifications([]);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/notifications", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      const local = readVisibleLocalNotifications(readAuthUser());
+      const remote = Array.isArray(data.notifications) ? data.notifications : [];
+      setNotifications([...local, ...remote]);
+    } catch {
+      setNotifications(readVisibleLocalNotifications(readAuthUser()));
+    }
+  }, []);
+
   useEffect(() => {
-    const syncAuth = () => setAuthUser(readAuthUser());
-    const syncNotifications = () => setNotifications(readNotifications());
+    const syncAuth = () => {
+      const user = readAuthUser();
+      setAuthUser(user);
+      checkOfflineTokenNotifications(user);
+      setNotifications(readVisibleLocalNotifications(user));
+    };
 
     window.addEventListener("authUserUpdated", syncAuth);
-    window.addEventListener("notificationsUpdated", syncNotifications);
+    window.addEventListener("notificationsUpdated", loadNotifications);
 
     const onStorage = (e) => {
       if (e.key === "authUser" || e.key === "authToken") syncAuth();
-      if (e.key === "appNotifications") syncNotifications();
     };
     window.addEventListener("storage", onStorage);
 
     refreshAuthUserFromApi();
-    syncNotifications();
+    checkOfflineTokenNotifications(readAuthUser());
+    loadNotifications();
+    const timer = window.setInterval(() => {
+      checkOfflineTokenNotifications(readAuthUser());
+      loadNotifications();
+    }, 30000);
 
     return () => {
       window.removeEventListener("authUserUpdated", syncAuth);
-      window.removeEventListener("notificationsUpdated", syncNotifications);
+      window.removeEventListener("notificationsUpdated", loadNotifications);
       window.removeEventListener("storage", onStorage);
+      window.clearInterval(timer);
     };
-  }, []);
+  }, [loadNotifications]);
 
   const displayName = authUser?.name || authUser?.email || "User";
   const role = String(authUser?.role || "").toUpperCase() || "USER";
@@ -192,19 +160,97 @@ export default function NavbarTop() {
   const showImage = !!photoUrl && !avatarFailed;
   const size = 36;
 
+  const canSendBroadcast = role === "ADMIN" || role === "L3";
+
   const visibleNotifications = useMemo(() => {
-    return [...notifications]
-      .filter((n) => isNotificationVisibleToUser(n, authUser))
-      .sort((a, b) => String(b?.createdAt || "").localeCompare(String(a?.createdAt || "")));
-  }, [notifications, authUser]);
+    return [...notifications].sort((a, b) => String(b?.createdAt || "").localeCompare(String(a?.createdAt || "")));
+  }, [notifications]);
 
   const unreadCount = useMemo(() => {
-    return visibleNotifications.filter((n) => !isNotificationReadByUser(n, authUser)).length;
-  }, [visibleNotifications, authUser]);
+    return visibleNotifications.filter((n) => !n.read).length;
+  }, [visibleNotifications]);
 
-  const hasReadNotifications = useMemo(() => {
-    return visibleNotifications.some((n) => isNotificationReadByUser(n, authUser));
-  }, [visibleNotifications, authUser]);
+  const hasClearableNotifications = useMemo(() => {
+    return visibleNotifications.some((n) => !(n.requiresAck && !n.acknowledged));
+  }, [visibleNotifications]);
+
+  async function notificationPost(path) {
+    const token = localStorage.getItem("authToken") || "";
+    if (!token) return;
+    try {
+      const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      await loadNotifications();
+      window.dispatchEvent(new CustomEvent("notificationsUpdated", { detail: data }));
+      if (data?.relatedTask || String(data?.notification?.relatedEntityType || "") === "daily_planner_task") {
+        window.dispatchEvent(new CustomEvent("dailyPlannerUpdated", { detail: data }));
+      }
+    } catch {
+      // ignore transient notification errors
+    }
+  }
+
+  async function markNotificationRead(notificationId) {
+    if (String(notificationId || "").startsWith("offline_token_")) {
+      updateLocalNotification(notificationId, { read: true });
+      setNotifications(readVisibleLocalNotifications(readAuthUser()));
+      return;
+    }
+    await notificationPost(`/api/notifications/${encodeURIComponent(notificationId)}/read`);
+  }
+
+  async function markAllNotificationsRead() {
+    visibleNotifications.forEach((n) => {
+      if (n?.local) updateLocalNotification(n.id, { read: true });
+    });
+    await notificationPost("/api/notifications/read-all");
+  }
+
+  async function acknowledgeNotification(notificationId) {
+    if (String(notificationId || "").startsWith("offline_token_")) {
+      updateLocalNotification(notificationId, { read: true, acknowledged: true, acknowledgementCount: 1 });
+      setNotifications(readVisibleLocalNotifications(readAuthUser()));
+      return;
+    }
+    await notificationPost(`/api/notifications/${encodeURIComponent(notificationId)}/ack`);
+  }
+
+  async function clearAllNotifications() {
+    clearVisibleLocalNotifications();
+    await notificationPost("/api/notifications/clear-visible");
+  }
+
+  async function sendBroadcastNotification(e) {
+    e.preventDefault();
+    const token = localStorage.getItem("authToken") || "";
+    if (!token || broadcastSending) return;
+    setBroadcastErr("");
+    setBroadcastSending(true);
+    try {
+      const res = await fetch("/api/notifications/broadcast", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ title: broadcastTitle, message: broadcastMessage, requiresAck: broadcastAck })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBroadcastErr(data?.message || "Notification could not be sent.");
+        return;
+      }
+      setBroadcastTitle("");
+      setBroadcastMessage("");
+      setBroadcastAck(true);
+      setBroadcastOpen(false);
+      await loadNotifications();
+    } catch {
+      setBroadcastErr("Notification could not be sent (API not reachable).");
+    } finally {
+      setBroadcastSending(false);
+    }
+  }
 
   function updateNotificationMenuPosition() {
     const el = notifWrapperRef.current;
@@ -214,12 +260,11 @@ export default function NavbarTop() {
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
 
-    const horizontalMargin = 12;
+    const horizontalMargin = 8;
     const verticalGap = 8;
     const desiredWidth = 380;
-    const minWidth = 280;
 
-    const availableWidth = Math.max(minWidth, viewportWidth - horizontalMargin * 2);
+    const availableWidth = Math.max(220, viewportWidth - horizontalMargin * 2);
     const width = Math.min(desiredWidth, availableWidth);
 
     const idealLeft = rect.right - width;
@@ -236,8 +281,10 @@ export default function NavbarTop() {
       top,
       left: clampedLeft,
       width,
-      minWidth: Math.min(minWidth, availableWidth),
-      maxWidth: viewportWidth - horizontalMargin * 2,
+      minWidth: 0,
+      maxWidth: `calc(100vw - ${horizontalMargin * 2}px)`,
+      boxSizing: "border-box",
+      overflowX: "hidden",
       zIndex: 2000,
       maxHeight
     });
@@ -269,6 +316,7 @@ export default function NavbarTop() {
   function handleNotificationToggle(isOpen) {
     setNotifOpen(!!isOpen);
     if (isOpen) {
+      loadNotifications();
       window.setTimeout(() => {
         updateNotificationMenuPosition();
       }, 0);
@@ -309,56 +357,119 @@ export default function NavbarTop() {
                 <Dropdown.Menu
                   className="dropdown-menu-lg mt-2 py-0"
                   align={false}
-                  style={notificationMenuStyle}
+                  style={{ ...notificationMenuStyle, transform: "none" }}
                 >
-                  <div className="p-3 border-bottom d-flex justify-content-between align-items-center" style={{ gap: 12 }}>
-                    <span className="fw-bold mb-0">Notifications</span>
-                    {visibleNotifications.length ? (
-                      <div className="d-flex align-items-center flex-wrap justify-content-end" style={{ gap: 10 }}>
-                        <ButtonLikeLink onClick={() => markAllNotificationsRead(authUser)}>
-                          Mark all read
+                  <div className="p-3 border-bottom">
+                    <div className="d-flex justify-content-between align-items-start" style={{ gap: 12 }}>
+                      <span className="fw-bold mb-0">Notifications</span>
+                      {visibleNotifications.length ? (
+                        <div className="d-flex align-items-center flex-wrap justify-content-end" style={{ gap: 10 }}>
+                          <ButtonLikeLink onClick={markAllNotificationsRead}>Mark all read</ButtonLikeLink>
+                          {hasClearableNotifications ? (
+                            <ButtonLikeLink onClick={clearAllNotifications}>Clear all</ButtonLikeLink>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {canSendBroadcast ? (
+                      <div className="mt-2">
+                        <ButtonLikeLink onClick={() => { setBroadcastOpen(!broadcastOpen); setBroadcastErr(""); }}>
+                          {broadcastOpen ? "Close message form" : "Send message to all users"}
                         </ButtonLikeLink>
-                        {hasReadNotifications ? (
-                          <ButtonLikeLink onClick={() => clearAllReadNotifications(authUser)}>
-                            Clear all read
-                          </ButtonLikeLink>
+
+                        {broadcastOpen ? (
+                          <form onSubmit={sendBroadcastNotification} className="mt-2">
+                            {broadcastErr ? <div className="text-danger small mb-2">{broadcastErr}</div> : null}
+                            <input
+                              className="form-control form-control-sm mb-2"
+                              placeholder="Notification title"
+                              value={broadcastTitle}
+                              onChange={(e) => setBroadcastTitle(e.target.value)}
+                              maxLength={120}
+                              disabled={broadcastSending}
+                            />
+                            <textarea
+                              className="form-control form-control-sm mb-2"
+                              placeholder="Message to all users"
+                              rows={3}
+                              value={broadcastMessage}
+                              onChange={(e) => setBroadcastMessage(e.target.value)}
+                              maxLength={1000}
+                              disabled={broadcastSending}
+                            />
+                            <label className="small d-flex align-items-center mb-2" style={{ gap: 6 }}>
+                              <input
+                                type="checkbox"
+                                checked={broadcastAck}
+                                onChange={(e) => setBroadcastAck(e.target.checked)}
+                                disabled={broadcastSending}
+                              />
+                              Require acknowledgement
+                            </label>
+                            <button type="submit" className="btn btn-sm btn-primary" disabled={broadcastSending || !broadcastTitle.trim() || !broadcastMessage.trim()}>
+                              {broadcastSending ? "Sending…" : "Send notification"}
+                            </button>
+                          </form>
                         ) : null}
                       </div>
                     ) : null}
                   </div>
 
-                  <div style={{ maxHeight: notificationMenuStyle.maxHeight ? notificationMenuStyle.maxHeight - 64 : 360, overflowY: "auto" }}>
+                  <div style={{ maxHeight: notificationMenuStyle.maxHeight ? notificationMenuStyle.maxHeight - 64 : 360, overflowY: "auto", overflowX: "hidden", maxWidth: "100%" }}>
                     {!visibleNotifications.length ? (
                       <div className="p-3 text-muted small">No notifications.</div>
                     ) : (
                       visibleNotifications.map((n) => {
-                        const isRead = isNotificationReadByUser(n, authUser);
+                        const isRead = !!n.read;
+                        const needsAck = !!n.requiresAck && !n.acknowledged;
+                        const severity = String(n.severity || "info").toLowerCase();
+                        const accent = severity === "danger" ? "#dc3545" : severity === "warning" ? "#ffc107" : severity === "success" ? "#198754" : "#0d6efd";
 
                         return (
                           <div
                             key={n.id}
                             className="px-3 py-2 border-bottom"
                             style={{
-                              background: isRead ? "#fff" : "rgba(13, 110, 253, 0.06)"
+                              background: isRead && !needsAck ? "#fff" : "rgba(13, 110, 253, 0.06)",
+                              borderLeft: `4px solid ${accent}`,
+                              maxWidth: "100%",
+                              minWidth: 0,
+                              boxSizing: "border-box",
+                              overflow: "hidden"
                             }}
                           >
-                            <div className="d-flex justify-content-between align-items-start" style={{ gap: 10 }}>
+                            <div className="d-flex justify-content-between align-items-start" style={{ gap: 10, minWidth: 0, maxWidth: "100%" }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  className="fw-bold text-dark"
-                                  style={{ fontSize: 14, wordBreak: "break-word", overflowWrap: "anywhere" }}
-                                >
-                                  {n.message || "Notification"}
+                                <div className="fw-bold text-dark" style={{ fontSize: 14, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                                  {n.title || "Notification"}
                                 </div>
-                                <div className="text-muted small">
+                                {n.message ? (
+                                  <div className="small text-dark" style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>{n.message}</div>
+                                ) : null}
+                                <div className="text-muted small mt-1">
                                   {formatNotificationTime(n.createdAt)}
+                                  {n.requiresAck ? ` · ${n.acknowledgementCount || 0} acknowledged` : ""}
                                 </div>
                               </div>
 
                               {!isRead ? (
-                                <ButtonLikeLink onClick={() => markNotificationRead(n.id, authUser)} title="Mark as read">
+                                <ButtonLikeLink onClick={() => markNotificationRead(n.id)} title="Mark as read">
                                   <FontAwesomeIcon icon={faCheck} />
                                 </ButtonLikeLink>
+                              ) : null}
+                            </div>
+
+                            <div className="d-flex flex-wrap align-items-center mt-2" style={{ gap: 8, maxWidth: "100%" }}>
+                              {needsAck ? (
+                                <button type="button" className="btn btn-sm btn-outline-success py-0" onClick={() => acknowledgeNotification(n.id)}>
+                                  <FontAwesomeIcon icon={faCheck} className="me-1" /> Acknowledge
+                                </button>
+                              ) : null}
+                              {n.actionUrl ? (
+                                <a className="small fw-bold" href={n.actionUrl} onClick={() => markNotificationRead(n.id)}>
+                                  Open
+                                </a>
                               ) : null}
                             </div>
                           </div>

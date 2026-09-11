@@ -29,32 +29,107 @@ import ScrollToTop from "./components/ScrollToTop";
 // ✅ CRA Workbox service worker helper
 import * as serviceWorker from "./serviceWorker";
 
+const UPDATE_PROMPT_KEY = "maintenix_update_prompted_main_js";
+
+function currentMainScriptPath() {
+  try {
+    const scripts = Array.from(document.scripts || []);
+    const main = scripts
+      .map((script) => script.getAttribute("src") || "")
+      .find((src) => /\/static\/js\/main\.[^/]+\.js(?:\?|$)/.test(src));
+    if (!main) return "";
+    return new URL(main, window.location.href).pathname;
+  } catch {
+    return "";
+  }
+}
+
+async function hardRefreshMaintenixApp() {
+  try {
+    if ("caches" in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.map((key) => window.caches.delete(key)));
+    }
+  } catch {}
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+  } catch {}
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("maintenix_refresh", String(Date.now()));
+  window.location.replace(url.toString());
+}
+
+async function checkForUpdatedBundleOnLoad() {
+  try {
+    const res = await fetch(`${process.env.PUBLIC_URL || ""}/asset-manifest.json?ts=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" }
+    });
+    if (!res.ok) return;
+
+    const manifest = await res.json();
+    const nextMainJs = String(manifest?.files?.["main.js"] || "").trim();
+    const currentMainJs = currentMainScriptPath();
+    if (!nextMainJs || !currentMainJs || nextMainJs === currentMainJs) return;
+
+    try {
+      if (sessionStorage.getItem(UPDATE_PROMPT_KEY) === nextMainJs) return;
+      sessionStorage.setItem(UPDATE_PROMPT_KEY, nextMainJs);
+    } catch {}
+
+    const ok = window.confirm("A Maintenix update is available. Press OK to reload and apply the update.");
+    if (ok) {
+      await hardRefreshMaintenixApp();
+    }
+  } catch {}
+}
+
+function runVersionCheckOnceOnLoad() {
+  if (document.readyState === "complete") {
+    window.setTimeout(checkForUpdatedBundleOnLoad, 0);
+    return;
+  }
+
+  window.addEventListener("load", checkForUpdatedBundleOnLoad, { once: true });
+}
+
 // ✅ Register CRA build service worker (build/service-worker.js)
 serviceWorker.register({
   onUpdate: (registration) => {
     try {
-      const ok = window.confirm("A new version is available. Reload now to update?");
+      const ok = window.confirm("A Maintenix update is available. Press OK to reload and apply the update.");
       if (!ok) return;
 
-      // Tell the waiting SW to activate immediately
+      // Reload once the new SW takes control. Register this before posting
+      // SKIP_WAITING so we cannot miss a fast controllerchange event.
+      let reloaded = false;
+      const reloadOnce = () => {
+        if (reloaded) return;
+        reloaded = true;
+        hardRefreshMaintenixApp();
+      };
+      navigator.serviceWorker.addEventListener("controllerchange", reloadOnce);
+
+      // Tell the waiting SW to activate immediately.
       if (registration && registration.waiting) {
         try {
           registration.waiting.postMessage({ type: "SKIP_WAITING" });
         } catch {}
       }
 
-      // Reload once the new SW takes control
-      let reloaded = false;
-      const onControllerChange = () => {
-        if (reloaded) return;
-        reloaded = true;
-        window.location.reload();
-      };
-
-      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+      // Fallback: if the browser does not fire controllerchange promptly,
+      // still perform the requested hard reload.
+      window.setTimeout(reloadOnce, 1500);
     } catch {}
   }
 });
+
+runVersionCheckOnceOnLoad();
 
 /**
  * --- Global Presence Heartbeat ---

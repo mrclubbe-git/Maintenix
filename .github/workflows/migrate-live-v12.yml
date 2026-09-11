@@ -73,8 +73,8 @@ jobs:
               root / 'Server_API/routes/dailyPlanner.js',
               root / 'Server_API/routes/formalReports.js',
               root / 'Server_API/routes/notifications.js',
-              root / 'Web_UI/src/pages/dashboard/DailyPlanner.js',
-              root / 'Web_UI/src/pages/dashboard/SectionReports.js',
+              root / 'Web_UI/src/pages/DailyPlanner.js',
+              root / 'Web_UI/src/pages/SectionReports.js',
               root / 'Web_UI/public/offline-sw.js',
               root / 'Web_UI/package.json',
           ]

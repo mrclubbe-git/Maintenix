@@ -14,6 +14,7 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 const MODULE_DIR = path.join(__dirname, "..", "formal-reporting");
 const SYSTEMS_FILE = path.join(DATA_DIR, "templates", "service-report-systems.json");
 const WORKER_FILE = path.join(MODULE_DIR, "report_worker.py");
+const PYTHON_EXECUTABLE = process.env.FORMAL_REPORT_PYTHON || "/usr/bin/python3";
 const TEMPLATES_DIR = path.join(DATA_DIR, "templates", "formal-reports");
 const STATE_DIR = path.join(DATA_DIR, "formal-reporting");
 const DRAFTS_DIR = path.join(STATE_DIR, "drafts");
@@ -115,19 +116,48 @@ function validateDraft(payload) {
 
 function runWorker(command, payload = null) {
   return new Promise((resolve, reject) => {
-    const child = spawn("python3", [WORKER_FILE, command], { cwd: MODULE_DIR, stdio: ["pipe", "pipe", "pipe"] });
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    let child;
+    try {
+      child = spawn(PYTHON_EXECUTABLE, [WORKER_FILE, command], {
+        cwd: MODULE_DIR,
+        stdio: ["pipe", "pipe", "pipe"]
+      });
+    } catch (error) {
+      fail(new Error(`Unable to start formal report worker (${PYTHON_EXECUTABLE}): ${error.message}`));
+      return;
+    }
+
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", (error) => {
+      fail(new Error(`Unable to start formal report worker (${PYTHON_EXECUTABLE}): ${error.message}`));
+    });
     child.on("close", (code) => {
+      if (settled) return;
       let parsed = null;
       try { parsed = JSON.parse(stdout); } catch {}
-      if (code !== 0) return reject(new Error(parsed?.error || stderr.trim() || `Worker exited ${code}`));
-      if (!parsed) return reject(new Error("Worker returned invalid JSON"));
+      if (code !== 0) return fail(new Error(parsed?.error || stderr.trim() || `Worker exited ${code}`));
+      if (!parsed) return fail(new Error("Worker returned invalid JSON"));
+      settled = true;
       resolve(parsed);
     });
-    child.stdin.end(payload == null ? "" : JSON.stringify(payload));
+    child.stdin.on("error", (error) => {
+      if (error?.code !== "EPIPE") fail(new Error(`Unable to write to formal report worker: ${error.message}`));
+    });
+    try {
+      child.stdin.end(payload == null ? "" : JSON.stringify(payload));
+    } catch (error) {
+      fail(new Error(`Unable to write to formal report worker: ${error.message}`));
+    }
   });
 }
 

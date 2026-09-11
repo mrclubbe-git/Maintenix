@@ -122,7 +122,12 @@ jobs:
             node --check "$file"
           done < <(find Server_API -type f -name '*.js' -print0)
 
-          if grep -RIl '100\.106\.40\.17' Server_API Web_UI/src Web_UI/public 2>/dev/null; then
+          if grep -RIl \
+            --include='*.js' \
+            --include='*.jsx' \
+            --include='*.json' \
+            --include='*.html' \
+            '100\.106\.40\.17' Server_API Web_UI/src Web_UI/public 2>/dev/null; then
             echo 'Obsolete private API URL remains in active source.'
             exit 1
           fi

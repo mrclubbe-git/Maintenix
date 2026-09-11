@@ -1,0 +1,47 @@
+name: Clean v1.2 migration artifacts
+
+on:
+  push:
+    branches:
+      - migrate-live-v1.2
+    paths:
+      - ".github/workflows/cleanup-v12-migration.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+        with:
+          ref: migrate-live-v1.2
+          fetch-depth: 0
+
+      - name: Remove generated files and protect them from future commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -rf --ignore-unmatch Web_UI/node_modules Web_UI/build Server_API/node_modules
+          cat > .gitignore <<'EOF'
+          Web_UI/node_modules/
+          Web_UI/build/
+          Server_API/node_modules/
+          **/__pycache__/
+          *.pyc
+          EOF
+          git add .gitignore
+          rm -f .github/workflows/cleanup-v12-migration.yml
+          git add -A .github/workflows/cleanup-v12-migration.yml
+
+      - name: Commit clean migration tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove generated migration artifacts'
+          git push origin HEAD:migrate-live-v1.2

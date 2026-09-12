@@ -28,7 +28,33 @@ jobs:
       - name: Extract and apply servicing migration
         shell: bash
         run: |
-          python3 -c "from pathlib import Path; raw=Path('.github/workflows/servicing-formal-style-migration.yml').read_text(); start=raw.index(\"          python3 - <<'PY'\\n\")+len(\"          python3 - <<'PY'\\n\"); end=raw.index(\"          PY\\n\\n      - name: Install UI dependencies\", start); src=raw[start:end]; src='\\n'.join((line[10:] if line.startswith('          ') else line) for line in src.split('\\n')); Path('/tmp/migrate_servicing.py').write_text(src); compile(src, '/tmp/migrate_servicing.py', 'exec')"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          raw = Path('.github/workflows/servicing-formal-style-migration.yml').read_text()
+          marker = "          python3 - <<'PY'\n"
+          start = raw.index(marker) + len(marker)
+          end = raw.index("          PY\n\n      - name: Install UI dependencies", start)
+          segment = raw[start:end]
+
+          output = []
+          in_triple = False
+          for line in segment.splitlines():
+              if in_triple:
+                  output.append(line)
+                  if line.count("'''") % 2 == 1:
+                      in_triple = False
+                  continue
+
+              adjusted = line[10:] if line.startswith('          ') else line
+              output.append(adjusted)
+              if adjusted.count("'''") % 2 == 1:
+                  in_triple = True
+
+          source = '\n'.join(output) + '\n'
+          compile(source, '/tmp/migrate_servicing.py', 'exec')
+          Path('/tmp/migrate_servicing.py').write_text(source)
+          PY
           python3 /tmp/migrate_servicing.py
 
       - name: Install UI dependencies

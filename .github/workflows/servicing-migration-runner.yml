@@ -57,6 +57,17 @@ jobs:
           PY
           python3 /tmp/migrate_servicing.py
 
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('Web_UI/src/pages/Servicing.js')
+          text = path.read_text()
+          old = '        document.getElementById(`servicing-check-${nextQuestion.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });'
+          new = '        const nextCard = document.getElementById(`servicing-check-${nextQuestion.id}`);\n        if (nextCard) nextCard.scrollIntoView({ behavior: "smooth", block: "center" });'
+          if old not in text:
+              raise SystemExit('Expected auto-scroll line not found after migration.')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
       - name: Install UI dependencies
         working-directory: Web_UI
         run: npm ci --legacy-peer-deps

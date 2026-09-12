@@ -185,6 +185,17 @@ async function generateServicingDocx(opts) {
     const standard = String(r?.standard || "").trim();
     const answer = String(r?.answer || "").trim().toUpperCase();
     const isGeneral = standard.toLowerCase() === "general";
+    const defects = Array.isArray(r?.defects)
+      ? r.defects.map((defect) => ({
+          finding: String(defect?.finding || "").trim(),
+          action: String(defect?.action || "").trim()
+        })).filter((defect) => defect.finding || defect.action)
+      : [];
+    const defectsText = defects.map((defect, defectIndex) => `${defectIndex + 1}. ${defect.finding || "-"}`).join("\n");
+    const requiredActionsText = defects.map((defect, defectIndex) => `${defectIndex + 1}. ${defect.action || "-"}`).join("\n");
+    const defectSummary = defects.map((defect, defectIndex) =>
+      `Defect ${defectIndex + 1}: ${defect.finding || "-"}\nRequired action: ${defect.action || "-"}`
+    ).join("\n\n");
 
     const photoField = String(r?.photoField || "").trim();
     const photoPath = photoField ? (photoByField?.[photoField] || "") : "";
@@ -204,7 +215,12 @@ async function generateServicingDocx(opts) {
       standard: r?.standard || "",
       question: r?.question || "",
       answer: r?.answer || "",
-      comment: r?.comment || "",
+      defectsFound: r?.defectsFound || "",
+      defects,
+      defectCount: defects.length,
+      defectsText,
+      requiredActionsText,
+      comment: defectSummary || r?.comment || "",
       extra,
       photo: photoPath || "",
       "%photo": photoPath || ""

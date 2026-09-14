@@ -25,6 +25,27 @@ jobs:
           cache: npm
           cache-dependency-path: Web_UI/package-lock.json
 
+      - name: Fix staged patch span boundaries
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/scripts/patch_servicing_defect_photo.py')
+          s = p.read_text(encoding='utf-8')
+          replacements = {
+              'helper + "function isMobileDevice() {"': 'helper',
+              'photo_count + "  const progress = useMemo("': 'photo_count',
+              'interaction + "  // ---- Signature: init + redraw ----"': 'interaction',
+              'build_draft + "  function loadDraftValueIntoForm(value) {"': 'build_draft',
+              'validate + "  async function enqueueServicingJobFromValue("': 'validate',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'missing patch expression: {old}')
+              s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Apply staged servicing patch
         run: python3 .github/scripts/patch_servicing_defect_photo.py
 

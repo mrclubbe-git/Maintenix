@@ -140,24 +140,51 @@ function legacyAnswerForDefectState(std, state) {
 }
 
 function normalizeDefects(record) {
-  return Array.isArray(record?.defects)
-    ? record.defects.map((defect) => ({
-        finding: String(defect?.finding || ""),
-        action: String(defect?.action || "")
-      }))
-    : [];
+  const source = Array.isArray(record?.defects)
+    ? record.defects
+    : Array.isArray(record?.defectEntries)
+      ? record.defectEntries
+      : [];
+
+  return source.map((defect) => ({
+    finding: String(defect?.finding || ""),
+    photoDataUrl: String(defect?.photoDataUrl || ""),
+    photoFile: defect?.photoFile || null,
+    photoField: String(defect?.photoField || "")
+  }));
+}
+
+function defectHasPhoto(defect, record, defectIndex) {
+  if (defect?.photoFile || defect?.photoDataUrl) return true;
+  // Older drafts stored one question-level photo. Treat it as defect 1.
+  return defectIndex === 0 && !!(record?.photoFile || record?.photoDataUrl);
+}
+
+function countMissingDefectPhotos(record) {
+  const state = String(record?.defectsFound || "").trim().toLowerCase() || defectStateFromAnswer(record?.answer);
+  if (state !== "yes") return 0;
+  const defects = normalizeDefects(record);
+  if (!defects.length) return 1;
+  return defects.reduce((count, defect, defectIndex) => (
+    count + (defectHasPhoto(defect, record, defectIndex) ? 0 : 1)
+  ), 0);
 }
 
 function servicingResponseComplete(record) {
   const explicitState = String(record?.defectsFound || "").trim().toLowerCase();
+  if (!explicitState) {
+    const legacyState = defectStateFromAnswer(record?.answer);
+    if (legacyState !== "yes") return !!String(record?.answer || "").trim();
+  }
 
-  // Existing saved drafts used only the legacy answer field. Keep those drafts usable.
-  if (!explicitState) return !!String(record?.answer || "").trim();
-  if (explicitState === "no" || explicitState === "na") return true;
-  if (explicitState !== "yes") return false;
+  const state = explicitState || defectStateFromAnswer(record?.answer);
+  if (state === "no" || state === "na") return true;
+  if (state !== "yes") return false;
 
   const defects = normalizeDefects(record);
-  return defects.length > 0 && defects.every((defect) => defect.finding.trim() && defect.action.trim());
+  return defects.length > 0 && defects.every((defect, defectIndex) => (
+    defect.finding.trim() && defectHasPhoto(defect, record, defectIndex)
+  ));
 }
 
 function defectsAsComment(defects) {
@@ -165,12 +192,11 @@ function defectsAsComment(defects) {
   return list
     .map((defect, index) => {
       const finding = String(defect?.finding || "").trim();
-      const action = String(defect?.action || "").trim();
-      if (!finding && !action) return "";
-      return `Defect ${index + 1}: ${finding || "-"}\nRequired action: ${action || "-"}`;
+      if (!finding) return "";
+      return `Defect ${index + 1}: ${finding}`;
     })
     .filter(Boolean)
-    .join("\n\n");
+    .join("\n");
 }
 
 function isMobileDevice() {
@@ -406,8 +432,9 @@ export default function Servicing() {
   const [highlightMissing, setHighlightMissing] = useState(false);
   const [highlightMissingPhotos, setHighlightMissingPhotos] = useState(false);
 
-  // Photo input refs per question (to trigger camera/file picker)
-  const photoInputRefs = useRef({});
+  // Shared defect camera input. Keeping it mounted lets button taps open the camera immediately.
+  const defectCameraInputRef = useRef(null);
+  const defectCameraTargetRef = useRef({ qid: "", defectIndex: 0 });
 
   // Steps: 0=PreStart, 1=Questionnaire, 2=Review, 3=Final
   const [step, setStep] = useState(0);
@@ -579,11 +606,9 @@ export default function Servicing() {
 
   const photoMissingCount = useMemo(() => {
     if (!questionRows.length) return 0;
-    return questionRows.filter((q) => {
-      const a = answers?.[q.id] || {};
-      const need = needsPhotoForAnswer(q.std, a.answer);
-      return need && !a.photoFile && !a.photoDataUrl;
-    }).length;
+    return questionRows.reduce((count, q) => (
+      count + countMissingDefectPhotos(answers?.[q.id] || {})
+    ), 0);
   }, [questionRows, answers]);
 
   const progress = useMemo(() => Math.round(((step + 1) / 4) * 100), [step]);
@@ -862,7 +887,7 @@ export default function Servicing() {
       };
       const existingDefects = normalizeDefects(current);
       const defects = state === "yes"
-        ? (existingDefects.length ? existingDefects : [{ finding: "", action: "" }])
+        ? (existingDefects.length ? existingDefects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
         : [];
       return {
         ...prev,
@@ -871,7 +896,8 @@ export default function Servicing() {
           defectsFound: state,
           answer: legacyAnswerForDefectState(q.std, state),
           defects,
-          comment: state === "yes" ? defectsAsComment(defects) : ""
+          comment: state === "yes" ? defectsAsComment(defects) : "",
+          ...(state === "yes" ? {} : { photoDataUrl: "", photoFile: null })
         }
       };
     });
@@ -886,12 +912,14 @@ export default function Servicing() {
     }
   }
 
-  function updateDefect(qid, defectIndex, field, value) {
+  function updateDefectFinding(qid, defectIndex, value) {
     setAnswers((prev) => {
       const current = prev?.[qid] || {};
       const defects = normalizeDefects(current);
-      if (!defects[defectIndex]) defects[defectIndex] = { finding: "", action: "" };
-      defects[defectIndex] = { ...defects[defectIndex], [field]: value };
+      if (!defects[defectIndex]) {
+        defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+      }
+      defects[defectIndex] = { ...defects[defectIndex], finding: value };
       return {
         ...prev,
         [qid]: {
@@ -903,27 +931,49 @@ export default function Servicing() {
     });
   }
 
+  // ---- Photos (one photo per defect, captured before defect text) ----
+  const isMobile = useMemo(() => isMobileDevice(), []);
+
+  function openDefectCamera(qid, defectIndex) {
+    defectCameraTargetRef.current = { qid, defectIndex };
+    const input = defectCameraInputRef.current;
+    if (input && typeof input.click === "function") input.click();
+  }
+
   function addDefect(qid) {
+    const newIndex = normalizeDefects(answers?.[qid] || {}).length;
     setAnswers((prev) => {
       const current = prev?.[qid] || {};
-      const defects = [...normalizeDefects(current), { finding: "", action: "" }];
-      return { ...prev, [qid]: { ...current, defects, comment: defectsAsComment(defects) } };
+      const defects = normalizeDefects(current);
+      const nextDefects = [...defects, { finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
+      return { ...prev, [qid]: { ...current, defects: nextDefects, comment: defectsAsComment(nextDefects) } };
     });
+    // Same user gesture: immediately repeat the workflow by opening the camera.
+    openDefectCamera(qid, newIndex);
   }
 
   function removeDefect(qid, defectIndex) {
     setAnswers((prev) => {
       const current = prev?.[qid] || {};
       const defects = normalizeDefects(current).filter((_, index) => index !== defectIndex);
-      const nextDefects = defects.length ? defects : [{ finding: "", action: "" }];
-      return { ...prev, [qid]: { ...current, defects: nextDefects, comment: defectsAsComment(nextDefects) } };
+      const nextDefects = defects.length
+        ? defects
+        : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
+      const first = nextDefects[0] || {};
+      return {
+        ...prev,
+        [qid]: {
+          ...current,
+          defects: nextDefects,
+          comment: defectsAsComment(nextDefects),
+          photoDataUrl: first.photoDataUrl || "",
+          photoFile: first.photoFile || null
+        }
+      };
     });
   }
 
-  // ---- Photos (per question) ----
-  const isMobile = useMemo(() => isMobileDevice(), []);
-
-  const onPhotoSelected = async (qid, file) => {
+  const onDefectPhotoSelected = async (qid, defectIndex, file) => {
     if (!file) return;
     if (!String(file.type || "").startsWith("image/")) {
       setErr("Please select an image file.");
@@ -942,26 +992,63 @@ export default function Servicing() {
 
     const reader = new FileReader();
     reader.onload = () => {
-      updateAnswer(qid, { photoDataUrl: String(reader.result || ""), photoFile: prepared });
+      const dataUrl = String(reader.result || "");
+      setAnswers((prev) => {
+        const current = prev?.[qid] || {};
+        const defects = normalizeDefects(current);
+        if (!defects[defectIndex]) {
+          defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+        }
+        defects[defectIndex] = {
+          ...defects[defectIndex],
+          photoDataUrl: dataUrl,
+          photoFile: prepared
+        };
+        const first = defects[0] || {};
+        return {
+          ...prev,
+          [qid]: {
+            ...current,
+            defects,
+            comment: defectsAsComment(defects),
+            // Mirror defect 1 for compatibility with old drafts/backends.
+            photoDataUrl: first.photoDataUrl || "",
+            photoFile: first.photoFile || null
+          }
+        };
+      });
+
+      window.setTimeout(() => {
+        const input = document.getElementById(`servicing-defect-${qid}-${defectIndex}`);
+        if (input && typeof input.focus === "function") input.focus();
+      }, 120);
     };
     reader.onerror = () => setErr("Failed to read selected photo.");
     reader.readAsDataURL(prepared);
   };
 
-  const clearPhoto = (qid) => {
-    updateAnswer(qid, { photoDataUrl: "", photoFile: null });
-    const el = photoInputRefs.current?.[qid];
-    if (el) {
-      try {
-        el.value = "";
-      } catch {}
-    }
-  };
-
-  const triggerPhotoPicker = (qid) => {
-    const el = photoInputRefs.current?.[qid];
-    if (el && typeof el.click === "function") el.click();
-  };
+  function clearDefectPhoto(qid, defectIndex) {
+    setAnswers((prev) => {
+      const current = prev?.[qid] || {};
+      const defects = normalizeDefects(current);
+      if (!defects[defectIndex]) return prev;
+      defects[defectIndex] = {
+        ...defects[defectIndex],
+        photoDataUrl: "",
+        photoFile: null
+      };
+      const first = defects[0] || {};
+      return {
+        ...prev,
+        [qid]: {
+          ...current,
+          defects,
+          photoDataUrl: first.photoDataUrl || "",
+          photoFile: first.photoFile || null
+        }
+      };
+    });
+  }
 
   // ---- Signature: init + redraw ----
   function initSignatureCanvasIfNeeded() {
@@ -1101,7 +1188,7 @@ export default function Servicing() {
 
     if (step === 1) {
       if (unansweredCount > 0) {
-        setErr(`Please complete every checklist item and all required defect/action fields before continuing. Incomplete: ${unansweredCount}`);
+        setErr(`Please complete every checklist item and all required defect photo/description fields before continuing. Incomplete: ${unansweredCount}`);
         setHighlightMissing(true);
         setHighlightMissingPhotos(false);
 
@@ -1400,13 +1487,19 @@ export default function Servicing() {
     const cleanAnswers = {};
     Object.keys(answers || {}).forEach((k) => {
       const a = answers?.[k] || {};
+      const normalizedDefects = normalizeDefects(a).map((defect, defectIndex) => ({
+        finding: defect.finding || "",
+        photoDataUrl: defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl || "" : ""),
+        photoFile: null,
+        photoField: defect.photoField || ""
+      }));
       cleanAnswers[k] = {
         answer: a.answer || "",
         defectsFound: a.defectsFound || defectStateFromAnswer(a.answer),
-        defects: normalizeDefects(a),
-        comment: defectsAsComment(normalizeDefects(a)) || a.comment || "",
+        defects: normalizedDefects,
+        comment: defectsAsComment(normalizedDefects) || a.comment || "",
         extra: a.extra || {},
-        photoDataUrl: a.photoDataUrl || "",
+        photoDataUrl: normalizedDefects[0]?.photoDataUrl || a.photoDataUrl || "",
         photoFile: null
       };
     });
@@ -1612,23 +1705,20 @@ export default function Servicing() {
 
     const standards = makeSelectedStandardsFromValue(v);
     if (!standards.length) return "Draft is missing selected standards.";
-
     if (!draftQuestionRows.length) {
       return "Draft questions are unavailable. Open the draft and save it again, then try Generate.";
     }
 
     const draftAnswers = v?.answers || {};
-    const unanswered = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {})).length;
-    if (unanswered > 0) return `Draft is incomplete. Checklist items still need a response or required defect/action details: ${unanswered}`;
+    const incomplete = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {})).length;
+    if (incomplete > 0) {
+      return `Draft is incomplete. Checklist items still need a response, defect photo or defect description: ${incomplete}`;
+    }
 
-    const missingPhotos = draftQuestionRows.filter((q) => {
-      const a = draftAnswers?.[q.id] || {};
-      const need = needsPhotoForAnswer(q.std, a.answer);
-      return need && !a.photoDataUrl && !a.photoFile;
-    }).length;
-
-    if (missingPhotos > 0) return `Draft is incomplete. Missing required photos: ${missingPhotos}`;
-
+    const missingPhotos = draftQuestionRows.reduce((count, q) => (
+      count + countMissingDefectPhotos(draftAnswers?.[q.id] || {})
+    ), 0);
+    if (missingPhotos > 0) return `Draft is incomplete. Missing defect photos: ${missingPhotos}`;
     return "";
   }
 
@@ -1678,53 +1768,57 @@ export default function Servicing() {
         svcNumber: reportId,
         serverFileName,
         signatureDataUrl: v.signatureDataUrl || "",
-        responses: draftQuestionRows.map((q, i) => ({
-          no: i + 1,
-          qid: q.id,
-          photoField: `photo_${q.id}`,
-          standard: q.std,
-          question: q.question,
-          answer: v?.answers?.[q.id]?.answer || "",
-          defectsFound: v?.answers?.[q.id]?.defectsFound || defectStateFromAnswer(v?.answers?.[q.id]?.answer),
-          defects: normalizeDefects(v?.answers?.[q.id] || {}),
-          comment: defectsAsComment(normalizeDefects(v?.answers?.[q.id] || {})) || v?.answers?.[q.id]?.comment || "",
-          extraType: q.extra || "",
-          extra: v?.answers?.[q.id]?.extra || {}
-        }))
+        responses: draftQuestionRows.map((q, i) => {
+          const responseRecord = v?.answers?.[q.id] || {};
+          const responseDefects = normalizeDefects(responseRecord);
+          const defectEntries = responseDefects.map((defect, defectIndex) => ({
+            finding: defect.finding || "",
+            photoField: `photo_${q.id}_defect_${defectIndex + 1}`
+          }));
+          return {
+            no: i + 1,
+            qid: q.id,
+            // Old backends still render defect 1 in the existing photo column.
+            photoField: defectEntries[0]?.photoField || `photo_${q.id}`,
+            standard: q.std,
+            question: q.question,
+            answer: responseRecord.answer || "",
+            defectsFound: responseRecord.defectsFound || defectStateFromAnswer(responseRecord.answer),
+            // Keep this empty so old generators use the comment text verbatim.
+            defects: [],
+            defectEntries,
+            comment: defectsAsComment(responseDefects) || responseRecord.comment || "",
+            extraType: q.extra || "",
+            extra: responseRecord.extra || {}
+          };
+        })
       };
 
-      // Collect attachments as blobs from saved draft dataUrls
+      // One attachment per defect. Additional defect images are preserved server-side.
       const attachments = [];
       draftQuestionRows.forEach((q) => {
         const a = v?.answers?.[q.id] || {};
-        const field = `photo_${q.id}`;
-
-        if (a.photoFile) {
-          attachments.push({
-            field,
-            fileName: `${field}.jpg`,
-            blob: a.photoFile
-          });
-          return;
-        }
-
-        if (a.photoDataUrl) {
-          const b = blobFromDataUrl(a.photoDataUrl);
-          if (b) {
-            attachments.push({
-              field,
-              fileName: `${field}.jpg`,
-              blob: b
-            });
+        const responseDefects = normalizeDefects(a);
+        responseDefects.forEach((defect, defectIndex) => {
+          const field = `photo_${q.id}_defect_${defectIndex + 1}`;
+          const photoFile = defect.photoFile || (defectIndex === 0 ? a.photoFile : null);
+          const photoDataUrl = defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl : "");
+          if (photoFile) {
+            attachments.push({ field, fileName: `${field}.jpg`, blob: photoFile });
+            return;
           }
-        }
+          if (photoDataUrl) {
+            const b = blobFromDataUrl(photoDataUrl);
+            if (b) attachments.push({ field, fileName: `${field}.jpg`, blob: b });
+          }
+        });
       });
 
       const job = {
         id: makeJobId(),
         reportId,
         type: "servicing_generate",
-        schemaVersion: 3,
+        schemaVersion: 4,
         status: "queued",
         retries: 0,
         createdAt,
@@ -1762,7 +1856,7 @@ export default function Servicing() {
     }
 
     if (unansweredCount > 0) {
-      setErr(`Please complete every checklist item and all required defect/action fields before saving. Incomplete: ${unansweredCount}`);
+      setErr(`Please complete every checklist item and all required defect photo/description fields before saving. Incomplete: ${unansweredCount}`);
       return;
     }
 
@@ -1846,6 +1940,19 @@ export default function Servicing() {
 
   return (
     <>
+      <input
+        ref={defectCameraInputRef}
+        type="file"
+        accept="image/*"
+        {...(isMobile ? { capture: "environment" } : {})}
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files && e.target.files[0];
+          const target = defectCameraTargetRef.current || {};
+          if (file && target.qid) onDefectPhotoSelected(target.qid, Number(target.defectIndex || 0), file);
+          try { e.target.value = ""; } catch {}
+        }}
+      />
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
         <div>
           <h4 className="mb-0">Servicing</h4>
@@ -2217,58 +2324,32 @@ export default function Servicing() {
               <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 12 }}>
                 <div>
                   <h5 className="mb-1">Checklist</h5>
-                  <div className="text-muted small">
-                    {systemType === "conveyor" ? "Conveyor" : "Substation"} • {area} • {serviceType}
-                  </div>
+                  <div className="text-muted small">{systemType === "conveyor" ? "Conveyor" : "Substation"} • {area} • {serviceType}</div>
                 </div>
                 <div className="text-end">
                   <div className="fw-bold">{completedCount} of {questionRows.length} completed</div>
-                  <div className="text-muted small">Defects found: {defectsFoundCount} • Photos missing: {photoMissingCount}</div>
+                  <div className="text-muted small">Defects found: {defectsFoundCount} • Defect photos missing: {photoMissingCount}</div>
                 </div>
               </div>
             </Card.Body>
           </Card>
 
           {!questionRows.length ? (
-            <Alert variant="warning" className="mb-0">
-              No checklist items found for the selected frequency/standards.
-            </Alert>
+            <Alert variant="warning" className="mb-0">No checklist items found for the selected frequency/standards.</Alert>
           ) : (
             questionRows.map((q, idx) => {
-              const a = answers?.[q.id] || {
-                answer: "",
-                defectsFound: "",
-                defects: [],
-                comment: "",
-                photoDataUrl: "",
-                photoFile: null
-              };
+              const a = answers?.[q.id] || { answer: "", defectsFound: "", defects: [], comment: "", photoDataUrl: "", photoFile: null };
               const defectState = String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer);
               const defects = normalizeDefects(a);
               const visibleDefects = defectState === "yes"
-                ? (defects.length ? defects : [{ finding: "", action: "" }])
+                ? (defects.length ? defects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
                 : [];
-              const needPhoto = needsPhotoForAnswer(q.std, a.answer);
               const responseComplete = servicingResponseComplete(a);
-              const showMissing =
-                (highlightMissing && !responseComplete) ||
-                (highlightMissingPhotos && needPhoto && !a.photoFile && !a.photoDataUrl);
-
-              const borderColor = showMissing
-                ? "#dc3545"
-                : defectState === "yes"
-                  ? "#f1aeb5"
-                  : defectState === "no"
-                    ? "#a3cfbb"
-                    : undefined;
+              const showMissing = (highlightMissing && !responseComplete) || (highlightMissingPhotos && countMissingDefectPhotos(a) > 0);
+              const borderColor = showMissing ? "#dc3545" : defectState === "yes" ? "#f1aeb5" : defectState === "no" ? "#a3cfbb" : undefined;
 
               return (
-                <Card
-                  id={`servicing-check-${q.id}`}
-                  key={q.id}
-                  className="mb-3 shadow-sm"
-                  style={borderColor ? { borderColor, borderWidth: 1 } : undefined}
-                >
+                <Card id={`servicing-check-${q.id}`} key={q.id} className="mb-3 shadow-sm" style={borderColor ? { borderColor, borderWidth: 1 } : undefined}>
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
                       <div style={{ flex: "1 1 520px" }}>
@@ -2282,27 +2363,9 @@ export default function Servicing() {
                     <div className="mt-3">
                       <div className="fw-bold mb-2">Were any defects found for this check?</div>
                       <div className="d-flex flex-wrap" style={{ gap: 10 }}>
-                        <Button
-                          type="button"
-                          variant={defectState === "no" ? "success" : "outline-success"}
-                          onClick={() => setDefectState(q, idx, "no")}
-                        >
-                          No defects
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={defectState === "yes" ? "danger" : "outline-danger"}
-                          onClick={() => setDefectState(q, idx, "yes")}
-                        >
-                          Defects found
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={defectState === "na" ? "secondary" : "outline-secondary"}
-                          onClick={() => setDefectState(q, idx, "na")}
-                        >
-                          N/A
-                        </Button>
+                        <Button type="button" variant={defectState === "no" ? "success" : "outline-success"} onClick={() => setDefectState(q, idx, "no")}>No defects</Button>
+                        <Button type="button" variant={defectState === "yes" ? "danger" : "outline-danger"} onClick={() => { setDefectState(q, idx, "yes"); openDefectCamera(q.id, 0); }}>Defects found</Button>
+                        <Button type="button" variant={defectState === "na" ? "secondary" : "outline-secondary"} onClick={() => setDefectState(q, idx, "na")}>N/A</Button>
                       </div>
                     </div>
 
@@ -2310,124 +2373,60 @@ export default function Servicing() {
                       <div className="mt-3 p-3" style={{ border: "1px solid #f1aeb5", borderRadius: 10, background: "#fff8f8" }}>
                         <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
                           <div>
-                            <div className="fw-bold">Defects and required actions</div>
-                            <div className="text-muted small">Add every defect found for this checklist item.</div>
+                            <div className="fw-bold">Defects</div>
+                            <div className="text-muted small">For each defect: take the photo first, then enter the defect description.</div>
                           </div>
                           <Badge bg="danger">{visibleDefects.length} defect{visibleDefects.length === 1 ? "" : "s"}</Badge>
                         </div>
 
-                        {visibleDefects.map((defect, defectIndex) => (
-                          <div key={`${q.id}-defect-${defectIndex}`} className="mb-3 p-3 bg-white" style={{ border: "1px solid #dee2e6", borderRadius: 8 }}>
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-                              <div className="fw-bold">Defect {defectIndex + 1}</div>
-                              {visibleDefects.length > 1 ? (
-                                <Button
-                                  type="button"
-                                  variant="outline-danger"
-                                  size="sm"
-                                  onClick={() => removeDefect(q.id, defectIndex)}
-                                >
-                                  Remove defect
-                                </Button>
-                              ) : null}
+                        {visibleDefects.map((defect, defectIndex) => {
+                          const hasPhoto = defectHasPhoto(defect, a, defectIndex);
+                          const preview = defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl || "" : "");
+                          const defectComplete = hasPhoto && !!String(defect.finding || "").trim();
+                          return (
+                            <div key={`${q.id}-defect-${defectIndex}`} className="mb-3 p-3 bg-white" style={{ border: "1px solid #dee2e6", borderRadius: 8 }}>
+                              <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
+                                <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                                  <div className="fw-bold">Defect {defectIndex + 1}</div>
+                                  {defectComplete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
+                                </div>
+                                {visibleDefects.length > 1 ? <Button type="button" variant="outline-danger" size="sm" onClick={() => removeDefect(q.id, defectIndex)}>Remove defect</Button> : null}
+                              </div>
+
+                              {!hasPhoto ? (
+                                <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
+                                  <div className="fw-bold mb-1">1. Take the defect photo</div>
+                                  <div className="text-muted small mb-3">The defect description unlocks after a photo is captured.</div>
+                                  <Button type="button" variant="primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Open camera</Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
+                                    <div className="fw-bold">1. Defect photo captured</div>
+                                    <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                                      <Button type="button" variant="outline-primary" size="sm" onClick={() => openDefectCamera(q.id, defectIndex)}>Retake photo</Button>
+                                      <Button type="button" variant="outline-secondary" size="sm" onClick={() => clearDefectPhoto(q.id, defectIndex)}>Clear</Button>
+                                    </div>
+                                  </div>
+                                  {preview ? <div className="mb-3"><img src={preview} alt={`Defect ${defectIndex + 1}`} style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }} /></div> : null}
+                                  <Form.Group>
+                                    <Form.Label>2. Defect <span className="text-danger">Required</span></Form.Label>
+                                    <Form.Control id={`servicing-defect-${q.id}-${defectIndex}`} as="textarea" rows={3} placeholder="Describe the defect found" value={defect.finding || ""} onChange={(e) => updateDefectFinding(q.id, defectIndex, e.target.value)} />
+                                    <Form.Text className="text-muted">This text is written to the servicing report comment column.</Form.Text>
+                                  </Form.Group>
+                                </>
+                              )}
                             </div>
+                          );
+                        })}
 
-                            <Form.Group className="mb-3">
-                              <Form.Label>Defect / Finding <span className="text-danger">Required</span></Form.Label>
-                              <Form.Control
-                                as="textarea"
-                                rows={3}
-                                placeholder="Describe the defect found"
-                                value={defect.finding || ""}
-                                onChange={(e) => updateDefect(q.id, defectIndex, "finding", e.target.value)}
-                              />
-                            </Form.Group>
-
-                            <Form.Group>
-                              <Form.Label>Required Action <span className="text-danger">Required</span></Form.Label>
-                              <Form.Control
-                                as="textarea"
-                                rows={3}
-                                placeholder="Describe the required corrective action"
-                                value={defect.action || ""}
-                                onChange={(e) => updateDefect(q.id, defectIndex, "action", e.target.value)}
-                              />
-                            </Form.Group>
-                          </div>
-                        ))}
-
-                        <Button type="button" variant="outline-secondary" size="sm" onClick={() => addDefect(q.id)}>
-                          Add another defect
-                        </Button>
-                      </div>
-                    ) : null}
-
-                    {(needPhoto || a.photoDataUrl || a.photoFile) ? (
-                      <div className="mt-3 p-3" style={{ border: "1px solid #dee2e6", borderRadius: 10 }}>
-                        <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
-                          <div>
-                            <div className="fw-bold">Photo evidence {needPhoto ? "required" : "captured"}</div>
-                            <div className="text-muted small">A photo remains required when defects are recorded.</div>
-                          </div>
-
-                          <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                            {(a.photoDataUrl || a.photoFile) ? <Badge bg="success">Captured</Badge> : <Badge bg="secondary">Not captured</Badge>}
-
-                            {(a.photoDataUrl || a.photoFile) ? (
-                              <Button type="button" variant="outline-secondary" size="sm" onClick={() => clearPhoto(q.id)}>
-                                Clear
-                              </Button>
-                            ) : null}
-
-                            <Button
-                              type="button"
-                              variant={(!a.photoDataUrl && !a.photoFile) ? "primary" : "outline-primary"}
-                              size="sm"
-                              onClick={() => triggerPhotoPicker(q.id)}
-                            >
-                              Take photo
-                            </Button>
-                          </div>
-                        </div>
-
-                        <input
-                          type="file"
-                          accept="image/*"
-                          {...(isMobile ? { capture: "environment" } : {})}
-                          style={{ display: "none" }}
-                          ref={(el) => {
-                            if (el) photoInputRefs.current[q.id] = el;
-                          }}
-                          onChange={(e) => {
-                            const file = e.target.files && e.target.files[0];
-                            onPhotoSelected(q.id, file);
-                          }}
-                        />
-
-                        {highlightMissingPhotos && needPhoto && !a.photoFile && !a.photoDataUrl ? (
-                          <div className="text-danger small mt-2">
-                            Please take a photo for this checklist item before continuing.
-                          </div>
-                        ) : null}
-
-                        {a.photoDataUrl ? (
-                          <div className="mt-2">
-                            <img
-                              src={a.photoDataUrl}
-                              alt="Captured evidence"
-                              style={{ maxWidth: "100%", maxHeight: 420, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }}
-                            />
-                          </div>
-                        ) : null}
+                        <Button type="button" variant="outline-secondary" size="sm" disabled={visibleDefects.some((defect, defectIndex) => !defectHasPhoto(defect, a, defectIndex) || !String(defect.finding || "").trim())} onClick={() => addDefect(q.id)}>Add another defect</Button>
+                        <div className="text-muted small mt-2">Adding another defect opens the camera again, then unlocks the next defect description.</div>
                       </div>
                     ) : null}
 
                     {highlightMissing && !responseComplete ? (
-                      <div className="text-danger small mt-2">
-                        {defectState === "yes"
-                          ? "Complete every defect and required action before continuing."
-                          : "Choose No defects, Defects found, or N/A."}
-                      </div>
+                      <div className="text-danger small mt-2">{defectState === "yes" ? "Each defect needs a photo first and then a defect description." : "Choose No defects, Defects found, or N/A."}</div>
                     ) : null}
                   </Card.Body>
                 </Card>
@@ -2468,21 +2467,18 @@ export default function Servicing() {
                     <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
                       <div>
                         <div className="fw-bold">{idx + 1}. {q.question}</div>
-                        <div className="text-muted small">{q.std} • Photo: {(a.photoDataUrl || a.photoFile) ? "Yes" : "No"}</div>
+                        <div className="text-muted small">{q.std} • Defect photos: {defects.filter((defect, defectIndex) => defectHasPhoto(defect, a, defectIndex)).length}/{defects.length}</div>
                       </div>
                       <Badge bg={defectState === "yes" ? "danger" : defectState === "no" ? "success" : "secondary"}>{label}</Badge>
                     </div>
-
                     {defectState === "yes" ? (
                       <div className="mt-2">
                         {defects.length ? defects.map((defect, defectIndex) => (
                           <div key={`${q.id}-review-${defectIndex}`} className="mb-2 p-2" style={{ background: "#f8f9fa", borderRadius: 8 }}>
-                            <div className="fw-bold">Defect {defectIndex + 1}: {defect.finding || "Finding required"}</div>
-                            <div className="small"><strong>Required action:</strong> {defect.action || "Required action needed"}</div>
+                            <div className="fw-bold">Defect {defectIndex + 1}: {defect.finding || "Defect description required"}</div>
+                            <div className="small"><strong>Photo:</strong> {defectHasPhoto(defect, a, defectIndex) ? "Captured" : "Missing"}</div>
                           </div>
-                        )) : (
-                          <div className="text-muted small">{a.comment || "No structured defect details recorded."}</div>
-                        )}
+                        )) : <div className="text-muted small">{a.comment || "No defect details recorded."}</div>}
                       </div>
                     ) : null}
                   </Card.Body>

@@ -185,29 +185,40 @@ async function generateServicingDocx(opts) {
     const standard = String(r?.standard || "").trim();
     const answer = String(r?.answer || "").trim().toUpperCase();
     const isGeneral = standard.toLowerCase() === "general";
-    const defects = Array.isArray(r?.defects)
-      ? r.defects.map((defect) => ({
-          finding: String(defect?.finding || "").trim(),
-          action: String(defect?.action || "").trim()
-        })).filter((defect) => defect.finding || defect.action)
-      : [];
+    const hasDefectEntries = Array.isArray(r?.defectEntries);
+    const rawDefects = hasDefectEntries ? r.defectEntries : (Array.isArray(r?.defects) ? r.defects : []);
+    const defects = rawDefects.map((defect) => {
+      const photoField = String(defect?.photoField || "").trim();
+      return {
+        finding: String(defect?.finding || "").trim(),
+        photoField,
+        photo: photoField ? (photoByField?.[photoField] || "") : ""
+      };
+    }).filter((defect) => defect.finding || defect.photoField);
     const defectsText = defects.map((defect, defectIndex) => `${defectIndex + 1}. ${defect.finding || "-"}`).join("\n");
-    const requiredActionsText = defects.map((defect, defectIndex) => `${defectIndex + 1}. ${defect.action || "-"}`).join("\n");
-    const defectSummary = defects.map((defect, defectIndex) =>
-      `Defect ${defectIndex + 1}: ${defect.finding || "-"}\nRequired action: ${defect.action || "-"}`
-    ).join("\n\n");
+    const requiredActionsText = "";
 
-    const photoField = String(r?.photoField || "").trim();
-    const photoPath = photoField ? (photoByField?.[photoField] || "") : "";
+    const legacyPhotoField = String(r?.photoField || "").trim();
+    const legacyPhotoPath = legacyPhotoField ? (photoByField?.[legacyPhotoField] || "") : "";
+    const photoPath = defects.find((defect) => defect.photo)?.photo || legacyPhotoPath;
 
     const needsPhoto = isGeneral ? answer === "YES" : answer === "FAIL";
-    if (needsPhoto && !photoPath) {
-      missingPhotos.push({
-        index: idx + 1,
-        standard,
-        question: String(r?.question || ""),
-        photoField
+    if (needsPhoto && hasDefectEntries) {
+      defects.forEach((defect, defectIndex) => {
+        if (defect.photo) return;
+        missingPhotos.push({
+          index: idx + 1,
+          defectIndex: defectIndex + 1,
+          standard,
+          question: String(r?.question || ""),
+          photoField: defect.photoField
+        });
       });
+      if (!defects.length) {
+        missingPhotos.push({ index: idx + 1, standard, question: String(r?.question || ""), photoField: legacyPhotoField });
+      }
+    } else if (needsPhoto && !photoPath) {
+      missingPhotos.push({ index: idx + 1, standard, question: String(r?.question || ""), photoField: legacyPhotoField });
     }
 
     return {
@@ -220,7 +231,7 @@ async function generateServicingDocx(opts) {
       defectCount: defects.length,
       defectsText,
       requiredActionsText,
-      comment: defectSummary || r?.comment || "",
+      comment: r?.comment || defectsText || "",
       extra,
       photo: photoPath || "",
       "%photo": photoPath || ""

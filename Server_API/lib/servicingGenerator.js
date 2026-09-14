@@ -167,9 +167,11 @@ async function generateServicingDocx(opts) {
 
   const responses = Array.isArray(payload?.responses) ? payload.responses : [];
 
-  // Build items and enforce required photos
+  // Build table rows and enforce required photos.
+  // A checklist item with multiple defects becomes one report row per defect so
+  // every defect keeps its own comment and image in the existing 4-column table.
   const missingPhotos = [];
-  const items = responses.map((r, idx) => {
+  const items = responses.flatMap((r, idx) => {
     const extraVal = r?.extra;
     let extra = "";
 
@@ -187,20 +189,22 @@ async function generateServicingDocx(opts) {
     const isGeneral = standard.toLowerCase() === "general";
     const hasDefectEntries = Array.isArray(r?.defectEntries);
     const rawDefects = hasDefectEntries ? r.defectEntries : (Array.isArray(r?.defects) ? r.defects : []);
-    const defects = rawDefects.map((defect) => {
-      const photoField = String(defect?.photoField || "").trim();
-      return {
-        finding: String(defect?.finding || "").trim(),
-        photoField,
-        photo: photoField ? (photoByField?.[photoField] || "") : ""
-      };
-    }).filter((defect) => defect.finding || defect.photoField);
-    const defectsText = defects.map((defect, defectIndex) => `${defectIndex + 1}. ${defect.finding || "-"}`).join("\n");
-    const requiredActionsText = "";
 
+    const defects = rawDefects
+      .map((defect) => {
+        const photoField = String(defect?.photoField || "").trim();
+        return {
+          finding: String(defect?.finding || "").trim(),
+          photoField,
+          photo: photoField ? (photoByField?.[photoField] || "") : ""
+        };
+      })
+      .filter((defect) => defect.finding || defect.photoField);
+
+    const requiredActionsText = "";
     const legacyPhotoField = String(r?.photoField || "").trim();
     const legacyPhotoPath = legacyPhotoField ? (photoByField?.[legacyPhotoField] || "") : "";
-    const photoPath = defects.find((defect) => defect.photo)?.photo || legacyPhotoPath;
+    const firstPhotoPath = defects.find((defect) => defect.photo)?.photo || legacyPhotoPath;
 
     const needsPhoto = isGeneral ? answer === "YES" : answer === "FAIL";
     if (needsPhoto && hasDefectEntries) {
@@ -215,27 +219,63 @@ async function generateServicingDocx(opts) {
         });
       });
       if (!defects.length) {
-        missingPhotos.push({ index: idx + 1, standard, question: String(r?.question || ""), photoField: legacyPhotoField });
+        missingPhotos.push({
+          index: idx + 1,
+          standard,
+          question: String(r?.question || ""),
+          photoField: legacyPhotoField
+        });
       }
-    } else if (needsPhoto && !photoPath) {
-      missingPhotos.push({ index: idx + 1, standard, question: String(r?.question || ""), photoField: legacyPhotoField });
+    } else if (needsPhoto && !firstPhotoPath) {
+      missingPhotos.push({
+        index: idx + 1,
+        standard,
+        question: String(r?.question || ""),
+        photoField: legacyPhotoField
+      });
     }
 
-    return {
+    // New photo-first servicing data: one row per defect. The first row carries
+    // the checklist question/answer; continuation rows carry the next defect
+    // comment and its own image. This works with the existing template row loop.
+    if (defects.length) {
+      return defects.map((defect, defectIndex) => {
+        const finding = defect.finding || "-";
+        const defectComment = `Defect ${defectIndex + 1}: ${finding}`;
+        return {
+          no: idx + 1,
+          standard: defectIndex === 0 ? (r?.standard || "") : "",
+          question: defectIndex === 0 ? (r?.question || "") : "",
+          answer: defectIndex === 0 ? (r?.answer || "") : "",
+          defectsFound: r?.defectsFound || "",
+          defects: [defect],
+          defectCount: 1,
+          defectsText: finding,
+          requiredActionsText,
+          comment: defectComment,
+          extra: defectIndex === 0 ? extra : "",
+          photo: defect.photo || (defectIndex === 0 ? legacyPhotoPath : ""),
+          "%photo": defect.photo || (defectIndex === 0 ? legacyPhotoPath : "")
+        };
+      });
+    }
+
+    // No-defect / N/A / legacy responses remain a single table row.
+    return [{
       no: idx + 1,
       standard: r?.standard || "",
       question: r?.question || "",
       answer: r?.answer || "",
       defectsFound: r?.defectsFound || "",
-      defects,
-      defectCount: defects.length,
-      defectsText,
+      defects: [],
+      defectCount: 0,
+      defectsText: "",
       requiredActionsText,
-      comment: r?.comment || defectsText || "",
+      comment: r?.comment || "",
       extra,
-      photo: photoPath || "",
-      "%photo": photoPath || ""
-    };
+      photo: firstPhotoPath || "",
+      "%photo": firstPhotoPath || ""
+    }];
   });
 
   if (missingPhotos.length) {

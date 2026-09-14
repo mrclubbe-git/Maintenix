@@ -1,0 +1,64 @@
+name: Run servicing defect photo-first migration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/servicing-defect-photo-runner.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: Web_UI/package-lock.json
+
+      - name: Extract and apply migration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          raw = Path('.github/workflows/servicing-defect-photo-flow.yml').read_text()
+          marker = "          python3 - <<'PY'\n"
+          start = raw.index(marker) + len(marker)
+          end = raw.index("          PY\n\n      - name: Install UI dependencies", start)
+          segment = raw[start:end]
+          source = '\n'.join((line[10:] if line.startswith('          ') else line) for line in segment.splitlines()) + '\n'
+          compile(source, '/tmp/servicing_defect_photo.py', 'exec')
+          Path('/tmp/servicing_defect_photo.py').write_text(source)
+          PY
+          python3 /tmp/servicing_defect_photo.py
+
+      - name: Install UI dependencies
+        working-directory: Web_UI
+        run: npm ci --legacy-peer-deps
+
+      - name: Build UI
+        working-directory: Web_UI
+        env:
+          CI: 'false'
+          REACT_APP_API_BASE_URL: https://dev-api.main-tenix.com
+        run: npm run build:github
+
+      - name: Commit migration and remove temporary workflows
+        shell: bash
+        run: |
+          rm -f .github/workflows/servicing-defect-photo-flow.yml
+          rm -f .github/workflows/servicing-defect-photo-runner.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Web_UI/src/pages/Servicing.js Server_API/lib/servicingGenerator.js .github/workflows/servicing-defect-photo-flow.yml .github/workflows/servicing-defect-photo-runner.yml
+          git commit -m 'feat: make servicing defects photo-first'
+          git push origin HEAD:main

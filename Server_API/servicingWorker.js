@@ -5,6 +5,11 @@ const { generateServicingDocx } = require("./lib/servicingGenerator");
 
 // Same helper style as routes/servicing.js
 const DATA_DIR = path.join(__dirname, "data");
+const APPROVED_TEMPLATE_DOCX = path.join(
+  DATA_DIR,
+  "templates",
+  "servicing_checklist_approved_v1.docx"
+);
 const SERVICING_PAYLOADS_DIR = path.join(DATA_DIR, "servicing-payloads");
 const SERVICING_STATUS_DIR = path.join(DATA_DIR, "servicing-status");
 const SERVICING_QUEUE_DIR = path.join(DATA_DIR, "servicing-queue");
@@ -219,6 +224,17 @@ async function processOne(jobFile) {
       writeJsonFileAtomic(reportsMeta, meta);
     };
 
+    // Resolve the approved template in the worker as well as the submit route.
+    // This means jobs queued before the route switch can still use Approved V1
+    // once the template exists on the server.
+    const resolvedTemplateDocx = fs.existsSync(APPROVED_TEMPLATE_DOCX)
+      ? APPROVED_TEMPLATE_DOCX
+      : stored.templateDocx;
+
+    if (!resolvedTemplateDocx || !fs.existsSync(resolvedTemplateDocx)) {
+      throw new Error("Servicing template DOCX not found on server.");
+    }
+
     const { fileName, relativePath, url } = await generateServicingDocx({
       reportId,
       payload: {
@@ -227,7 +243,7 @@ async function processOne(jobFile) {
         ownerEmail
       },
       user: resolvedOwner || { email: ownerEmail },
-      templateDocx: stored.templateDocx,
+      templateDocx: resolvedTemplateDocx,
       reportsDir: stored.reportsDir,
       reportPhotosDir: stored.reportPhotosDir,
       signaturesDir: stored.signaturesDir,

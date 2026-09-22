@@ -142,6 +142,167 @@ function normalizeOwner(ownerLike) {
   return { id, email, name, role };
 }
 
+function formatExtraValue(extraVal) {
+  if (extraVal == null) return "";
+  if (Array.isArray(extraVal)) {
+    return extraVal.map(formatExtraValue).filter(Boolean).join(", ");
+  }
+  if (extraVal && typeof extraVal === "object") {
+    return Object.entries(extraVal)
+      .map(([key, value]) => {
+        const formatted = formatExtraValue(value);
+        if (!formatted) return "";
+        const label = String(key || "")
+          .replace(/[_-]+/g, " ")
+          .replace(/\b\w/g, (m) => m.toUpperCase());
+        return `${label}: ${formatted}`;
+      })
+      .filter(Boolean)
+      .join("; ");
+  }
+  return String(extraVal).trim();
+}
+
+function classifyResponseSection(standard) {
+  const s = String(standard || "").trim().toUpperCase();
+  if (!s || s === "GENERAL") return "general";
+  if (
+    s.includes("NFPA 2001") ||
+    s.includes("NFPA 25") ||
+    /SUPPRESSION|DELUGE|WATER\s*SPRAY|EXTINGUISH/.test(s)
+  ) {
+    return "suppression";
+  }
+  return "detection";
+}
+
+function buildServicingReportSections(responses, photoByField) {
+  const detectionItems = [];
+  const suppressionItems = [];
+  const generalItems = [];
+  const detailedFindings = [];
+  const missingPhotos = [];
+
+  (Array.isArray(responses) ? responses : []).forEach((r, idx) => {
+    const standard = String(r?.standard || "").trim();
+    const answer = String(r?.answer || "").trim().toUpperCase();
+    const question = String(r?.question || "").trim();
+    const section = classifyResponseSection(standard);
+    const extra = formatExtraValue(r?.extra);
+
+    const rawDefects = Array.isArray(r?.defectEntries)
+      ? r.defectEntries
+      : (Array.isArray(r?.defects) ? r.defects : []);
+
+    const legacyPhotoField = String(r?.photoField || "").trim();
+    const legacyPhotoPath = legacyPhotoField ? (photoByField?.[legacyPhotoField] || "") : "";
+
+    const defects = rawDefects
+      .map((defect, defectIndex) => {
+        const photoField = String(defect?.photoField || "").trim();
+        const mappedPhoto = photoField ? (photoByField?.[photoField] || "") : "";
+        return {
+          finding: String(defect?.finding || "").trim(),
+          photoField,
+          photo: mappedPhoto || (defectIndex === 0 ? legacyPhotoPath : "")
+        };
+      })
+      .filter((defect) => defect.finding || defect.photoField || defect.photo);
+
+    const firstPhotoPath = defects.find((defect) => defect.photo)?.photo || legacyPhotoPath;
+    const needsPhoto = section === "general" ? answer === "YES" : answer === "FAIL";
+
+    if (needsPhoto) {
+      if (defects.length) {
+        defects.forEach((defect, defectIndex) => {
+          if (defect.photo) return;
+          missingPhotos.push({
+            index: idx + 1,
+            defectIndex: defectIndex + 1,
+            standard,
+            question,
+            photoField: defect.photoField
+          });
+        });
+      } else if (!firstPhotoPath) {
+        missingPhotos.push({
+          index: idx + 1,
+          standard,
+          question,
+          photoField: legacyPhotoField
+        });
+      }
+    }
+
+    if (section === "general") {
+      const generalNo =
+        generalItems.reduce((max, item) => Math.max(max, Number(item.no) || 0), 0) + 1;
+
+      if (defects.length) {
+        defects.forEach((defect, defectIndex) => {
+          const photo = defect.photo || (defectIndex === 0 ? firstPhotoPath : "");
+          generalItems.push({
+            no: generalNo,
+            question,
+            answer,
+            comment: defect.finding || String(r?.comment || "").trim(),
+            generalPhoto: photo,
+            "%generalPhoto": photo
+          });
+        });
+      } else {
+        generalItems.push({
+          no: generalNo,
+          question,
+          answer,
+          comment: String(r?.comment || "").trim(),
+          generalPhoto: firstPhotoPath,
+          "%generalPhoto": firstPhotoPath
+        });
+      }
+      return;
+    }
+
+    const target = section === "suppression" ? suppressionItems : detectionItems;
+    const sectionLabel = section === "suppression" ? "Suppression" : "Detection";
+    const sectionNo = target.length + 1;
+
+    target.push({
+      no: sectionNo,
+      question,
+      answer,
+      extra
+    });
+
+    if (defects.length) {
+      defects.forEach((defect, defectIndex) => {
+        const photo = defect.photo || (defectIndex === 0 ? firstPhotoPath : "");
+        detailedFindings.push({
+          findingPhoto: photo,
+          "%findingPhoto": photo,
+          relatedItem: `${sectionLabel} ${sectionNo}: ${question}`,
+          comment: defect.finding || String(r?.comment || "").trim()
+        });
+      });
+    } else if (needsPhoto && firstPhotoPath) {
+      detailedFindings.push({
+        findingPhoto: firstPhotoPath,
+        "%findingPhoto": firstPhotoPath,
+        relatedItem: `${sectionLabel} ${sectionNo}: ${question}`,
+        comment: String(r?.comment || "").trim()
+      });
+    }
+  });
+
+  return {
+    detectionItems,
+    suppressionItems,
+    generalItems,
+    detailedFindings,
+    missingPhotos
+  };
+}
+
 async function generateServicingDocx(opts) {
   const {
     reportId,
@@ -166,117 +327,13 @@ async function generateServicingDocx(opts) {
   ensureDir(signaturesDir);
 
   const responses = Array.isArray(payload?.responses) ? payload.responses : [];
-
-  // Build table rows and enforce required photos.
-  // A checklist item with multiple defects becomes one report row per defect so
-  // every defect keeps its own comment and image in the existing 4-column table.
-  const missingPhotos = [];
-  const items = responses.flatMap((r, idx) => {
-    const extraVal = r?.extra;
-    let extra = "";
-
-    if (extraVal && typeof extraVal === "object") {
-      if (Array.isArray(extraVal)) extra = extraVal.length ? JSON.stringify(extraVal) : "";
-      else extra = Object.keys(extraVal).length ? JSON.stringify(extraVal) : "";
-    } else if (typeof extraVal === "string") {
-      extra = extraVal.trim();
-    } else if (extraVal != null) {
-      extra = String(extraVal);
-    }
-
-    const standard = String(r?.standard || "").trim();
-    const answer = String(r?.answer || "").trim().toUpperCase();
-    const isGeneral = standard.toLowerCase() === "general";
-    const hasDefectEntries = Array.isArray(r?.defectEntries);
-    const rawDefects = hasDefectEntries ? r.defectEntries : (Array.isArray(r?.defects) ? r.defects : []);
-
-    const defects = rawDefects
-      .map((defect) => {
-        const photoField = String(defect?.photoField || "").trim();
-        return {
-          finding: String(defect?.finding || "").trim(),
-          photoField,
-          photo: photoField ? (photoByField?.[photoField] || "") : ""
-        };
-      })
-      .filter((defect) => defect.finding || defect.photoField);
-
-    const requiredActionsText = "";
-    const legacyPhotoField = String(r?.photoField || "").trim();
-    const legacyPhotoPath = legacyPhotoField ? (photoByField?.[legacyPhotoField] || "") : "";
-    const firstPhotoPath = defects.find((defect) => defect.photo)?.photo || legacyPhotoPath;
-
-    const needsPhoto = isGeneral ? answer === "YES" : answer === "FAIL";
-    if (needsPhoto && hasDefectEntries) {
-      defects.forEach((defect, defectIndex) => {
-        if (defect.photo) return;
-        missingPhotos.push({
-          index: idx + 1,
-          defectIndex: defectIndex + 1,
-          standard,
-          question: String(r?.question || ""),
-          photoField: defect.photoField
-        });
-      });
-      if (!defects.length) {
-        missingPhotos.push({
-          index: idx + 1,
-          standard,
-          question: String(r?.question || ""),
-          photoField: legacyPhotoField
-        });
-      }
-    } else if (needsPhoto && !firstPhotoPath) {
-      missingPhotos.push({
-        index: idx + 1,
-        standard,
-        question: String(r?.question || ""),
-        photoField: legacyPhotoField
-      });
-    }
-
-    // New photo-first servicing data: one row per defect. The first row carries
-    // the checklist question/answer; continuation rows carry the next defect
-    // comment and its own image. This works with the existing template row loop.
-    if (defects.length) {
-      return defects.map((defect, defectIndex) => {
-        const finding = defect.finding || "-";
-        const defectComment = `Defect ${defectIndex + 1}: ${finding}`;
-        return {
-          no: idx + 1,
-          standard: defectIndex === 0 ? (r?.standard || "") : "",
-          question: defectIndex === 0 ? (r?.question || "") : "",
-          answer: defectIndex === 0 ? (r?.answer || "") : "",
-          defectsFound: r?.defectsFound || "",
-          defects: [defect],
-          defectCount: 1,
-          defectsText: finding,
-          requiredActionsText,
-          comment: defectComment,
-          extra: defectIndex === 0 ? extra : "",
-          photo: defect.photo || (defectIndex === 0 ? legacyPhotoPath : ""),
-          "%photo": defect.photo || (defectIndex === 0 ? legacyPhotoPath : "")
-        };
-      });
-    }
-
-    // No-defect / N/A / legacy responses remain a single table row.
-    return [{
-      no: idx + 1,
-      standard: r?.standard || "",
-      question: r?.question || "",
-      answer: r?.answer || "",
-      defectsFound: r?.defectsFound || "",
-      defects: [],
-      defectCount: 0,
-      defectsText: "",
-      requiredActionsText,
-      comment: r?.comment || "",
-      extra,
-      photo: firstPhotoPath || "",
-      "%photo": firstPhotoPath || ""
-    }];
-  });
+  const {
+    detectionItems,
+    suppressionItems,
+    generalItems,
+    detailedFindings,
+    missingPhotos
+  } = buildServicingReportSections(responses, photoByField);
 
   if (missingPhotos.length) {
     const err = new Error("Missing required photos for one or more questions.");
@@ -321,7 +378,10 @@ async function generateServicingDocx(opts) {
     standards: Array.isArray(payload?.standards) ? payload.standards.join(", ") : "",
     technician: payload?.technician || resolvedOwner?.name || resolvedOwner?.email || "",
     createdAt: createdDateOnly,
-    items,
+    detectionItems,
+    suppressionItems,
+    generalItems,
+    detailedFindings,
     photoCount: Array.isArray(savedPhotos) ? savedPhotos.length : 0,
     signature: signaturePath,
     "%signature": signaturePath,
@@ -351,18 +411,26 @@ async function generateServicingDocx(opts) {
           return Buffer.from(TRANSPARENT_PNG_B64, "base64");
         }
       },
-      getSize: (img, tagValue) => {
+      getSize: (img, tagValue, tagName) => {
         const p = String(tagValue || "").trim();
+        const tag = String(tagName || "").trim().toLowerCase();
         const isSignature =
+          tag.includes("signature") ||
           p.includes("/signatures/") ||
           p.includes("\\signatures\\") ||
           /signature_.*\.(png|jpe?g)$/i.test(p);
-
-        const photoBoxW = cmToPx(3.2);
-        const photoBoxH = cmToPx(4.0);
-
         const sigBoxW = 240;
         const sigBoxH = 90;
+
+        let photoBoxW = cmToPx(3.2);
+        let photoBoxH = cmToPx(4.0);
+        if (tag.includes("generalphoto")) {
+          photoBoxW = cmToPx(3.0);
+          photoBoxH = cmToPx(3.0);
+        } else if (tag.includes("findingphoto")) {
+          photoBoxW = cmToPx(4.5);
+          photoBoxH = cmToPx(3.8);
+        }
 
         let w = 0;
         let h = 0;
@@ -377,6 +445,7 @@ async function generateServicingDocx(opts) {
           }
         }
 
+        if (!p && !isSignature) return [1, 1];
         if (!w || !h) return isSignature ? [sigBoxW, sigBoxH] : [photoBoxW, photoBoxH];
 
         const boxW = isSignature ? sigBoxW : photoBoxW;

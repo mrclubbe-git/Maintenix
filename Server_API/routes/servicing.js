@@ -33,7 +33,7 @@ const CHECKLIST_FILES = {
 };
 const DEFAULT_CHECKLIST_TYPE = "substation";
 const CHECKLIST_FILE = CHECKLIST_FILES[DEFAULT_CHECKLIST_TYPE]; // backward-compatible default
-const TEMPLATE_DOCX = path.join(TEMPLATES_DIR, "template.docx");
+const TEMPLATE_DOCX = path.join(TEMPLATES_DIR, "servicing_checklist_template_v1.docx");
 const AREAS_TXT = path.join(TEMPLATES_DIR, "areas.txt");
 const SERVICES_TXT = path.join(TEMPLATES_DIR, "services.txt");
 

@@ -278,6 +278,117 @@ async function generateServicingDocx(opts) {
     }];
   });
 
+
+  // Build the approved V1 report structure without changing the servicing capture workflow.
+  // Detection and Suppression keep concise checklist rows; General retains comment/photo;
+  // Detailed Findings contains one evidence object per defect photo.
+  function extraText(extraVal) {
+    if (extraVal && typeof extraVal === "object") {
+      if (Array.isArray(extraVal)) return extraVal.length ? JSON.stringify(extraVal) : "";
+      return Object.keys(extraVal).length ? JSON.stringify(extraVal) : "";
+    }
+    if (typeof extraVal === "string") return extraVal.trim();
+    return extraVal != null ? String(extraVal) : "";
+  }
+
+  function reportSectionForStandard(standardLike) {
+    const s = String(standardLike || "").trim().toLowerCase();
+    if (s === "general") return "general";
+    if (
+      s.includes("nfpa 2001") ||
+      s.includes("iso 14520") ||
+      s.includes("suppression") ||
+      s.includes("extinguishing") ||
+      s.includes("clean agent")
+    ) return "suppression";
+    return "detection";
+  }
+
+  const approvedRows = responses.map((r, sourceIndex) => {
+    const standard = String(r?.standard || "").trim();
+    const answer = String(r?.answer || "").trim().toUpperCase();
+    const hasDefectEntries = Array.isArray(r?.defectEntries);
+    const rawDefects = hasDefectEntries
+      ? r.defectEntries
+      : (Array.isArray(r?.defects) ? r.defects : []);
+
+    const defects = rawDefects
+      .map((defect) => {
+        const photoField = String(defect?.photoField || "").trim();
+        return {
+          finding: String(defect?.finding || "").trim(),
+          photoField,
+          photo: photoField ? (photoByField?.[photoField] || "") : ""
+        };
+      })
+      .filter((defect) => defect.finding || defect.photoField || defect.photo);
+
+    const legacyPhotoField = String(r?.photoField || "").trim();
+    const legacyPhotoPath = legacyPhotoField ? (photoByField?.[legacyPhotoField] || "") : "";
+    const firstPhotoPath = defects.find((defect) => defect.photo)?.photo || legacyPhotoPath;
+    const comment = String(r?.comment || "").trim() ||
+      defects.map((defect) => defect.finding).filter(Boolean).join("; ");
+
+    return {
+      sourceIndex,
+      section: reportSectionForStandard(standard),
+      standard,
+      question: String(r?.question || "").trim(),
+      answer,
+      extra: extraText(r?.extra),
+      comment,
+      photo: firstPhotoPath || "",
+      defects,
+      hasDefectEntries
+    };
+  });
+
+  const detectionItems = approvedRows
+    .filter((row) => row.section === "detection")
+    .map((row, index) => ({ ...row, no: index + 1 }));
+
+  const suppressionItems = approvedRows
+    .filter((row) => row.section === "suppression")
+    .map((row, index) => ({ ...row, no: index + 1 }));
+
+  const generalItems = approvedRows
+    .filter((row) => row.section === "general")
+    .map((row, index) => ({ ...row, no: index + 1 }));
+
+  const relatedItemBySourceIndex = new Map();
+  detectionItems.forEach((row) => {
+    relatedItemBySourceIndex.set(row.sourceIndex, `Detection ${row.no} - ${row.question}`);
+  });
+  suppressionItems.forEach((row) => {
+    relatedItemBySourceIndex.set(row.sourceIndex, `Suppression ${row.no} - ${row.question}`);
+  });
+
+  const detailedFindings = [];
+  approvedRows.forEach((row) => {
+    if (row.section === "general") return;
+
+    if (row.defects.length) {
+      row.defects.forEach((defect) => {
+        detailedFindings.push({
+          photo: defect.photo || "",
+          relatedItem: relatedItemBySourceIndex.get(row.sourceIndex) || row.question,
+          comment: defect.finding || row.comment || ""
+        });
+      });
+      return;
+    }
+
+    // Backward compatibility for legacy FAIL responses that stored one comment/photo
+    // at question level rather than in defectEntries.
+    if (row.answer === "FAIL" && (row.comment || row.photo)) {
+      detailedFindings.push({
+        photo: row.photo || "",
+        relatedItem: relatedItemBySourceIndex.get(row.sourceIndex) || row.question,
+        comment: row.comment || ""
+      });
+    }
+  });
+
   if (missingPhotos.length) {
     const err = new Error("Missing required photos for one or more questions.");
     err.details = { missingPhotos };
@@ -322,6 +433,10 @@ async function generateServicingDocx(opts) {
     technician: payload?.technician || resolvedOwner?.name || resolvedOwner?.email || "",
     createdAt: createdDateOnly,
     items,
+    detectionItems,
+    suppressionItems,
+    generalItems,
+    detailedFindings,
     photoCount: Array.isArray(savedPhotos) ? savedPhotos.length : 0,
     signature: signaturePath,
     "%signature": signaturePath,

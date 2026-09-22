@@ -33,7 +33,11 @@ const CHECKLIST_FILES = {
 };
 const DEFAULT_CHECKLIST_TYPE = "substation";
 const CHECKLIST_FILE = CHECKLIST_FILES[DEFAULT_CHECKLIST_TYPE]; // backward-compatible default
-const TEMPLATE_DOCX = path.join(TEMPLATES_DIR, "template.docx");
+const LEGACY_TEMPLATE_DOCX = path.join(TEMPLATES_DIR, "template.docx");
+const APPROVED_TEMPLATE_DOCX = path.join(TEMPLATES_DIR, "servicing_checklist_approved_v1.docx");
+// Keep the current production template working until the approved binary template is
+// committed. Once present, new servicing submissions use it automatically.
+const TEMPLATE_DOCX = fs.existsSync(APPROVED_TEMPLATE_DOCX) ? APPROVED_TEMPLATE_DOCX : LEGACY_TEMPLATE_DOCX;
 const AREAS_TXT = path.join(TEMPLATES_DIR, "areas.txt");
 const SERVICES_TXT = path.join(TEMPLATES_DIR, "services.txt");
 

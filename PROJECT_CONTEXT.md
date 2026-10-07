@@ -432,6 +432,16 @@ Update this file whenever a session establishes a durable project fact such as:
 Avoid filling this document with temporary debugging details. It should remain a concise, durable handoff document for future Maintenix development sessions.
 
 
+### General response evidence rules
+
+The General checklist uses **YES / NO / N/A** responses with the following mandatory evidence rules:
+
+- **YES** → a picture must be captured. A comment is not mandatory.
+- **NO** → a comment is mandatory. A picture is not required.
+- **N/A** → a comment is mandatory. A picture is not required.
+
+The frontend must enforce these rules before Review/save/generation, and the server-side servicing generator must reject General NO/N/A responses without comments. General YES picture evidence remains in the General report table and must not be duplicated into Detailed Findings.
+
 ## 16. Approved Servicing Report V1 — verified baseline
 
 As of 2026-10-07, the servicing report generated from the approved template has been confirmed to populate correctly and the current report version is accepted as the working baseline.

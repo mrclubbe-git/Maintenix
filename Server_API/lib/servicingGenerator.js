@@ -395,6 +395,27 @@ async function generateServicingDocx(opts) {
     throw err;
   }
 
+  // General checklist rule:
+  // YES requires picture evidence (validated above);
+  // NO and N/A require a technician comment explaining the response.
+  const missingGeneralComments = approvedRows
+    .filter((row) => (
+      row.section === "general" &&
+      (row.answer === "NO" || row.answer === "N/A") &&
+      !String(row.comment || "").trim()
+    ))
+    .map((row) => ({
+      index: row.sourceIndex + 1,
+      question: row.question,
+      answer: row.answer
+    }));
+
+  if (missingGeneralComments.length) {
+    const err = new Error("Missing required comments for one or more General questions.");
+    err.details = { missingGeneralComments };
+    throw err;
+  }
+
   // Date-only (but keep a full ISO for metadata)
   const rawCreated = String(payload?.createdAt || "").trim();
   const createdIso = rawCreated.includes("T") ? rawCreated : new Date().toISOString();

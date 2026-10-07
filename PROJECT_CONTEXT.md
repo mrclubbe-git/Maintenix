@@ -2,7 +2,7 @@
 
 > **Purpose:** This file is the persistent source of truth for critical Maintenix development context across ChatGPT project sessions.
 >
-> **Last updated:** 2026-09-22
+> **Last updated:** 2026-10-07
 >
 > Future work should read this file before making architecture, workflow, report-template, or servicing changes.
 
@@ -430,3 +430,23 @@ Update this file whenever a session establishes a durable project fact such as:
 - a production deployment convention
 
 Avoid filling this document with temporary debugging details. It should remain a concise, durable handoff document for future Maintenix development sessions.
+
+
+## 16. Approved Servicing Report V1 — verified baseline
+
+As of 2026-10-07, the servicing report generated from the approved template has been confirmed to populate correctly and the current report version is accepted as the working baseline.
+
+Accepted formatting details:
+
+- Detection and Suppression use a narrow Item-number column with the recovered width added to Inspection / Test.
+- General uses the same narrow Item-number column with the recovered width added to General Check.
+- Detailed Findings follows General naturally; there is no forced page break before the section.
+- Detailed Findings uses borders consistent with the other servicing tables.
+- Detailed Findings remains Picture | Related Item | Comment, with one evidence picture per row.
+- General evidence stays in the General table and is not duplicated into Detailed Findings.
+
+The server template remains:
+
+`/home/charl/projects/maintenix-dev-api/Server_API/data/templates/servicing_checklist_approved_v1.docx`
+
+Treat this accepted version as the V1 formatting baseline for future servicing-report changes.

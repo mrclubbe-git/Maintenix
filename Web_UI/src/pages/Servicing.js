@@ -160,7 +160,18 @@ function defectHasPhoto(defect, record, defectIndex) {
   return defectIndex === 0 && !!(record?.photoFile || record?.photoDataUrl);
 }
 
-function countMissingDefectPhotos(record) {
+function generalPhotoPresent(record) {
+  const defects = normalizeDefects(record);
+  if (defects.some((defect, defectIndex) => defectHasPhoto(defect, record, defectIndex))) return true;
+  return !!(record?.photoFile || record?.photoDataUrl);
+}
+
+function countMissingRequiredPhotos(record, std) {
+  if (isGeneralStd(std)) {
+    const answer = String(record?.answer || "").trim().toUpperCase();
+    return answer === "YES" && !generalPhotoPresent(record) ? 1 : 0;
+  }
+
   const state = String(record?.defectsFound || "").trim().toLowerCase() || defectStateFromAnswer(record?.answer);
   if (state !== "yes") return 0;
   const defects = normalizeDefects(record);
@@ -170,7 +181,14 @@ function countMissingDefectPhotos(record) {
   ), 0);
 }
 
-function servicingResponseComplete(record) {
+function servicingResponseComplete(record, std) {
+  if (isGeneralStd(std)) {
+    const answer = String(record?.answer || "").trim().toUpperCase();
+    if (answer === "YES") return generalPhotoPresent(record);
+    if (answer === "NO" || answer === "N/A") return !!String(record?.comment || "").trim();
+    return false;
+  }
+
   const explicitState = String(record?.defectsFound || "").trim().toLowerCase();
   if (!explicitState) {
     const legacyState = defectStateFromAnswer(record?.answer);
@@ -589,7 +607,7 @@ export default function Servicing() {
 
   const unansweredCount = useMemo(() => {
     if (!questionRows.length) return 0;
-    return questionRows.filter((q) => !servicingResponseComplete(answers?.[q.id] || {})).length;
+    return questionRows.filter((q) => !servicingResponseComplete(answers?.[q.id] || {}, q.std)).length;
   }, [questionRows, answers]);
 
   const completedCount = useMemo(
@@ -600,14 +618,14 @@ export default function Servicing() {
   const defectsFoundCount = useMemo(() => {
     return questionRows.filter((q) => {
       const a = answers?.[q.id] || {};
-      return (String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer)) === "yes";
+      return !isGeneralStd(q.std) && (String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer)) === "yes";
     }).length;
   }, [questionRows, answers]);
 
   const photoMissingCount = useMemo(() => {
     if (!questionRows.length) return 0;
     return questionRows.reduce((count, q) => (
-      count + countMissingDefectPhotos(answers?.[q.id] || {})
+      count + countMissingRequiredPhotos(answers?.[q.id] || {}, q.std)
     ), 0);
   }, [questionRows, answers]);
 
@@ -910,6 +928,48 @@ export default function Servicing() {
         if (nextCard) nextCard.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 180);
     }
+  }
+
+  function setGeneralResponse(q, answer) {
+    const normalizedAnswer = String(answer || "").trim().toUpperCase();
+    const state = defectStateFromAnswer(normalizedAnswer);
+
+    setAnswers((prev) => {
+      const current = prev?.[q.id] || {
+        answer: "",
+        defectsFound: "",
+        defects: [],
+        comment: "",
+        extra: {},
+        photoDataUrl: "",
+        photoFile: null
+      };
+      const existingDefects = normalizeDefects(current);
+      const evidence = existingDefects[0] || { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+      const isYes = normalizedAnswer === "YES";
+
+      return {
+        ...prev,
+        [q.id]: {
+          ...current,
+          answer: normalizedAnswer,
+          defectsFound: state,
+          defects: isYes ? [{ ...evidence, finding: "" }] : [],
+          comment: isYes ? "" : String(current.comment || ""),
+          ...(isYes ? {} : { photoDataUrl: "", photoFile: null })
+        }
+      };
+    });
+
+    if (normalizedAnswer === "YES") {
+      openDefectCamera(q.id, 0);
+      return;
+    }
+
+    window.setTimeout(() => {
+      const input = document.getElementById(`servicing-general-comment-${q.id}`);
+      if (input && typeof input.focus === "function") input.focus();
+    }, 120);
   }
 
   function updateDefectFinding(qid, defectIndex, value) {
@@ -1710,15 +1770,15 @@ export default function Servicing() {
     }
 
     const draftAnswers = v?.answers || {};
-    const incomplete = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {})).length;
+    const incomplete = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {}, q.std)).length;
     if (incomplete > 0) {
       return `Draft is incomplete. Checklist items still need a response, defect photo or defect description: ${incomplete}`;
     }
 
     const missingPhotos = draftQuestionRows.reduce((count, q) => (
-      count + countMissingDefectPhotos(draftAnswers?.[q.id] || {})
+      count + countMissingRequiredPhotos(draftAnswers?.[q.id] || {}, q.std)
     ), 0);
-    if (missingPhotos > 0) return `Draft is incomplete. Missing defect photos: ${missingPhotos}`;
+    if (missingPhotos > 0) return `Draft is incomplete. Missing required photos: ${missingPhotos}`;
     return "";
   }
 
@@ -2344,8 +2404,8 @@ export default function Servicing() {
               const visibleDefects = defectState === "yes"
                 ? (defects.length ? defects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
                 : [];
-              const responseComplete = servicingResponseComplete(a);
-              const showMissing = (highlightMissing && !responseComplete) || (highlightMissingPhotos && countMissingDefectPhotos(a) > 0);
+              const responseComplete = servicingResponseComplete(a, q.std);
+              const showMissing = (highlightMissing && !responseComplete) || (highlightMissingPhotos && countMissingRequiredPhotos(a, q.std) > 0);
               const borderColor = showMissing ? "#dc3545" : defectState === "yes" ? "#f1aeb5" : defectState === "no" ? "#a3cfbb" : undefined;
 
               return (

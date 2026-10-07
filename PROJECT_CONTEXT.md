@@ -22,6 +22,23 @@
 - Draft PR: **#2 — Implement approved servicing checklist report structure**
 - The branch contains the first backend mapping for the approved servicing checklist template structure.
 
+## Frontend hosting and deployment
+
+The Maintenix React UI is served from **GitHub Pages**, not from the development API server.
+
+Live UI:
+
+`https://mrclubbe-git.github.io/Maintenix/#/dashboard/overview`
+
+Deployment workflow:
+
+- Workflow: `.github/workflows/deploy-web-ui.yml`
+- GitHub Pages deployment is triggered by pushes to the **`deploy` branch** when `Web_UI/**` changes.
+- `main` remains the development/source-of-truth branch, but a frontend change on `main` is **not live** until the corresponding `Web_UI` change is synchronized to `deploy`.
+- The GitHub Pages build uses `Web_UI/scripts/build-github.js` and currently targets the API base configured by `MAINTENIX_API_BASE_URL`, falling back to `https://dev-api.main-tenix.com`.
+- When changing frontend behavior, update `main` first, then synchronize the required frontend files to `deploy` and verify the GitHub Pages workflow completes successfully.
+- The React service worker can retain an older bundle temporarily; after a successful deployment, closing/reopening Maintenix tabs or reloading may be required before the new UI becomes active.
+
 ## 2. Server paths
 
 The working API root on the development server is:

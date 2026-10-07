@@ -1248,7 +1248,7 @@ export default function Servicing() {
 
     if (step === 1) {
       if (unansweredCount > 0) {
-        setErr(`Please complete every checklist item and all required defect photo/description fields before continuing. Incomplete: ${unansweredCount}`);
+        setErr(`Please complete every checklist item and all required photo/comment/defect fields before continuing. Incomplete: ${unansweredCount}`);
         setHighlightMissing(true);
         setHighlightMissingPhotos(false);
 
@@ -1772,7 +1772,7 @@ export default function Servicing() {
     const draftAnswers = v?.answers || {};
     const incomplete = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {}, q.std)).length;
     if (incomplete > 0) {
-      return `Draft is incomplete. Checklist items still need a response, defect photo or defect description: ${incomplete}`;
+      return `Draft is incomplete. Checklist items still need a response or required photo/comment/defect detail: ${incomplete}`;
     }
 
     const missingPhotos = draftQuestionRows.reduce((count, q) => (
@@ -1916,7 +1916,7 @@ export default function Servicing() {
     }
 
     if (unansweredCount > 0) {
-      setErr(`Please complete every checklist item and all required defect photo/description fields before saving. Incomplete: ${unansweredCount}`);
+      setErr(`Please complete every checklist item and all required photo/comment/defect fields before saving. Incomplete: ${unansweredCount}`);
       return;
     }
 
@@ -2388,7 +2388,7 @@ export default function Servicing() {
                 </div>
                 <div className="text-end">
                   <div className="fw-bold">{completedCount} of {questionRows.length} completed</div>
-                  <div className="text-muted small">Defects found: {defectsFoundCount} • Defect photos missing: {photoMissingCount}</div>
+                  <div className="text-muted small">Defects found: {defectsFoundCount} • Required photos missing: {photoMissingCount}</div>
                 </div>
               </div>
             </Card.Body>
@@ -2404,9 +2404,22 @@ export default function Servicing() {
               const visibleDefects = defectState === "yes"
                 ? (defects.length ? defects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
                 : [];
+              const isGeneralQuestion = isGeneralStd(q.std);
+              const generalAnswer = String(a.answer || "").trim().toUpperCase();
+              const generalEvidence = defects[0] || {};
+              const generalHasPhoto = generalPhotoPresent(a);
+              const generalPreview = generalEvidence.photoDataUrl || a.photoDataUrl || "";
               const responseComplete = servicingResponseComplete(a, q.std);
               const showMissing = (highlightMissing && !responseComplete) || (highlightMissingPhotos && countMissingRequiredPhotos(a, q.std) > 0);
-              const borderColor = showMissing ? "#dc3545" : defectState === "yes" ? "#f1aeb5" : defectState === "no" ? "#a3cfbb" : undefined;
+              const borderColor = showMissing
+                ? "#dc3545"
+                : isGeneralQuestion
+                  ? (responseComplete ? "#a3cfbb" : undefined)
+                  : defectState === "yes"
+                    ? "#f1aeb5"
+                    : defectState === "no"
+                      ? "#a3cfbb"
+                      : undefined;
 
               return (
                 <Card id={`servicing-check-${q.id}`} key={q.id} className="mb-3 shadow-sm" style={borderColor ? { borderColor, borderWidth: 1 } : undefined}>
@@ -2420,6 +2433,93 @@ export default function Servicing() {
                       {responseComplete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
                     </div>
 
+                    {isGeneralQuestion ? (
+                      <>
+                        <div className="mt-3">
+                          <div className="fw-bold mb-2">Response</div>
+                          <div className="d-flex flex-wrap" style={{ gap: 10 }}>
+                            <Button
+                              type="button"
+                              variant={generalAnswer === "YES" ? "success" : "outline-success"}
+                              onClick={() => setGeneralResponse(q, "YES")}
+                            >
+                              YES
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={generalAnswer === "NO" ? "secondary" : "outline-secondary"}
+                              onClick={() => setGeneralResponse(q, "NO")}
+                            >
+                              NO
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={generalAnswer === "N/A" ? "secondary" : "outline-secondary"}
+                              onClick={() => setGeneralResponse(q, "N/A")}
+                            >
+                              N/A
+                            </Button>
+                          </div>
+                        </div>
+
+                        {generalAnswer === "YES" ? (
+                          <div className="mt-3 p-3" style={{ border: "1px solid #a3cfbb", borderRadius: 10, background: "#f7fff9" }}>
+                            <div className="fw-bold mb-2">Picture Evidence <span className="text-danger">Required</span></div>
+                            {!generalHasPhoto ? (
+                              <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
+                                <div className="text-muted small mb-3">A picture is mandatory when YES is selected.</div>
+                                <Button type="button" variant="primary" onClick={() => openDefectCamera(q.id, 0)}>Open camera</Button>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
+                                  <Badge bg="success">Picture captured</Badge>
+                                  <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                                    <Button type="button" variant="outline-primary" size="sm" onClick={() => openDefectCamera(q.id, 0)}>Retake photo</Button>
+                                    <Button type="button" variant="outline-secondary" size="sm" onClick={() => clearDefectPhoto(q.id, 0)}>Clear</Button>
+                                  </div>
+                                </div>
+                                {generalPreview ? (
+                                  <div className="mb-2">
+                                    <img
+                                      src={generalPreview}
+                                      alt="General check evidence"
+                                      style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }}
+                                    />
+                                  </div>
+                                ) : null}
+                              </>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {generalAnswer === "NO" || generalAnswer === "N/A" ? (
+                          <Form.Group className="mt-3">
+                            <Form.Label>Comment <span className="text-danger">Required</span></Form.Label>
+                            <Form.Control
+                              id={`servicing-general-comment-${q.id}`}
+                              as="textarea"
+                              rows={3}
+                              placeholder={generalAnswer === "NO" ? "Explain why the answer is NO" : "Explain why this item is not applicable"}
+                              value={a.comment || ""}
+                              onChange={(e) => updateAnswer(q.id, { comment: e.target.value })}
+                            />
+                            <Form.Text className="text-muted">A comment is mandatory when NO or N/A is selected.</Form.Text>
+                          </Form.Group>
+                        ) : null}
+
+                        {(highlightMissing || highlightMissingPhotos) && !responseComplete ? (
+                          <div className="text-danger small mt-2">
+                            {!generalAnswer
+                              ? "Choose YES, NO, or N/A."
+                              : generalAnswer === "YES"
+                                ? "A picture is required when YES is selected."
+                                : "A comment is required when NO or N/A is selected."}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
                     <div className="mt-3">
                       <div className="fw-bold mb-2">Were any defects found for this check?</div>
                       <div className="d-flex flex-wrap" style={{ gap: 10 }}>
@@ -2488,6 +2588,9 @@ export default function Servicing() {
                     {highlightMissing && !responseComplete ? (
                       <div className="text-danger small mt-2">{defectState === "yes" ? "Each defect needs a photo first and then a defect description." : "Choose No defects, Defects found, or N/A."}</div>
                     ) : null}
+
+                      </>
+                    )}
                   </Card.Body>
                 </Card>
               );
@@ -2520,18 +2623,51 @@ export default function Servicing() {
               const a = answers?.[q.id] || {};
               const defectState = String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer);
               const defects = normalizeDefects(a);
-              const label = defectState === "yes" ? "Defects found" : defectState === "no" ? "No defects" : defectState === "na" ? "N/A" : "Pending";
+              const isGeneralQuestion = isGeneralStd(q.std);
+              const generalAnswer = String(a.answer || "").trim().toUpperCase();
+              const label = isGeneralQuestion
+                ? (generalAnswer || "Pending")
+                : defectState === "yes"
+                  ? "Defects found"
+                  : defectState === "no"
+                    ? "No defects"
+                    : defectState === "na"
+                      ? "N/A"
+                      : "Pending";
+              const badgeVariant = isGeneralQuestion
+                ? (generalAnswer === "YES" ? "success" : generalAnswer ? "secondary" : "secondary")
+                : defectState === "yes"
+                  ? "danger"
+                  : defectState === "no"
+                    ? "success"
+                    : "secondary";
+
               return (
                 <Card key={q.id} className="mb-3">
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
                       <div>
                         <div className="fw-bold">{idx + 1}. {q.question}</div>
-                        <div className="text-muted small">{q.std} • Defect photos: {defects.filter((defect, defectIndex) => defectHasPhoto(defect, a, defectIndex)).length}/{defects.length}</div>
+                        <div className="text-muted small">
+                          {isGeneralQuestion
+                            ? q.std
+                            : `${q.std} • Defect photos: ${defects.filter((defect, defectIndex) => defectHasPhoto(defect, a, defectIndex)).length}/${defects.length}`}
+                        </div>
                       </div>
-                      <Badge bg={defectState === "yes" ? "danger" : defectState === "no" ? "success" : "secondary"}>{label}</Badge>
+                      <Badge bg={badgeVariant}>{label}</Badge>
                     </div>
-                    {defectState === "yes" ? (
+
+                    {isGeneralQuestion ? (
+                      <div className="mt-2 p-2" style={{ background: "#f8f9fa", borderRadius: 8 }}>
+                        {generalAnswer === "YES" ? (
+                          <div className="small"><strong>Picture:</strong> {generalPhotoPresent(a) ? "Captured" : "Missing"}</div>
+                        ) : generalAnswer === "NO" || generalAnswer === "N/A" ? (
+                          <div className="small"><strong>Comment:</strong> {String(a.comment || "").trim() || "Missing"}</div>
+                        ) : (
+                          <div className="text-muted small">No response selected.</div>
+                        )}
+                      </div>
+                    ) : defectState === "yes" ? (
                       <div className="mt-2">
                         {defects.length ? defects.map((defect, defectIndex) => (
                           <div key={`${q.id}-review-${defectIndex}`} className="mb-2 p-2" style={{ background: "#f8f9fa", borderRadius: 8 }}>

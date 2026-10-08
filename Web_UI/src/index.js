@@ -26,8 +26,6 @@ import "react-datetime/css/react-datetime.css";
 import HomePage from "./pages/HomePage";
 import ScrollToTop from "./components/ScrollToTop";
 
-// ✅ CRA Workbox service worker helper
-import * as serviceWorker from "./serviceWorker";
 
 const UPDATE_PROMPT_KEY = "maintenix_update_prompted_main_js";
 
@@ -89,6 +87,39 @@ async function checkForUpdatedBundleOnLoad() {
   } catch {}
 }
 
+async function removeLegacyOfflineArtifacts() {
+  const hadController = typeof navigator !== "undefined" &&
+    "serviceWorker" in navigator &&
+    !!navigator.serviceWorker.controller;
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+  } catch {}
+
+  try {
+    if ("caches" in window) {
+      const keys = await window.caches.keys();
+      const maintenixKeys = keys.filter((key) => String(key || "").toLowerCase().includes("maintenix"));
+      await Promise.all(maintenixKeys.map((key) => window.caches.delete(key)));
+    }
+  } catch {}
+
+  // A page already controlled by the old offline worker stays controlled until reload.
+  // Reload once after unregistering so the live GitHub Pages bundle takes over immediately.
+  if (hadController) {
+    try {
+      const cleanupKey = "maintenix_offline_worker_removed";
+      if (sessionStorage.getItem(cleanupKey) !== "1") {
+        sessionStorage.setItem(cleanupKey, "1");
+        window.location.reload();
+      }
+    } catch {}
+  }
+}
+
 function runVersionCheckOnceOnLoad() {
   if (document.readyState === "complete") {
     window.setTimeout(checkForUpdatedBundleOnLoad, 0);
@@ -98,37 +129,7 @@ function runVersionCheckOnceOnLoad() {
   window.addEventListener("load", checkForUpdatedBundleOnLoad, { once: true });
 }
 
-// ✅ Register CRA build service worker (build/service-worker.js)
-serviceWorker.register({
-  onUpdate: (registration) => {
-    try {
-      const ok = window.confirm("A Maintenix update is available. Press OK to reload and apply the update.");
-      if (!ok) return;
-
-      // Reload once the new SW takes control. Register this before posting
-      // SKIP_WAITING so we cannot miss a fast controllerchange event.
-      let reloaded = false;
-      const reloadOnce = () => {
-        if (reloaded) return;
-        reloaded = true;
-        hardRefreshMaintenixApp();
-      };
-      navigator.serviceWorker.addEventListener("controllerchange", reloadOnce);
-
-      // Tell the waiting SW to activate immediately.
-      if (registration && registration.waiting) {
-        try {
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        } catch {}
-      }
-
-      // Fallback: if the browser does not fire controllerchange promptly,
-      // still perform the requested hard reload.
-      window.setTimeout(reloadOnce, 1500);
-    } catch {}
-  }
-});
-
+removeLegacyOfflineArtifacts();
 runVersionCheckOnceOnLoad();
 
 /**

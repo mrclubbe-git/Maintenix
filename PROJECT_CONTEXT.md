@@ -477,3 +477,22 @@ The server template remains:
 `/home/charl/projects/maintenix-dev-api/Server_API/data/templates/servicing_checklist_approved_v1.docx`
 
 Treat this accepted version as the V1 formatting baseline for future servicing-report changes.
+
+
+## Offline mode status — temporarily disabled
+
+As of 2026-10-08, browser offline support is intentionally disabled until the overall site is complete.
+
+Current decision:
+
+- The React UI must operate online-only for now.
+- Browser service-worker registration has been removed.
+- The offline app-shell worker and recovery-worker build hooks/files have been removed.
+- Offline sign-in/session support has been removed.
+- The Settings offline-mode controls and offline-token notifications have been removed.
+- Servicing and Call Out no longer permit offline save/generate workflows; an internet connection is required.
+- A startup cleanup in `Web_UI/src/index.js` unregisters any legacy Maintenix browser service-worker registrations and clears Maintenix browser caches so previously installed workers stop controlling the GitHub Pages app.
+- The normal server-side report workers (`Server_API/servicingWorker.js`, `Server_API/calloutWorker.js`) remain enabled because they are part of online report generation and are not browser offline workers.
+- The current local IndexedDB-backed draft/job staging code may remain where required by the existing online workflow, but it must not be presented or used as an offline mode.
+
+When the overall site is complete, offline functionality can be deliberately reintroduced as a separate project phase.

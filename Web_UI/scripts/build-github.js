@@ -23,14 +23,4 @@ if (result.error) {
 
 if (result.status !== 0) process.exit(result.status == null ? 1 : result.status);
 
-const recovery = spawnSync(process.execPath, ["scripts/write-recovery-service-worker.js"], {
-  stdio: "inherit",
-  env: process.env
-});
-
-if (recovery.error) {
-  console.error(recovery.error);
-  process.exit(1);
-}
-
-process.exit(recovery.status == null ? 1 : recovery.status);
+process.exit(result.status == null ? 1 : result.status);

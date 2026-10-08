@@ -654,6 +654,10 @@ export default function CallOut() {
   };
 
   const saveOfflineDraft = async () => {
+    if (!online) {
+      setBanner({ show: true, variant: "warning", text: "Internet connection is required. Offline mode is temporarily disabled." });
+      return;
+    }
     setBusy(true);
     try {
       await saveDraftRecord("");
@@ -673,6 +677,11 @@ export default function CallOut() {
   const generateWithAutoDraft = async () => {
     // Requirement: Generate should auto-save draft, then generate
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    if (!online) {
+      setBanner({ show: true, variant: "warning", text: "Internet connection is required to generate a call-out report." });
+      return;
+    }
 
     // Save a draft first (even if validation fails)
     try {
@@ -912,6 +921,11 @@ export default function CallOut() {
     // Requirement: navigate to top when queue button is pressed (even if validation fails)
     window.scrollTo({ top: 0, behavior: "smooth" });
 
+    if (!online) {
+      setBanner({ show: true, variant: "warning", text: "Internet connection is required to generate a call-out report." });
+      return;
+    }
+
     const err = validateForQueue();
     if (err) {
       setBanner({ show: true, variant: "warning", text: err });
@@ -949,7 +963,7 @@ export default function CallOut() {
       setBanner({
         show: true,
         variant: "success",
-        text: online ? `Queued. Report ID: ${reportId}` : `Queued (offline). Will sync when online. Report ID: ${reportId}`
+        text: `Queued. Report ID: ${reportId}`
       });
 
       // refresh jobs widget quickly
@@ -995,9 +1009,9 @@ export default function CallOut() {
           {!online ? (
             <div className="mt-1">
               <Badge bg="warning" text="dark">
-                Offline mode
+                Offline
               </Badge>
-              <span className="text-muted small ms-2">You can capture the form offline and queue for sync.</span>
+              <span className="text-muted small ms-2">Internet connection is required. Offline mode is temporarily disabled.</span>
             </div>
           ) : null}
         </div>

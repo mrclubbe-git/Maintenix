@@ -1,84 +1,34 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
-import { Col, Row, Form, Card, Button, FormCheck, Container, InputGroup, Alert, Spinner } from "@themesberg/react-bootstrap";
+import { Col, Row, Form, Card, Button, Container, InputGroup, Alert, Spinner } from "@themesberg/react-bootstrap";
 import { Link } from "react-router-dom";
 
 import { Routes } from "../../routes";
 import BgImage from "../../assets/img/illustrations/signin.svg";
-import {
-  clearOfflineSession,
-  getOfflineSession,
-  isExpired,
-  notifyOfflineTokenLoaded,
-  safeJsonParse,
-  storeOfflineSession,
-  warmOfflineMode
-} from "../../offlineMode";
 
-function readOfflineSession() {
-  const sess = getOfflineSession();
-  if (!sess.token || !sess.user?.email || isExpired(sess.expiresAt)) return null;
-  return sess;
+function safeJsonParse(str, fallback = null) {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
 }
 
 export default function Signin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const [offlineAvailable, setOfflineAvailable] = useState(false);
-  const [offlineInfo, setOfflineInfo] = useState({ email: "", role: "", expiresAt: "" });
-
-  const isOnline = useMemo(() => (typeof navigator !== "undefined" ? navigator.onLine : true), []);
-
   useEffect(() => {
     const existingToken = localStorage.getItem("authToken") || "";
     const existingUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
-
-    // If already logged in:
-    // - Online: go Overview
-    // - Offline: go Servicing (avoid Overview API calls)
     if (existingToken && existingUser?.email) {
-      window.location.hash = navigator.onLine ? Routes.DashboardOverview.path : Routes.Servicing.path;
-      return;
-    }
-
-    const sess = readOfflineSession();
-    if (sess) {
-      setOfflineAvailable(true);
-      setOfflineInfo({ email: sess.user.email || "", role: sess.user.role || "", expiresAt: sess.expiresAt || "" });
-    } else {
-      setOfflineAvailable(false);
-      setOfflineInfo({ email: "", role: "", expiresAt: "" });
-      clearOfflineSession();
+      window.location.hash = Routes.DashboardOverview.path;
     }
   }, []);
-
-  function continueOffline() {
-    setErr("");
-    setSuccessMsg("");
-
-    const sess = readOfflineSession();
-    if (!sess) {
-      setOfflineAvailable(false);
-      setErr("Offline sign-in is not available on this device (no saved session, or it expired).");
-      return;
-    }
-
-    localStorage.setItem("authToken", sess.token);
-    localStorage.setItem("authUser", JSON.stringify(sess.user));
-    window.dispatchEvent(new Event("authUserUpdated"));
-
-    setSuccessMsg(`Continuing offline as ${sess.user.email} (${sess.user.role}).`);
-
-    // ✅ Offline should land on Servicing (works offline)
-    window.location.hash = Routes.Servicing.path;
-  }
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -115,30 +65,13 @@ export default function Signin() {
       localStorage.setItem("authUser", JSON.stringify(data.user));
       window.dispatchEvent(new Event("authUserUpdated"));
 
-      const ttlMs = remember ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-      const expiresAt = storeOfflineSession(data.token, data.user, ttlMs);
-      notifyOfflineTokenLoaded(data.user);
-
-      setOfflineAvailable(true);
-      setOfflineInfo({ email: data.user?.email || "", role: data.user?.role || "", expiresAt });
-
-      await warmOfflineMode(data.token).catch(() => null);
-
       setSuccessMsg(`Logged in as ${data.user.email} (${data.user.role}).`);
       setLoading(false);
 
       // ✅ Online login still goes to Overview
       window.location.hash = Routes.DashboardOverview.path;
     } catch {
-      const sess = readOfflineSession();
-      if (sess) {
-        setOfflineAvailable(true);
-        setOfflineInfo({ email: sess.user.email || "", role: sess.user.role || "", expiresAt: sess.expiresAt || "" });
-        setErr("API not reachable. You can continue offline using the last saved session on this device.");
-      } else {
-        setOfflineAvailable(false);
-        setErr("Login failed (API not reachable).");
-      }
+      setErr("Login failed (API not reachable).");
       setLoading(false);
     }
   }
@@ -154,39 +87,7 @@ export default function Signin() {
                   <h3 className="mb-0">Sign in to our platform</h3>
                 </div>
 
-                {!isOnline ? (
-                  <Alert variant="warning">
-                    You are offline. Online sign-in will fail until the API is reachable.
-                    {offlineAvailable ? (
-                      <div className="mt-2 small">
-                        Offline session available for: <strong>{offlineInfo.email}</strong> ({offlineInfo.role})
-                        {offlineInfo.expiresAt ? (
-                          <>
-                            <br />
-                            Expires: <strong>{new Date(offlineInfo.expiresAt).toLocaleString()}</strong>
-                          </>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="mt-2 small">
-                        Offline sign-in is not available yet on this device. Sign in once online to enable offline mode.
-                      </div>
-                    )}
-                  </Alert>
-                ) : null}
-
-                {err ? (
-                  <Alert variant="danger">
-                    {err}
-                    {offlineAvailable ? (
-                      <div className="mt-3">
-                        <Button variant="warning" onClick={continueOffline} disabled={loading}>
-                          Continue Offline
-                        </Button>
-                      </div>
-                    ) : null}
-                  </Alert>
-                ) : null}
+                {err ? <Alert variant="danger">{err}</Alert> : null}
 
                 {successMsg ? (
                   <Alert variant="success">
@@ -239,20 +140,7 @@ export default function Signin() {
                     </InputGroup>
                   </Form.Group>
 
-                  <div className="d-flex justify-content-between align-items-center mb-4">
-                    <Form.Check type="checkbox">
-                      <FormCheck.Input
-                        id="rememberMe"
-                        className="me-2"
-                        checked={remember}
-                        onChange={(e) => setRemember(e.target.checked)}
-                        disabled={loading}
-                      />
-                      <FormCheck.Label htmlFor="rememberMe" className="mb-0">
-                        Remember me
-                      </FormCheck.Label>
-                    </Form.Check>
-
+                  <div className="d-flex justify-content-end mb-4">
                     <Card.Link className="small text-end">Lost password?</Card.Link>
                   </div>
 
@@ -266,11 +154,7 @@ export default function Signin() {
                     )}
                   </Button>
 
-                  {!isOnline && offlineAvailable ? (
-                    <Button variant="warning" className="w-100 mt-2" type="button" onClick={continueOffline} disabled={loading}>
-                      Continue Offline
-                    </Button>
-                  ) : null}
+
                 </Form>
 
                 <div className="d-flex justify-content-center align-items-center mt-4">

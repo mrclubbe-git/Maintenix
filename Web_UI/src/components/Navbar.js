@@ -6,12 +6,6 @@ import { faUserCircle } from "@fortawesome/free-regular-svg-icons";
 import { Link } from "react-router-dom";
 
 import { Routes } from "../routes";
-import {
-  checkOfflineTokenNotifications,
-  clearVisibleLocalNotifications,
-  readVisibleLocalNotifications,
-  updateLocalNotification
-} from "../offlineMode";
 
 function safeJsonParse(str, fallback = null) {
   try {
@@ -26,7 +20,7 @@ function readAuthUser() {
 }
 
 function readNotifications() {
-  return readVisibleLocalNotifications(readAuthUser());
+  return [];
 }
 
 // Reuse the same initials logic as DashboardOverview.js
@@ -108,11 +102,10 @@ export default function NavbarTop() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
-      const local = readVisibleLocalNotifications(readAuthUser());
       const remote = Array.isArray(data.notifications) ? data.notifications : [];
-      setNotifications([...local, ...remote]);
+      setNotifications(remote);
     } catch {
-      setNotifications(readVisibleLocalNotifications(readAuthUser()));
+      setNotifications([]);
     }
   }, []);
 
@@ -120,8 +113,7 @@ export default function NavbarTop() {
     const syncAuth = () => {
       const user = readAuthUser();
       setAuthUser(user);
-      checkOfflineTokenNotifications(user);
-      setNotifications(readVisibleLocalNotifications(user));
+      setNotifications([]);
     };
 
     window.addEventListener("authUserUpdated", syncAuth);
@@ -133,10 +125,8 @@ export default function NavbarTop() {
     window.addEventListener("storage", onStorage);
 
     refreshAuthUserFromApi();
-    checkOfflineTokenNotifications(readAuthUser());
     loadNotifications();
     const timer = window.setInterval(() => {
-      checkOfflineTokenNotifications(readAuthUser());
       loadNotifications();
     }, 30000);
 
@@ -191,32 +181,18 @@ export default function NavbarTop() {
   }
 
   async function markNotificationRead(notificationId) {
-    if (String(notificationId || "").startsWith("offline_token_")) {
-      updateLocalNotification(notificationId, { read: true });
-      setNotifications(readVisibleLocalNotifications(readAuthUser()));
-      return;
-    }
     await notificationPost(`/api/notifications/${encodeURIComponent(notificationId)}/read`);
   }
 
   async function markAllNotificationsRead() {
-    visibleNotifications.forEach((n) => {
-      if (n?.local) updateLocalNotification(n.id, { read: true });
-    });
     await notificationPost("/api/notifications/read-all");
   }
 
   async function acknowledgeNotification(notificationId) {
-    if (String(notificationId || "").startsWith("offline_token_")) {
-      updateLocalNotification(notificationId, { read: true, acknowledged: true, acknowledgementCount: 1 });
-      setNotifications(readVisibleLocalNotifications(readAuthUser()));
-      return;
-    }
     await notificationPost(`/api/notifications/${encodeURIComponent(notificationId)}/ack`);
   }
 
   async function clearAllNotifications() {
-    clearVisibleLocalNotifications();
     await notificationPost("/api/notifications/clear-visible");
   }
 

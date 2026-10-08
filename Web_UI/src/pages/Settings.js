@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 
 import { Routes } from "../routes";
 import Profile3 from "../assets/img/team/profile-picture-3.jpg";
-import { clearOfflineModeCache, notifyOfflineTokenLoaded, storeOfflineSession, warmOfflineMode } from "../offlineMode";
 
 function safeJsonParse(str, fallback = null) {
   try {
@@ -30,12 +29,9 @@ export default function Settings() {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingPhoto, setSavingPhoto] = useState(false);
-  const [warmingOffline, setWarmingOffline] = useState(false);
-  const [clearingOfflineCache, setClearingOfflineCache] = useState(false);
 
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
-  const [offlineMsg, setOfflineMsg] = useState("");
 
   const [profile, setProfile] = useState({
     name: storedUser?.name || "",
@@ -217,55 +213,6 @@ export default function Settings() {
     }
   }
 
-  async function prepareOfflineMode() {
-    if (!authToken) {
-      setErr("Not logged in.");
-      return;
-    }
-
-    setWarmingOffline(true);
-    setErr("");
-    setOkMsg("");
-    setOfflineMsg("");
-
-    try {
-      const summary = await warmOfflineMode(authToken);
-      const currentUser = safeJsonParse(localStorage.getItem("authUser") || "null", storedUser || {});
-      const ttlMs = 7 * 24 * 60 * 60 * 1000;
-      storeOfflineSession(authToken, currentUser, ttlMs);
-      notifyOfflineTokenLoaded(currentUser);
-
-      const cached = summary.cached.length ? summary.cached.join(", ") : "offline data";
-      const failed = summary.failed.length ? ` Some items could not be refreshed: ${summary.failed.join(", ")}.` : "";
-      setOfflineMsg(`Offline mode prepared. Cached: ${cached}.${failed}`);
-    } catch (e) {
-      setErr(String(e?.message || "Failed to prepare offline mode."));
-    } finally {
-      setWarmingOffline(false);
-    }
-  }
-
-  async function clearOfflineCache() {
-    const confirmed = window.confirm(
-      "Clear offline cache on this device?\n\nThis removes prepared offline data and the 7 day offline token, but keeps queued jobs."
-    );
-    if (!confirmed) return;
-
-    setClearingOfflineCache(true);
-    setErr("");
-    setOkMsg("");
-    setOfflineMsg("");
-
-    try {
-      const cleared = await clearOfflineModeCache();
-      setOfflineMsg(`Offline cache cleared: ${cleared.join(", ")}.`);
-    } catch (e) {
-      setErr(String(e?.message || "Failed to clear offline cache."));
-    } finally {
-      setClearingOfflineCache(false);
-    }
-  }
-
   // ------------------------------------------------------------
   // Admin widget: user management
   // ------------------------------------------------------------
@@ -410,7 +357,6 @@ export default function Settings() {
 
       {err ? <Alert variant="danger">{err}</Alert> : null}
       {okMsg ? <Alert variant="success">{okMsg}</Alert> : null}
-      {offlineMsg ? <Alert variant="success">{offlineMsg}</Alert> : null}
 
       <Row className="g-4">
         <Col xs={12} xl={4}>
@@ -455,36 +401,6 @@ export default function Settings() {
             </Card.Body>
           </Card>
 
-          <Card border="light" className="shadow-sm mb-4">
-            <Card.Header>
-              <h5 className="mb-0">Offline Mode</h5>
-            </Card.Header>
-            <Card.Body>
-              <p className="text-muted small mb-3">
-                Cache servicing areas, services, and checklists on this device before going onsite.
-              </p>
-              <div className="d-flex flex-wrap gap-2">
-                <Button variant="outline-primary" size="sm" onClick={prepareOfflineMode} disabled={warmingOffline || loadingProfile}>
-                  {warmingOffline ? (
-                    <>
-                      <Spinner size="sm" className="me-2" /> Preparing…
-                    </>
-                  ) : (
-                    "Prepare Offline Mode"
-                  )}
-                </Button>
-                <Button variant="outline-danger" size="sm" onClick={clearOfflineCache} disabled={clearingOfflineCache || warmingOffline}>
-                  {clearingOfflineCache ? (
-                    <>
-                      <Spinner size="sm" className="me-2" /> Clearing…
-                    </>
-                  ) : (
-                    "Clear Offline Cache"
-                  )}
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
         </Col>
 
         <Col xs={12} xl={8}>

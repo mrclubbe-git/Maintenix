@@ -765,65 +765,40 @@ export default function Servicing() {
       setErr("Not logged in.");
       return;
     }
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setChecklist(null);
+      setAreaOptions([]);
+      setServiceOptions([]);
+      setErr("Internet connection is required. Offline mode is temporarily disabled.");
+      return;
+    }
 
     setLoadingLists(true);
     setLoadingChecklist(true);
 
     try {
-      // Network first
-      const [areasRes, servicesRes, checklistRes] = await Promise.allSettled([
+      const [areasRes, servicesRes, checklistRes] = await Promise.all([
         fetchJson("/api/servicing/areas"),
         fetchJson("/api/servicing/services"),
         fetchJson(`/api/servicing/checklist?type=${encodeURIComponent(systemType)}`)
       ]);
 
-      if (areasRes.status === "fulfilled") {
-        const a = Array.isArray(areasRes.value?.areas) ? areasRes.value.areas : [];
-        setAreaOptions(a);
-        await cacheSet("areas", a);
-      } else {
-        // Offline / API fail: fallback to cache
-        const cached = await cacheGet("areas");
-        if (Array.isArray(cached) && cached.length) {
-          setAreaOptions(cached);
-          setInfo("Offline: loaded cached areas.");
-        } else {
-          setAreaOptions(["Pump Room", "Server Room", "Warehouse", "Office"]);
-          setInfo("Areas endpoint not available yet — using defaults for now.");
-        }
-      }
+      const areas = Array.isArray(areasRes?.areas) ? areasRes.areas : [];
+      const services = Array.isArray(servicesRes?.services) ? servicesRes.services : [];
+      const loadedChecklist = getChecklistPayload(checklistRes);
 
-      if (servicesRes.status === "fulfilled") {
-        const s = Array.isArray(servicesRes.value?.services) ? servicesRes.value.services : [];
-        setServiceOptions(s);
-        await cacheSet("services", s);
-      } else {
-        const cached = await cacheGet("services");
-        if (Array.isArray(cached) && cached.length) {
-          setServiceOptions(cached);
-          setInfo((prev) => (prev ? prev : "Offline: loaded cached services."));
-        } else {
-          setServiceOptions(["Weekly", "Monthly", "3-Monthly", "Annual"]);
-          setInfo((prev) => (prev ? prev : "Services endpoint not available yet — using defaults for now."));
-        }
-      }
+      setAreaOptions(areas);
+      setServiceOptions(services);
+      setChecklist(loadedChecklist);
 
-      if (checklistRes.status === "fulfilled") {
-        const loadedChecklist = getChecklistPayload(checklistRes.value);
-        setChecklist(loadedChecklist);
-        await cacheSet(`checklist_${systemType}`, loadedChecklist);
-      } else {
-        const cached = await cacheGet(`checklist_${systemType}`) || await cacheGet("checklist");
-        if (cached) {
-          setChecklist(cached);
-          setInfo((prev) => (prev ? prev : "Offline: loaded cached checklist."));
-        } else {
-          setChecklist(null);
-          setInfo((prev) => (prev ? prev : "Checklist endpoint not available yet."));
-        }
-      }
+      // Keep a local mirror for current draft/job implementation, but do not
+      // use it as an offline fallback while offline mode is disabled.
+      await cacheSet("areas", areas);
+      await cacheSet("services", services);
+      await cacheSet(`checklist_${systemType}`, loadedChecklist);
     } catch (e) {
-      setErr(String(e?.message || "Failed to load servicing data."));
+      setChecklist(null);
+      setErr(String(e?.message || "Failed to load servicing data. Internet connection is required."));
     } finally {
       setLoadingLists(false);
       setLoadingChecklist(false);
@@ -831,11 +806,14 @@ export default function Servicing() {
   }
 
   useEffect(() => {
-    // Online can fetch immediately; offline must wait for IndexedDB so cached checklists can load.
-    const isOnlineNow = typeof navigator === "undefined" ? true : navigator.onLine;
-    if (canAccess && (isOnlineNow || dbReady)) loadListsAndChecklist();
+    if (!canAccess) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setErr("Internet connection is required. Offline mode is temporarily disabled.");
+      return;
+    }
+    loadListsAndChecklist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemType, dbReady, canAccess]);
+  }, [systemType, online, canAccess]);
 
   useEffect(() => {
     if (dbReady) refreshJobs();
@@ -850,6 +828,7 @@ export default function Servicing() {
   }, [step]);
 
   function validatePreStart() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return "Internet connection is required. Offline mode is temporarily disabled.";
     if (!area) return "Please select an Area.";
     if (!serviceType) return "Please select a Service Type.";
     if (!selectedStandards.length) return "Please select at least one standard.";
@@ -1786,6 +1765,11 @@ export default function Servicing() {
     setErr("");
     setInfo("");
 
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setErr("Internet connection is required to generate a servicing report.");
+      return;
+    }
+
     if (!authToken) {
       setErr("Not logged in.");
       return;
@@ -1897,7 +1881,7 @@ export default function Servicing() {
       await idbPut(dbRef.current, "servicingJobs", job);
       await refreshJobs();
 
-      setInfo(navigator.onLine ? "Draft queued and will submit to server in the background." : "Draft queued offline. It will submit when online.");
+      setInfo("Draft queued and will submit to the server in the background.");
 
       emitJobsEvent();
     } catch (e) {
@@ -1909,6 +1893,11 @@ export default function Servicing() {
 
   async function saveCurrentAsDraftOnly() {
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setErr("Internet connection is required to save a servicing draft.");
+      return;
+    }
 
     if (!dbRef.current) {
       setErr("Offline storage not available in this browser.");
@@ -2019,8 +2008,8 @@ export default function Servicing() {
           <small className="text-muted">Mobile workflow (Pre-Start → Checklist → Review → Final)</small>
           {!online ? (
             <div className="mt-1">
-              <Badge bg="warning" text="dark">Offline mode</Badge>
-              <span className="text-muted small ms-2">Using cached data. Draft generation jobs will queue until online.</span>
+              <Badge bg="warning" text="dark">Offline</Badge>
+              <span className="text-muted small ms-2">Internet connection is required. Offline mode is temporarily disabled.</span>
             </div>
           ) : null}
         </div>

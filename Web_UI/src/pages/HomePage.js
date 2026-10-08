@@ -81,14 +81,6 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
         return;
       }
 
-      // ✅ OFFLINE: accept existing session locally (do not ping API)
-      if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        if (!mounted) return;
-        setAuthOk(true);
-        setAuthChecked(true);
-        return;
-      }
-
       try {
         const res = await fetch("/api/profile/me", {
           headers: { Authorization: `Bearer ${authToken}` },
@@ -103,24 +95,9 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
         setAuthChecked(true);
       } catch (e) {
         if (e?.name === "AbortError") return;
-
-        // ✅ If the API is unreachable but we're online-flagged incorrectly, don't wipe tokens.
-        // Only wipe on actual HTTP responses that indicate invalid token (we don't have that detail here),
-        // so we keep the existing behavior but avoid nuking sessions on network errors.
-        const msg = String(e?.message || "");
-        const isNetworkish =
-          msg.includes("Failed to fetch") ||
-          msg.includes("NetworkError") ||
-          msg.includes("ERR_INTERNET_DISCONNECTED");
-
-        if (!isNetworkish) {
-          // token invalid (common after backend restart) => clear and redirect to signin
-          localStorage.removeItem("authToken");
-          localStorage.removeItem("authUser");
-        }
-
         if (!mounted) return;
-        setAuthOk(isNetworkish ? true : false);
+        // Offline access is intentionally disabled for now.
+        setAuthOk(false);
         setAuthChecked(true);
       }
     }
@@ -180,12 +157,12 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
 export default function HomePage() {
   return (
     <Switch>
-      {/* Root: Online -> Overview, Offline -> Servicing */}
+      {/* Root -> Overview */}
       <Route
         exact
         path={Routes.Presentation.path}
         render={() => (
-          <Redirect to={(typeof navigator !== "undefined" && navigator.onLine === false) ? Routes.Servicing.path : Routes.DashboardOverview.path} />
+          <Redirect to={Routes.DashboardOverview.path} />
         )}
       />
 

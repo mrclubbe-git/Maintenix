@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Row, Col, Button, Form, Alert, Badge } from "@themesberg/react-bootstrap";
+import { Card, Row, Col, Button, Form, Alert, Badge, ProgressBar, Spinner } from "@themesberg/react-bootstrap";
 
 function isMobileDevice() {
   if (typeof navigator === "undefined") return false;
@@ -361,6 +361,11 @@ export default function CallOut() {
   const [banner, setBanner] = useState({ show: false, variant: "info", text: "" });
   const [busy, setBusy] = useState(false);
 
+  // Workflow: 0=Call Details, 1=Attendance, 2=Review, 3=Draft creation progress.
+  const [step, setStep] = useState(0);
+  const [draftProgress, setDraftProgress] = useState(0);
+  const [draftProgressText, setDraftProgressText] = useState("");
+
   // ---- Jobs / Drafts widgets ----
   const [jobs, setJobs] = useState([]);
   const [drafts, setDrafts] = useState([]);
@@ -511,7 +516,7 @@ export default function CallOut() {
     setPhotos((prev) => (prev || []).filter((p) => p.id !== id));
   };
 
-  function resetForm() {
+  function resetForm(message = "") {
     setArea("");
     setSystemType("");
     setTimeCallLogged("");
@@ -528,6 +533,12 @@ export default function CallOut() {
     setJobcardNumber("");
     setNoJobcardReason("");
     setPhotos([]);
+    setStep(0);
+    setDraftProgress(0);
+    setDraftProgressText("");
+    if (message) {
+      setBanner({ show: true, variant: "success", text: message });
+    }
   }
 
   function buildPayload() {
@@ -588,21 +599,79 @@ export default function CallOut() {
     setPhotos(Array.isArray(payload.photos) ? payload.photos.map((p) => ({ ...p, file: null })) : []);
   }
 
+  function validatePayloadForQueue(payload) {
+    const p = payload || {};
+    if (!String(p.area || "").trim()) return "Area is required.";
+    if (!String(p.systemType || "").trim()) return "System type is required.";
+    if (!p.timeCallLogged) return "Time of call logged is required.";
+    if (!String(p.clientDefectDesc || "").trim()) return "Client description of the defect is required.";
+    if (!p.timeArrival) return "Time of responder arrival is required.";
+    if (!p.couldRectify) return "Please select whether the defect could be rectified.";
+    if (p.couldRectify === "YES" && !String(p.actionTaken || "").trim()) return "Action taken is required when rectified = Yes.";
+    if (p.couldRectify === "NO" && !String(p.materialsRequired || "").trim()) return "Materials required is required when rectified = No.";
+    if (!p.timeDeparture) return "Time of responder departure is required.";
+    if (!p.jobcardCreated) return "Please select whether a jobcard was created.";
+    if (p.jobcardCreated === "YES" && !String(p.jobcardNumber || "").trim()) return "Jobcard number is required when jobcard created = Yes.";
+    if (p.jobcardCreated === "NO" && !String(p.noJobcardReason || "").trim()) return "Reason is required when jobcard created = No.";
+    return "";
+  }
+
   function validateForQueue() {
-    // Light validation + enforce conditional logic
+    return validatePayloadForQueue(buildPayload());
+  }
+
+  function validateCallDetailsStep() {
     if (!area.trim()) return "Area is required.";
     if (!systemType.trim()) return "System type is required.";
     if (!timeCallLogged) return "Time of call logged is required.";
     if (!clientDefectDesc.trim()) return "Client description of the defect is required.";
-    if (!timeArrival) return "Time of responder arrival is required.";
-    if (!couldRectify) return "Please select whether the defect could be rectified.";
-    if (couldRectify === "YES" && !actionTaken.trim()) return "Action taken is required when rectified = Yes.";
-    if (couldRectify === "NO" && !materialsRequired.trim()) return "Materials required is required when rectified = No.";
-    if (!timeDeparture) return "Time of responder departure is required.";
-    if (!jobcardCreated) return "Please select whether a jobcard was created.";
-    if (jobcardCreated === "YES" && !jobcardNumber.trim()) return "Jobcard number is required when jobcard created = Yes.";
-    if (jobcardCreated === "NO" && !noJobcardReason.trim()) return "Reason is required when jobcard created = No.";
     return "";
+  }
+
+  function validateAttendanceStep() {
+    const payload = buildPayload();
+    if (!payload.timeArrival) return "Time of responder arrival is required.";
+    if (!payload.couldRectify) return "Please select whether the defect could be rectified.";
+    if (payload.couldRectify === "YES" && !String(payload.actionTaken || "").trim()) return "Action taken is required when rectified = Yes.";
+    if (payload.couldRectify === "NO" && !String(payload.materialsRequired || "").trim()) return "Materials required is required when rectified = No.";
+    if (!payload.timeDeparture) return "Time of responder departure is required.";
+    if (!payload.jobcardCreated) return "Please select whether a jobcard was created.";
+    if (payload.jobcardCreated === "YES" && !String(payload.jobcardNumber || "").trim()) return "Jobcard number is required when jobcard created = Yes.";
+    if (payload.jobcardCreated === "NO" && !String(payload.noJobcardReason || "").trim()) return "Reason is required when jobcard created = No.";
+    return "";
+  }
+
+  function nextStep() {
+    setBanner({ show: false, variant: "info", text: "" });
+
+    if (step === 0) {
+      const err = validateCallDetailsStep();
+      if (err) {
+        setBanner({ show: true, variant: "warning", text: err });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setStep(1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    if (step === 1) {
+      const err = validateAttendanceStep();
+      if (err) {
+        setBanner({ show: true, variant: "warning", text: err });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function backStep() {
+    setBanner({ show: false, variant: "info", text: "" });
+    setStep((current) => Math.max(0, current - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   const saveDraftRecord = async (nameOverride) => {
@@ -653,53 +722,50 @@ export default function CallOut() {
     return key;
   };
 
-  const saveOfflineDraft = async () => {
-    if (!online) {
-      setBanner({ show: true, variant: "warning", text: "Internet connection is required. Offline mode is temporarily disabled." });
-      return;
-    }
-    setBusy(true);
-    try {
-      await saveDraftRecord("");
-      setBanner({ show: true, variant: "success", text: "Draft saved." });
-    } catch (e) {
-      setBanner({
-        show: true,
-        variant: "danger",
-        text: `Failed to save draft: ${e?.message || "Unknown error"}`
-      });
-    } finally {
-      setBusy(false);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const generateWithAutoDraft = async () => {
-    // Requirement: Generate should auto-save draft, then generate
+  const submitReviewAndSaveDraft = async () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
 
     if (!online) {
-      setBanner({ show: true, variant: "warning", text: "Internet connection is required to generate a call-out report." });
+      setBanner({ show: true, variant: "warning", text: "Internet connection is required to submit this call-out." });
       return;
     }
 
-    // Save a draft first (even if validation fails)
+    const err = validateForQueue();
+    if (err) {
+      setBanner({ show: true, variant: "warning", text: err });
+      return;
+    }
+
+    setBusy(true);
+    setDraftProgress(10);
+    setDraftProgressText("Preparing call-out draft…");
+    setStep(3);
+
     try {
-      setBusy(true);
-      await saveDraftRecord(area);
+      setDraftProgress(35);
+      setDraftProgressText("Collecting call-out details and photos…");
+
+      const draftName = String(area || "").trim() || `Call Out ${new Date().toLocaleString()}`;
+
+      setDraftProgress(65);
+      setDraftProgressText("Saving draft…");
+
+      await saveDraftRecord(draftName);
+
+      setDraftProgress(100);
+      setDraftProgressText("Draft created successfully.");
+
+      await new Promise((resolve) => window.setTimeout(resolve, 650));
+      resetForm(`Draft saved: ${draftName}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
-      // Show warning but continue to validate + queue
-      setBanner({
-        show: true,
-        variant: "warning",
-        text: `Could not auto-save draft: ${e?.message || "Unknown error"}`
-      });
+      setStep(2);
+      setDraftProgress(0);
+      setDraftProgressText("");
+      setBanner({ show: true, variant: "danger", text: `Failed to save draft: ${e?.message || "Unknown error"}` });
     } finally {
       setBusy(false);
     }
-
-    // Now queue generation (uses validation)
-    await queueGenerate();
   };
 
   const loadDraft = async (draftKey) => {
@@ -713,6 +779,9 @@ export default function CallOut() {
       }
 
       loadPayloadIntoForm(d.value);
+      setStep(0);
+      setDraftProgress(0);
+      setDraftProgressText("");
       setBanner({ show: true, variant: "success", text: `Draft loaded: ${d.name || draftKey}` });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
@@ -804,6 +873,54 @@ export default function CallOut() {
       setDrafts(onlyDrafts);
     } catch (e) {
       setBanner({ show: true, variant: "danger", text: `Failed to delete draft: ${e?.message || "Unknown error"}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const generateFromDraft = async (draftKey) => {
+    if (!online) {
+      setBanner({ show: true, variant: "warning", text: "Internet connection is required to generate a call-out report." });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const db = await openDb();
+      const draft = await idbGet(db, STORE_CACHE, draftKey);
+      if (!draft?.value) {
+        setBanner({ show: true, variant: "warning", text: "Draft not found." });
+        return;
+      }
+
+      const payload = draft.value || {};
+      const err = validatePayloadForQueue(payload);
+      if (err) {
+        setBanner({ show: true, variant: "warning", text: `Draft is incomplete. ${err}` });
+        return;
+      }
+
+      const reportId = makeReportId();
+      const jobId = makeJobId();
+      const job = {
+        id: jobId,
+        type: "callout",
+        schemaVersion: JOB_SCHEMA_VERSION,
+        createdAt: new Date().toISOString(),
+        status: "queued",
+        reportId,
+        payload: { ...payload, reportId },
+        retries: 0,
+        error: "",
+        lastUpdateAt: new Date().toISOString()
+      };
+
+      await idbPut(db, STORE_JOBS, job);
+      window.dispatchEvent(new CustomEvent("maintenix:callout-jobs"));
+      setBanner({ show: true, variant: "success", text: `Draft queued for report generation. Report ID: ${reportId}` });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setBanner({ show: true, variant: "danger", text: `Failed to generate from draft: ${e?.message || "Unknown error"}` });
     } finally {
       setBusy(false);
     }
@@ -917,94 +1034,12 @@ export default function CallOut() {
     }
   };
 
-  const queueGenerate = async () => {
-    // Requirement: navigate to top when queue button is pressed (even if validation fails)
-    window.scrollTo({ top: 0, behavior: "smooth" });
-
-    if (!online) {
-      setBanner({ show: true, variant: "warning", text: "Internet connection is required to generate a call-out report." });
-      return;
-    }
-
-    const err = validateForQueue();
-    if (err) {
-      setBanner({ show: true, variant: "warning", text: err });
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const db = await openDb();
-      const payload = buildPayload();
-
-      const reportId = makeReportId();
-      const jobId = makeJobId();
-
-      const job = {
-        id: jobId,
-        type: "callout",
-        schemaVersion: JOB_SCHEMA_VERSION,
-        createdAt: new Date().toISOString(),
-        status: "queued",
-        reportId,
-        payload: { ...payload, reportId },
-        retries: 0,
-        error: "",
-        lastUpdateAt: new Date().toISOString()
-      };
-
-      await idbPut(db, STORE_JOBS, job);
-
-      // Wake background runner
-      try {
-        window.dispatchEvent(new CustomEvent("maintenix:callout-jobs"));
-      } catch {}
-
-      setBanner({
-        show: true,
-        variant: "success",
-        text: `Queued. Report ID: ${reportId}`
-      });
-
-      // refresh jobs widget quickly
-      try {
-        const allJobs = await idbGetAll(db, STORE_JOBS);
-
-        const migratedJobs = [];
-        for (const raw of allJobs || []) {
-          const { migrated, changed } = migrateCalloutJob(raw);
-          if (!migrated) continue;
-          migratedJobs.push(migrated);
-          if (changed) {
-            try {
-              await idbPut(db, STORE_JOBS, migrated);
-            } catch {
-              // ignore
-            }
-          }
-        }
-
-        const sorted = migratedJobs
-          .slice()
-          .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-        setJobs(sorted);
-      } catch {}
-    } catch (e) {
-      setBanner({
-        show: true,
-        variant: "danger",
-        text: `Failed to queue generation job: ${e?.message || "Unknown error"}`
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <>
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
         <div>
           <h4 className="mb-0">Call Out</h4>
+          <small className="text-muted">Workflow (Call Details → Attendance → Review → Submit)</small>
 
           {!online ? (
             <div className="mt-1">
@@ -1017,6 +1052,7 @@ export default function CallOut() {
         </div>
 
         <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
+          <Badge bg="info">{step === 3 ? "Saving Draft" : `Step ${step + 1} / 3`}</Badge>
           {online ? <Badge bg="success">Online</Badge> : <Badge bg="secondary">Offline</Badge>}
         </div>
       </div>
@@ -1040,6 +1076,7 @@ export default function CallOut() {
       ) : null}
 
       {/* Jobs + Drafts widgets */}
+      {step !== 3 ? (
       <Row className="g-3 mb-3">
         <Col xs={12} lg={6}>
           <Card border="light" className="shadow-sm h-100">
@@ -1152,6 +1189,9 @@ export default function CallOut() {
                           <Button size="sm" variant="primary" onClick={() => loadDraft(d.key)} disabled={busy}>
                             Load
                           </Button>
+                          <Button size="sm" variant="success" onClick={() => generateFromDraft(d.key)} disabled={busy}>
+                            Generate
+                          </Button>
                           <Button size="sm" variant="outline-secondary" onClick={() => renameDraft(d.key)} disabled={busy}>
                             Rename
                           </Button>
@@ -1170,10 +1210,12 @@ export default function CallOut() {
           </Card>
         </Col>
       </Row>
+      ) : null}
 
+      {step === 0 ? (
       <Card border="light" className="shadow-sm mb-3">
         <Card.Header>
-          <h5 className="mb-0">Call Out Details</h5>
+          <h5 className="mb-0">Call Details</h5>
         </Card.Header>
         <Card.Body>
           <Row className="g-3">
@@ -1228,200 +1270,293 @@ export default function CallOut() {
               </Form.Group>
             </Col>
 
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Time of responder arrival on site
-                  <div className="text-muted small">Technician/responder on-site arrival time (hh:mm / date)</div>
-                </Form.Label>
-                <Form.Control type="datetime-local" value={timeArrival} onChange={(e) => setTimeArrival(e.target.value)} />
-              </Form.Group>
-            </Col>
-
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Time of responder departure from site
-                  <div className="text-muted small">Technician/responder departure time (hh:mm / date)</div>
-                </Form.Label>
-                <Form.Control type="datetime-local" value={timeDeparture} onChange={(e) => setTimeDeparture(e.target.value)} />
-              </Form.Group>
-            </Col>
-
-            <Col md={12}>
-              <Form.Group>
-                <Form.Label>
-                  Responder description of defect
-                  <div className="text-muted small">Technician assessment and confirmed fault description</div>
-                </Form.Label>
-                <Form.Control as="textarea" rows={4} value={responderDefectDesc} onChange={(e) => setResponderDefectDesc(e.target.value)} placeholder="What was found on site?" />
-              </Form.Group>
-            </Col>
-
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Could the defect be rectified?
-                  <div className="text-muted small">Rectification possible during this attendance? (Yes/No)</div>
-                </Form.Label>
-                <Form.Select value={couldRectify} onChange={(e) => setCouldRectify(e.target.value)}>
-                  <option value="">Select…</option>
-                  <option value="YES">Yes</option>
-                  <option value="NO">No</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-
-            {couldRectify === "YES" ? (
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>
-                    Action taken by responder
-                    <div className="text-muted small">Corrective actions undertaken on site (work performed and outcome)</div>
-                  </Form.Label>
-                  <Form.Control as="textarea" rows={4} value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} placeholder="Describe what was done and outcome." />
-                </Form.Group>
-              </Col>
-            ) : null}
-
-            {couldRectify === "NO" ? (
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>
-                    List equipment/material to rectify the defect
-                    <div className="text-muted small">Items/parts/materials required (qty, specs, urgency)</div>
-                  </Form.Label>
-                  <Form.Control as="textarea" rows={4} value={materialsRequired} onChange={(e) => setMaterialsRequired(e.target.value)} placeholder="e.g., 1x solenoid valve 24VDC (urgent), 2x detector bases..." />
-                </Form.Group>
-              </Col>
-            ) : null}
-
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Was a jobcard created for the call out?
-                  <div className="text-muted small">Job card/work order raised for this call-out? (Yes/No)</div>
-                </Form.Label>
-                <Form.Select value={jobcardCreated} onChange={(e) => setJobcardCreated(e.target.value)}>
-                  <option value="">Select…</option>
-                  <option value="YES">Yes</option>
-                  <option value="NO">No</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-
-            {jobcardCreated === "YES" ? (
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>
-                    Jobcard number
-                    <div className="text-muted small">Job card/work order reference number</div>
-                  </Form.Label>
-                  <Form.Control value={jobcardNumber} onChange={(e) => setJobcardNumber(e.target.value)} placeholder="e.g., JC-12345" />
-                </Form.Group>
-              </Col>
-            ) : null}
-
-            {jobcardCreated === "NO" ? (
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>
-                    If no job card raised
-                    <div className="text-muted small">Record reason/authorisation (advice only / false alarm / no access / client declined)</div>
-                  </Form.Label>
-                  <Form.Control as="textarea" rows={3} value={noJobcardReason} onChange={(e) => setNoJobcardReason(e.target.value)} placeholder="Reason and authorisation" />
-                </Form.Group>
-              </Col>
-            ) : null}
           </Row>
         </Card.Body>
       </Card>
+      ) : null}
 
-      <Card border="light" className="shadow-sm mb-3">
-        <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
-          <div>
-            <h5 className="mb-0">Pictures</h5>
-            <small className="text-muted">Add one or multiple pictures and a description for each</small>
-          </div>
-
-          <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
-            <Badge bg="info">{photos.length} photo(s)</Badge>
-            <Button variant="primary" size="sm" onClick={triggerPhotoPicker}>
-              Add picture
-            </Button>
-          </div>
-        </Card.Header>
-
-        <Card.Body>
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            {...(isMobile ? { capture: "environment" } : {})}
-            style={{ display: "none" }}
-            onChange={(e) => onPhotosSelected(e.target.files)}
-          />
-
-          {!photos.length ? (
-            <div className="text-muted small">No photos added.</div>
-          ) : (
-            <Row className="g-3">
-              {photos.map((p) => (
-                <Col key={p.id} xs={12} md={6} lg={4}>
-                  <Card className="h-100">
-                    <Card.Body>
-                      {p.dataUrl ? (
-                        <img src={p.dataUrl} alt={p.name} style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }} />
-                      ) : null}
-
-                      <div className="mt-2 text-muted small" style={{ wordBreak: "break-word" }}>
-                        {p.name}
-                      </div>
-
-                      <Form.Group className="mt-2">
-                        <Form.Label className="small mb-1">Description</Form.Label>
-                        <Form.Control value={p.description || ""} onChange={(e) => updatePhoto(p.id, { description: e.target.value })} placeholder="Describe what this photo shows" />
-                      </Form.Group>
-
-                      <div className="d-flex justify-content-end mt-3">
-                        <Button variant="outline-danger" size="sm" onClick={() => removePhoto(p.id)}>
-                          Remove
-                        </Button>
-                      </div>
-                    </Card.Body>
-                  </Card>
+      {step === 1 ? (
+        <>
+          <Card border="light" className="shadow-sm mb-3">
+            <Card.Header>
+              <h5 className="mb-0">Attendance & Resolution</h5>
+            </Card.Header>
+            <Card.Body>
+              <Row className="g-3">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Time of responder arrival on site
+                      <div className="text-muted small">Technician/responder on-site arrival time (hh:mm / date)</div>
+                    </Form.Label>
+                    <Form.Control type="datetime-local" value={timeArrival} onChange={(e) => setTimeArrival(e.target.value)} />
+                  </Form.Group>
                 </Col>
-              ))}
-            </Row>
-          )}
-        </Card.Body>
-      </Card>
 
-      <Card border="light" className="shadow-sm">
-        <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
-          <div>
-            <h5 className="mb-0">Actions</h5>
-            <small className="text-muted">Report generation</small>
-          </div>
-          <Button variant="outline-secondary" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-            Back to top
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Time of responder departure from site
+                      <div className="text-muted small">Technician/responder departure time (hh:mm / date)</div>
+                    </Form.Label>
+                    <Form.Control type="datetime-local" value={timeDeparture} onChange={(e) => setTimeDeparture(e.target.value)} />
+                  </Form.Group>
+                </Col>
+
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label>
+                      Responder description of defect
+                      <div className="text-muted small">Technician assessment and confirmed fault description</div>
+                    </Form.Label>
+                    <Form.Control as="textarea" rows={4} value={responderDefectDesc} onChange={(e) => setResponderDefectDesc(e.target.value)} placeholder="What was found on site?" />
+                  </Form.Group>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Could the defect be rectified?
+                      <div className="text-muted small">Rectification possible during this attendance? (Yes/No)</div>
+                    </Form.Label>
+                    <Form.Select value={couldRectify} onChange={(e) => setCouldRectify(e.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="YES">Yes</option>
+                      <option value="NO">No</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+
+                {couldRectify === "YES" ? (
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>
+                        Action taken by responder
+                        <div className="text-muted small">Corrective actions undertaken on site (work performed and outcome)</div>
+                      </Form.Label>
+                      <Form.Control as="textarea" rows={4} value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} placeholder="Describe what was done and outcome." />
+                    </Form.Group>
+                  </Col>
+                ) : null}
+
+                {couldRectify === "NO" ? (
+                  <Col md={12}>
+                    <Form.Group>
+                      <Form.Label>
+                        List equipment/material to rectify the defect
+                        <div className="text-muted small">Items/parts/materials required (qty, specs, urgency)</div>
+                      </Form.Label>
+                      <Form.Control as="textarea" rows={4} value={materialsRequired} onChange={(e) => setMaterialsRequired(e.target.value)} placeholder="e.g., 1x solenoid valve 24VDC (urgent), 2x detector bases..." />
+                    </Form.Group>
+                  </Col>
+                ) : null}
+
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Was a jobcard created for the call out?
+                      <div className="text-muted small">Job card/work order raised for this call-out? (Yes/No)</div>
+                    </Form.Label>
+                    <Form.Select value={jobcardCreated} onChange={(e) => setJobcardCreated(e.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="YES">Yes</option>
+                      <option value="NO">No</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+
+                {jobcardCreated === "YES" ? (
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>
+                        Jobcard number
+                        <div className="text-muted small">Job card/work order reference number</div>
+                      </Form.Label>
+                      <Form.Control value={jobcardNumber} onChange={(e) => setJobcardNumber(e.target.value)} placeholder="e.g., JC-12345" />
+                    </Form.Group>
+                  </Col>
+                ) : null}
+
+                {jobcardCreated === "NO" ? (
+                  <Col md={12}>
+                    <Form.Group>
+                      <Form.Label>
+                        If no job card raised
+                        <div className="text-muted small">Record reason/authorisation (advice only / false alarm / no access / client declined)</div>
+                      </Form.Label>
+                      <Form.Control as="textarea" rows={3} value={noJobcardReason} onChange={(e) => setNoJobcardReason(e.target.value)} placeholder="Reason and authorisation" />
+                    </Form.Group>
+                  </Col>
+                ) : null}
+              </Row>
+            </Card.Body>
+          </Card>
+
+          <Card border="light" className="shadow-sm mb-3">
+            <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
+              <div>
+                <h5 className="mb-0">Pictures</h5>
+                <small className="text-muted">Add one or multiple pictures and a description for each</small>
+              </div>
+
+              <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
+                <Badge bg="info">{photos.length} photo(s)</Badge>
+                <Button variant="primary" size="sm" onClick={triggerPhotoPicker}>
+                  Add picture
+                </Button>
+              </div>
+            </Card.Header>
+
+            <Card.Body>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                {...(isMobile ? { capture: "environment" } : {})}
+                style={{ display: "none" }}
+                onChange={(e) => onPhotosSelected(e.target.files)}
+              />
+
+              {!photos.length ? (
+                <div className="text-muted small">No photos added.</div>
+              ) : (
+                <Row className="g-3">
+                  {photos.map((p) => (
+                    <Col key={p.id} xs={12} md={6} lg={4}>
+                      <Card className="h-100">
+                        <Card.Body>
+                          {p.dataUrl ? (
+                            <img src={p.dataUrl} alt={p.name} style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }} />
+                          ) : null}
+
+                          <div className="mt-2 text-muted small" style={{ wordBreak: "break-word" }}>
+                            {p.name}
+                          </div>
+
+                          <Form.Group className="mt-2">
+                            <Form.Label className="small mb-1">Description</Form.Label>
+                            <Form.Control value={p.description || ""} onChange={(e) => updatePhoto(p.id, { description: e.target.value })} placeholder="Describe what this photo shows" />
+                          </Form.Group>
+
+                          <div className="d-flex justify-content-end mt-3">
+                            <Button variant="outline-danger" size="sm" onClick={() => removePhoto(p.id)}>
+                              Remove
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              )}
+            </Card.Body>
+          </Card>
+        </>
+      ) : null}
+
+      {step === 2 ? (
+        <Card border="light" className="shadow-sm mb-3">
+          <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
+            <div>
+              <h5 className="mb-0">Review</h5>
+              <small className="text-muted">Review the call-out before creating the draft</small>
+            </div>
+            <Badge bg="info">{photos.length} photo(s)</Badge>
+          </Card.Header>
+          <Card.Body>
+            <Alert variant="info">
+              Review the completed call-out, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Call Details.
+            </Alert>
+
+            <Row className="g-3">
+              <Col md={6}><strong>Area:</strong><div>{area || "-"}</div></Col>
+              <Col md={6}><strong>System type:</strong><div>{systemType || "-"}</div></Col>
+              <Col md={6}><strong>Call logged:</strong><div>{timeCallLogged ? formatDateTimeLocal(timeCallLogged) : "-"}</div></Col>
+              <Col md={6}><strong>Call logged by:</strong><div>{[callLoggedByName, callLoggedByRole].filter(Boolean).join(" • ") || "-"}</div></Col>
+              <Col md={12}><strong>Client defect description:</strong><div className="mt-1">{clientDefectDesc || "-"}</div></Col>
+              <Col md={6}><strong>Responder arrival:</strong><div>{timeArrival ? formatDateTimeLocal(timeArrival) : "-"}</div></Col>
+              <Col md={6}><strong>Responder departure:</strong><div>{timeDeparture ? formatDateTimeLocal(timeDeparture) : "-"}</div></Col>
+              <Col md={12}><strong>Responder defect description:</strong><div className="mt-1">{responderDefectDesc || "-"}</div></Col>
+              <Col md={6}><strong>Rectified:</strong><div>{couldRectify || "-"}</div></Col>
+              <Col md={6}><strong>Jobcard created:</strong><div>{jobcardCreated || "-"}</div></Col>
+              {couldRectify === "YES" ? <Col md={12}><strong>Action taken:</strong><div className="mt-1">{actionTaken || "-"}</div></Col> : null}
+              {couldRectify === "NO" ? <Col md={12}><strong>Materials required:</strong><div className="mt-1">{materialsRequired || "-"}</div></Col> : null}
+              {jobcardCreated === "YES" ? <Col md={12}><strong>Jobcard number:</strong><div>{jobcardNumber || "-"}</div></Col> : null}
+              {jobcardCreated === "NO" ? <Col md={12}><strong>No jobcard reason:</strong><div className="mt-1">{noJobcardReason || "-"}</div></Col> : null}
+            </Row>
+
+            {photos.length ? (
+              <>
+                <hr />
+                <div className="fw-bold mb-2">Pictures</div>
+                <Row className="g-3">
+                  {photos.map((photo, index) => (
+                    <Col key={photo.id || index} xs={12} md={6} lg={4}>
+                      <Card className="h-100">
+                        <Card.Body>
+                          {photo.dataUrl ? <img src={photo.dataUrl} alt={photo.name || `Photo ${index + 1}`} style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }} /> : null}
+                          <div className="text-muted small mt-2">{photo.name || `Photo ${index + 1}`}</div>
+                          <div className="small mt-1">{photo.description || "No description"}</div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </>
+            ) : null}
+          </Card.Body>
+        </Card>
+      ) : null}
+
+      {step === 3 ? (
+        <Card border="light" className="shadow-sm mb-3">
+          <Card.Header>
+            <h5 className="mb-0">Creating Draft</h5>
+          </Card.Header>
+          <Card.Body>
+            <ProgressBar
+              now={draftProgress}
+              label={`${draftProgress}%`}
+              animated={draftProgress > 0 && draftProgress < 100}
+              variant={draftProgress === 100 ? "success" : "primary"}
+              style={{ height: "20px" }}
+            />
+            <div className="d-flex align-items-center mt-3" style={{ gap: 10 }}>
+              {draftProgress < 100 ? <Spinner /> : <Badge bg="success">Saved</Badge>}
+              <div className="fw-bold">{draftProgressText || "Preparing draft…"}</div>
+            </div>
+            <div className="text-muted small mt-2">
+              Please wait. You will return to the Call Out start screen automatically once the draft has been saved.
+            </div>
+          </Card.Body>
+        </Card>
+      ) : null}
+
+      {step < 3 ? (
+        <div className="d-flex justify-content-between mt-3">
+          <Button variant="secondary" onClick={backStep} disabled={step === 0 || busy}>
+            Back
           </Button>
-        </Card.Header>
-        <Card.Body>
-          <div className="d-flex flex-wrap" style={{ gap: 10 }}>
-            <Button variant="secondary" onClick={saveOfflineDraft} disabled={busy}>
-              {busy ? "Working..." : "Save Draft"}
+
+          {step === 2 ? (
+            <Button variant="success" onClick={submitReviewAndSaveDraft} disabled={busy}>
+              {busy ? (
+                <>
+                  <Spinner className="me-2" /> Submitting…
+                </>
+              ) : (
+                "Submit"
+              )}
             </Button>
-            <Button variant="success" onClick={generateWithAutoDraft} disabled={busy}>
-              {busy ? "Working..." : "Generate Report"}
+          ) : (
+            <Button variant="primary" onClick={nextStep} disabled={busy}>
+              Next
             </Button>
-            <Button variant="outline-danger" onClick={resetForm} disabled={busy}>
-              Clear form
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
+          )}
+        </div>
+      ) : null}
+
     </>
   );
 }

@@ -542,3 +542,45 @@ On the Review screen:
 - if draft creation fails, the UI returns to Review with the error instead of clearing the form
 
 The transient draft-creation progress screen is implementation step 4 internally, but the user-facing workflow is presented as 3 steps.
+
+
+## Call Out workflow — aligned with Servicing
+
+As of 2026-10-09, the Call Out page follows the same user-flow pattern as Servicing.
+
+User-facing steps:
+
+1. **Call Details**
+   - Area
+   - System type
+   - Time call logged
+   - Call logged by
+   - Client description of defect
+2. **Attendance & Resolution**
+   - Arrival/departure times
+   - Responder defect description
+   - Rectification result and conditional action/material fields
+   - Jobcard decision and conditional jobcard/reason fields
+   - Pictures
+3. **Review**
+   - Read-only summary of the completed call-out
+   - Picture summary
+   - **Submit** action
+
+On Submit:
+
+- the completed call-out is saved immediately as a draft
+- a transient **Creating Draft** progress screen is shown
+- after a successful save the form resets automatically to Call Details
+- if saving fails, the form returns to Review without clearing the entered data
+
+Saved Drafts now mirrors the Servicing pattern with:
+
+- Load
+- Generate
+- Rename
+- Delete
+
+Report generation is initiated from the saved draft rather than directly from the active form.
+
+The existing Call Out server-side queue/worker remains responsible for asynchronous report generation.

@@ -285,7 +285,7 @@ function resizeCanvasToCSS(canvas, ctx) {
 // ---- IndexedDB helpers (offline cache + queue) ----
 function openMaintenixDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("maintenix");
+    const req = indexedDB.open("maintenix_callout_v2");
     req.onupgradeneeded = () => {
       const db = req.result;
 

@@ -1,26 +1,52 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Card, Row, Col, Button, Form, Alert, Badge, ProgressBar, Spinner } from "@themesberg/react-bootstrap";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Card, Row, Col, Button, Form, Alert, ProgressBar, Badge, Spinner } from "@themesberg/react-bootstrap";
 
-function isMobileDevice() {
-  if (typeof navigator === "undefined") return false;
-  const ua = String(navigator.userAgent || "").toLowerCase();
-  return /android|iphone|ipad|ipod|mobile/.test(ua);
+function CallOutButton({ variant = "primary", disabled = false, style, children, ...props }) {
+  return (
+    <Button
+      {...props}
+      variant={variant}
+      size="sm"
+      disabled={disabled}
+      style={{
+        fontWeight: 700,
+        ...style
+      }}
+    >
+      {children}
+    </Button>
+  );
 }
 
-function makePhotoId() {
-  return `photo_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+function ChecklistOptionPill({ active, tone, icon, children, onClick }) {
+  return (
+    <CallOutButton
+      variant={active ? tone : `outline-${tone}`}
+      aria-pressed={active}
+      onClick={onClick}
+      style={{
+        minWidth: 0,
+        transition: "background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
+        boxShadow: active ? "0 2px 6px rgba(0, 0, 0, 0.14)" : undefined,
+        transform: active ? "translateY(-1px)" : undefined
+      }}
+    >
+      <span aria-hidden="true" className="me-1">{icon}</span>
+      <span>{children}</span>
+    </CallOutButton>
+  );
 }
 
-function makeJobId() {
-  return `job_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+function safeRole(x) {
+  return String(x || "").trim().toUpperCase().replace(/\s+/g, "");
 }
 
-function makeReportId() {
-  return `co_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-function makeDraftKey() {
-  return `callout_draft_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+function safeJsonParse(s, fallback = null) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return fallback;
+  }
 }
 
 function readCorrectionContextFromHash() {
@@ -39,7 +65,298 @@ function readCorrectionContextFromHash() {
   }
 }
 
-const CLIENT_MAX_PHOTO_BYTES = 15 * 1024 * 1024;
+function normalizeServiceToFreqKey(serviceLabel) {
+  const s = String(serviceLabel || "").trim().toLowerCase();
+  if (s === "weekly") return "weekly";
+  if (s === "monthly") return "monthly";
+  if (s === "3-monthly" || s === "3monthly" || s === "quarterly") return "quarterly";
+  if (s === "annual" || s === "yearly") return "annual";
+  return "monthly";
+}
+
+function mergeQuestions(checklist, frequencyKey, standards) {
+  const freqOrder = ["weekly", "monthly", "quarterly", "annual"];
+  const idx = Math.max(0, freqOrder.indexOf(frequencyKey));
+  const selectedFreqs = freqOrder.slice(0, idx + 1);
+
+  const out = {};
+  (standards || []).forEach((std) => {
+    out[std] = [];
+    selectedFreqs.forEach((fk) => {
+      const chunk = checklist?.[fk]?.[std];
+      if (Array.isArray(chunk)) out[std].push(...chunk);
+    });
+  });
+
+  const general = checklist?.general?.general;
+  out.General = Array.isArray(general) ? general : [];
+  return out;
+}
+
+function getChecklistPayload(data) {
+  return data?.checklist && typeof data.checklist === "object" ? data.checklist : data;
+}
+
+function getAvailableStandards(checklist) {
+  const set = new Set();
+  if (!checklist || typeof checklist !== "object") return [];
+  Object.keys(checklist).forEach((freq) => {
+    if (freq === "general") return;
+    const group = checklist[freq];
+    if (!group || typeof group !== "object" || Array.isArray(group)) return;
+    Object.keys(group).forEach((std) => {
+      if (Array.isArray(group[std])) set.add(std);
+    });
+  });
+  return Array.from(set).sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function defaultStandardsForChecklist(checklist) {
+  return getAvailableStandards(checklist);
+}
+
+function standardsFromDraftValue(v) {
+  if (Array.isArray(v?.selectedStandards)) return v.selectedStandards.filter(Boolean);
+
+  // Backward compatibility for older drafts saved before dynamic standards.
+  const out = [];
+  if (v?.nfpa72) out.push("NFPA 72");
+  if (v?.nfpa2001) out.push("NFPA 2001");
+  return out;
+}
+
+function makeQid(std, qText, idx) {
+  const base = `${std}__${idx}__${String(qText || "").slice(0, 40)}`;
+  return base.replace(/[^a-zA-Z0-9_]+/g, "_");
+}
+
+// ---- Photo helpers ----
+function isGeneralStd(std) {
+  return String(std || "").trim().toLowerCase() === "general";
+}
+
+function needsPhotoForAnswer(std, answer) {
+  const a = String(answer || "").toUpperCase();
+  // Normal questions: photo required when FAIL
+  if (!isGeneralStd(std)) return a === "FAIL";
+  // General questions: photo required when YES
+  return a === "YES";
+}
+
+function answerOptionsForStd(std) {
+  return isGeneralStd(std)
+    ? [
+        { v: "", l: "Select answer…" },
+        { v: "YES", l: "YES" },
+        { v: "NO", l: "NO" },
+        { v: "N/A", l: "N/A" }
+      ]
+    : [
+        { v: "", l: "Select answer…" },
+        { v: "PASS", l: "PASS" },
+        { v: "FAIL", l: "FAIL" },
+        { v: "N/A", l: "N/A" }
+      ];
+}
+
+
+function defectStateFromAnswer(answer) {
+  const value = String(answer || "").trim().toUpperCase();
+  if (value === "FAIL" || value === "YES") return "yes";
+  if (value === "PASS" || value === "NO") return "no";
+  if (value === "N/A") return "na";
+  return "";
+}
+
+function legacyAnswerForDefectState(std, state) {
+  if (state === "yes") return isGeneralStd(std) ? "YES" : "FAIL";
+  if (state === "no") return isGeneralStd(std) ? "NO" : "PASS";
+  if (state === "na") return "N/A";
+  return "";
+}
+
+function normalizeDefects(record) {
+  const source = Array.isArray(record?.defects)
+    ? record.defects
+    : Array.isArray(record?.defectEntries)
+      ? record.defectEntries
+      : [];
+
+  return source.map((defect) => ({
+    finding: String(defect?.finding || ""),
+    photoDataUrl: String(defect?.photoDataUrl || ""),
+    photoFile: defect?.photoFile || null,
+    photoField: String(defect?.photoField || "")
+  }));
+}
+
+function defectHasPhoto(defect, record, defectIndex) {
+  if (defect?.photoFile || defect?.photoDataUrl) return true;
+  // Older drafts stored one question-level photo. Treat it as defect 1.
+  return defectIndex === 0 && !!(record?.photoFile || record?.photoDataUrl);
+}
+
+function generalPhotoPresent(record) {
+  const defects = normalizeDefects(record);
+  if (defects.some((defect, defectIndex) => defectHasPhoto(defect, record, defectIndex))) return true;
+  return !!(record?.photoFile || record?.photoDataUrl);
+}
+
+function countMissingRequiredPhotos(record, std) {
+  if (isGeneralStd(std)) {
+    const answer = String(record?.answer || "").trim().toUpperCase();
+    return answer === "YES" && !generalPhotoPresent(record) ? 1 : 0;
+  }
+
+  const state = String(record?.defectsFound || "").trim().toLowerCase() || defectStateFromAnswer(record?.answer);
+  if (state !== "yes") return 0;
+  const defects = normalizeDefects(record);
+  if (!defects.length) return 1;
+  return defects.reduce((count, defect, defectIndex) => (
+    count + (defectHasPhoto(defect, record, defectIndex) ? 0 : 1)
+  ), 0);
+}
+
+function servicingResponseComplete(record, std) {
+  if (isGeneralStd(std)) {
+    const answer = String(record?.answer || "").trim().toUpperCase();
+    if (answer === "YES") return generalPhotoPresent(record);
+    if (answer === "NO" || answer === "N/A") return !!String(record?.comment || "").trim();
+    return false;
+  }
+
+  const explicitState = String(record?.defectsFound || "").trim().toLowerCase();
+  if (!explicitState) {
+    const legacyState = defectStateFromAnswer(record?.answer);
+    if (legacyState !== "yes") return !!String(record?.answer || "").trim();
+  }
+
+  const state = explicitState || defectStateFromAnswer(record?.answer);
+  if (state === "no" || state === "na") return true;
+  if (state !== "yes") return false;
+
+  const defects = normalizeDefects(record);
+  return defects.length > 0 && defects.every((defect, defectIndex) => (
+    defect.finding.trim() && defectHasPhoto(defect, record, defectIndex)
+  ));
+}
+
+function defectsAsComment(defects) {
+  const list = Array.isArray(defects) ? defects : [];
+  return list
+    .map((defect, index) => {
+      const finding = String(defect?.finding || "").trim();
+      if (!finding) return "";
+      return `Defect ${index + 1}: ${finding}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function isMobileDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = String(navigator.userAgent || "").toLowerCase();
+  return /android|iphone|ipad|ipod|mobile/.test(ua);
+}
+
+// ---- Signature helpers (no external libs) ----
+function getCanvasPoint(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const src = e.touches && e.touches[0] ? e.touches[0] : e;
+  return {
+    x: src.clientX - rect.left,
+    y: src.clientY - rect.top
+  };
+}
+
+function resizeCanvasToCSS(canvas, ctx) {
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.clientWidth;
+  const cssHeight = canvas.clientHeight;
+  const targetW = Math.round(cssWidth * dpr);
+  const targetH = Math.round(cssHeight * dpr);
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+}
+
+// ---- IndexedDB helpers (offline cache + queue) ----
+function openMaintenixDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("maintenix_callout_v2");
+    req.onupgradeneeded = () => {
+      const db = req.result;
+
+      if (!db.objectStoreNames.contains("calloutCache")) {
+        db.createObjectStore("calloutCache", { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains("calloutJobs")) {
+        const s = db.createObjectStore("calloutJobs", { keyPath: "id" });
+        s.createIndex("status", "status", { unique: false });
+        s.createIndex("createdAt", "createdAt", { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbPut(db, store, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(store).put(value);
+  });
+}
+
+async function idbGet(db, store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGetAll(db, store) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbDelete(db, store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(store).delete(key);
+  });
+}
+
+function blobFromDataUrl(dataUrl) {
+  try {
+    const parts = String(dataUrl || "").split(",");
+    if (parts.length < 2) return null;
+    const meta = parts[0];
+    const b64 = parts[1];
+    const mimeMatch = /data:(.*?);base64/.exec(meta);
+    const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
+const CLIENT_MAX_PHOTO_BYTES = 12 * 1024 * 1024;
 const CLIENT_TARGET_PHOTO_BYTES = 3 * 1024 * 1024;
 const CLIENT_MAX_PHOTO_DIMENSION = 1600;
 const CLIENT_JPEG_QUALITY = 0.78;
@@ -83,95 +400,18 @@ function compressImageFile(file) {
   });
 }
 
-// ---- IndexedDB helpers (mirrors Servicing approach) ----
-const DB_NAME = "maintenix";
-const STORE_CACHE = "calloutCache";
-const STORE_JOBS = "calloutJobs";
-
-// Job schema protection (keep in sync with runner)
-const JOB_SCHEMA_VERSION = 2;
-
-function openDb() {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === "undefined") {
-      reject(new Error("IndexedDB not available in this environment."));
-      return;
-    }
-
-    // IMPORTANT: do NOT force a version here (prevents version mismatch with other pages)
-    const req = indexedDB.open(DB_NAME);
-
-    req.onupgradeneeded = (ev) => {
-      const db = ev.target.result;
-
-      // NOTE: We only create the callout stores here.
-      // Servicing stores are created elsewhere in your app (or may already exist).
-      if (!db.objectStoreNames.contains(STORE_CACHE)) {
-        db.createObjectStore(STORE_CACHE, { keyPath: "key" });
-      }
-
-      if (!db.objectStoreNames.contains(STORE_JOBS)) {
-        const s = db.createObjectStore(STORE_JOBS, { keyPath: "id" });
-        s.createIndex("status", "status", { unique: false });
-        s.createIndex("createdAt", "createdAt", { unique: false });
-      }
-    };
-
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error("Failed to open IndexedDB."));
-  });
+function makeJobId() {
+  return `job_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-function idbGet(db, storeName, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readonly");
-    const store = tx.objectStore(storeName);
-    const req = store.get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error("IndexedDB get failed"));
-  });
+function makeReportId() {
+  return `co_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-function idbPut(db, storeName, value) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readwrite");
-    const store = tx.objectStore(storeName);
-    const req = store.put(value);
-    req.onsuccess = () => resolve(true);
-    req.onerror = () => reject(req.error || new Error("IndexedDB put failed"));
-  });
+// ✅ Draft helpers
+function makeDraftKey() {
+  return `callout_v2_draft_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
-
-function idbDelete(db, storeName, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readwrite");
-    const store = tx.objectStore(storeName);
-    const req = store.delete(key);
-    req.onsuccess = () => resolve(true);
-    req.onerror = () => reject(req.error || new Error("IndexedDB delete failed"));
-  });
-}
-
-function idbGetAll(db, storeName) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readonly");
-    const store = tx.objectStore(storeName);
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error || new Error("IndexedDB getAll failed"));
-  });
-}
-
-function sanitizePhotoForStorage(p) {
-  return {
-    id: p.id,
-    name: p.name || "photo.jpg",
-    dataUrl: p.dataUrl || "",
-    description: p.description || ""
-    // IMPORTANT: do not store the File object in IndexedDB drafts/jobs
-  };
-}
-
 function formatDateTimeLocal(iso) {
   try {
     if (!iso) return "";
@@ -183,1512 +423,2165 @@ function formatDateTimeLocal(iso) {
   }
 }
 
-function isActiveJobStatus(status) {
-  const s = String(status || "").toLowerCase();
-  return s === "queued" || s === "retry" || s === "submitting" || s === "server_pending" || s === "polling" || s === "running";
+function safeNamePart(v, fallback) {
+  const s = String(v || "").trim();
+  if (!s) return fallback;
+  return s
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .replace(/_+/g, "_")
+    .slice(0, 60);
 }
 
-function badgeForStatus(status) {
-  const s = String(status || "").toLowerCase();
-  if (s === "done") return <Badge bg="success">done</Badge>;
-  if (s === "error") return <Badge bg="danger">error</Badge>;
-  if (s === "stopped") return <Badge bg="secondary">stopped</Badge>;
-  if (s === "queued") return <Badge bg="secondary">queued</Badge>;
-  if (s === "submitting") return <Badge bg="info">submitting</Badge>;
-  if (s === "server_pending") return (
-    <Badge bg="warning" text="dark">
-      server_pending
-    </Badge>
-  );
-  if (s === "polling") return <Badge bg="info">polling</Badge>;
-  if (s === "running") return <Badge bg="primary">running</Badge>;
-  if (s === "retry") return (
-    <Badge bg="warning" text="dark">
-      retry
-    </Badge>
-  );
-  return (
-    <Badge bg="light" text="dark">
-      {s || "unknown"}
-    </Badge>
-  );
+function last4FromSource(source) {
+  const s = String(source || "").trim();
+  const digits = (s.match(/\d+/g) || []).join("");
+  return digits ? digits.slice(-4).padStart(4, "0") : "0000";
 }
 
-function migrateCalloutJob(job) {
-  const j = job && typeof job === "object" ? { ...job } : null;
-  if (!j) return { migrated: null, changed: false };
-
-  let changed = false;
-
-  if (!j.schemaVersion || Number(j.schemaVersion) !== JOB_SCHEMA_VERSION) {
-    j.schemaVersion = JOB_SCHEMA_VERSION;
-    changed = true;
-  }
-
-  if (!j.type) {
-    j.type = "callout";
-    changed = true;
-  }
-
-  if (!j.createdAt) {
-    j.createdAt = new Date().toISOString();
-    changed = true;
-  }
-
-  if (!j.status) {
-    j.status = "queued";
-    changed = true;
-  }
-
-  if (typeof j.retries !== "number") {
-    j.retries = 0;
-    changed = true;
-  }
-
-  if (typeof j.error !== "string") {
-    j.error = "";
-    changed = true;
-  }
-
-  if (!j.payload || typeof j.payload !== "object") {
-    j.payload = {};
-    changed = true;
-  }
-
-  if (!j.reportId) {
-    const rid = String(j.payload?.reportId || "").trim();
-    j.reportId = rid || makeReportId();
-    changed = true;
-  }
-
-  if (!j.payload.reportId) {
-    j.payload.reportId = j.reportId;
-    changed = true;
-  }
-
-  if (!j.lastUpdateAt) {
-    j.lastUpdateAt = j.createdAt;
-    changed = true;
-  }
-
-  return { migrated: j, changed };
+function buildServerStyleBaseName(areaValue, serviceValue, createdAt, uniqueSource) {
+  const dateCreated = String(createdAt || new Date().toISOString()).slice(0, 10);
+  const last4 = last4FromSource(uniqueSource || Date.now());
+  return `${safeNamePart(areaValue, "area")}_${safeNamePart(serviceValue, "service")}_${dateCreated}_${last4}`;
 }
 
-function migrateCalloutDraft(rec) {
-  const d = rec && typeof rec === "object" ? { ...rec } : null;
-  if (!d) return { migrated: null, changed: false };
+// Runner lock to avoid double-processing if multiple tabs open
+function getRunnerLockKey() {
+  return "maintenix_callout_v2_runner_lock";
+}
+function nowMs() {
+  return Date.now();
+}
+function acquireRunnerLock(ttlMs = 8000) {
+  try {
+    const key = getRunnerLockKey();
+    const raw = localStorage.getItem(key) || "";
+    const cur = raw ? safeJsonParse(raw, null) : null;
+    if (cur?.expiresAt && cur.expiresAt > nowMs()) return false;
 
-  let changed = false;
-
-  if (!d.schemaVersion || Number(d.schemaVersion) !== JOB_SCHEMA_VERSION) {
-    d.schemaVersion = JOB_SCHEMA_VERSION;
-    changed = true;
+    const next = { expiresAt: nowMs() + ttlMs };
+    localStorage.setItem(key, JSON.stringify(next));
+    return true;
+  } catch {
+    return true; // if localStorage blocked, just run (best-effort)
   }
-
-  if (!d.type) {
-    d.type = "calloutDraft";
-    changed = true;
-  }
-
-  if (!d.createdAt) {
-    d.createdAt = new Date().toISOString();
-    changed = true;
-  }
-
-  if (!d.updatedAt) {
-    d.updatedAt = d.createdAt;
-    changed = true;
-  }
-
-  if (!d.value || typeof d.value !== "object") {
-    d.value = {};
-    changed = true;
-  }
-
-  if (typeof d.name !== "string") {
-    d.name = "";
-    changed = true;
-  }
-
-  return { migrated: d, changed };
+}
+function releaseRunnerLock() {
+  try {
+    localStorage.removeItem(getRunnerLockKey());
+  } catch {}
 }
 
 export default function CallOut() {
-  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
+  const authToken = localStorage.getItem("authToken") || "";
+  const roleKey = safeRole(authUser?.role);
+  const topRef = useRef(null);
   const correctionContext = useMemo(() => readCorrectionContextFromHash(), []);
 
+  const canAccess = ["ADMIN", "L1", "L2", "L3"].includes(roleKey);
+
+  const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
+  const [highlightMissing, setHighlightMissing] = useState(false);
+  const [highlightMissingPhotos, setHighlightMissingPhotos] = useState(false);
+
+  // Shared defect camera input. Keeping it mounted lets button taps open the camera immediately.
+  const defectCameraInputRef = useRef(null);
+  const defectCameraTargetRef = useRef({ qid: "", defectIndex: 0 });
+
+  // Steps: 0=PreStart, 1=Questionnaire, 2=Review, 3=Draft creation progress
+  const [step, setStep] = useState(0);
+  const [draftSubmitting, setDraftSubmitting] = useState(false);
+  const [draftProgress, setDraftProgress] = useState(0);
+  const [draftProgressText, setDraftProgressText] = useState("");
+
+  // Prestart
+  const [area, setArea] = useState("");
+  const [areaSearch, setAreaSearch] = useState("");
+  const [areaOpen, setAreaOpen] = useState(false); // ✅ dropdown open state
+  const areaBoxRef = useRef(null); // ✅ outside click detection
+  const areaInputRef = useRef(null); // ✅ focus/select behavior
+  const areaCloseTimerRef = useRef(null); // ✅ blur delay to allow click
+  const [serviceType, setServiceType] = useState("");
+  const [systemType, setSystemType] = useState("substation");
+  const [selectedStandardsState, setSelectedStandardsState] = useState([]);
+  // Legacy draft booleans are still read by standardsFromDraftValue().
+
+  // Loaded lists
+  const [areaOptions, setAreaOptions] = useState([]);
+  const [serviceOptions, setServiceOptions] = useState([]);
+
+  // Checklist
+  // Temporary baseline: Call Out intentionally uses the Servicing checklist source
+  // until the Call Out-specific question set is defined.
+  const [checklist, setChecklist] = useState(null);
+  const [loadingLists, setLoadingLists] = useState(false);
+  const [loadingChecklist, setLoadingChecklist] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  // ✅ Offline/queue UI
+  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [dbReady, setDbReady] = useState(false);
+  const dbRef = useRef(null);
+
+  const [jobs, setJobs] = useState([]); // local UI snapshot
+  const [loadingJobs, setLoadingJobs] = useState(false);
+
+  // ✅ Drafts UI
+  const [drafts, setDrafts] = useState([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+
+  // ✅ Signature state
+  const sigCanvasRef = useRef(null);
+  const sigCtxRef = useRef(null);
+  const sigIsDrawingRef = useRef(false);
+  const sigLastRef = useRef({ x: 0, y: 0 });
+
+  const [signatureDataUrl, setSignatureDataUrl] = useState(""); // base64 png
+  const [signatureTouched, setSignatureTouched] = useState(false);
+
   useEffect(() => {
+    let mounted = true;
+
+    openMaintenixDb()
+      .then((db) => {
+        if (!mounted) return;
+        dbRef.current = db;
+        setDbReady(true);
+      })
+      .catch(() => {
+        setDbReady(false);
+      });
+
     const onOn = () => setOnline(true);
     const onOff = () => setOnline(false);
     window.addEventListener("online", onOn);
     window.addEventListener("offline", onOff);
+
+    const onJobEvent = () => {
+      refreshJobs();
+    };
+    window.addEventListener("maintenix:callout-v2-jobs", onJobEvent);
+
     return () => {
+      mounted = false;
       window.removeEventListener("online", onOn);
       window.removeEventListener("offline", onOff);
+      window.removeEventListener("maintenix:callout-v2-jobs", onJobEvent);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ✅ close Area dropdown when clicking outside
+  useEffect(() => {
+    const onDocDown = (e) => {
+      if (!areaOpen) return;
+      const box = areaBoxRef.current;
+      if (!box) return;
+      if (box.contains(e.target)) return;
+      setAreaOpen(false);
+    };
+    document.addEventListener("mousedown", onDocDown);
+    return () => document.removeEventListener("mousedown", onDocDown);
+  }, [areaOpen]);
+
+  const filteredAreaOptions = useMemo(() => {
+    const q = String(areaSearch || "").trim().toLowerCase();
+    if (!q) return areaOptions;
+
+    const filtered = (areaOptions || []).filter((a) => String(a || "").toLowerCase().includes(q));
+
+    // If the user already selected an area, keep it visible even if it doesn't match the filter
+    if (area && !filtered.includes(area) && (areaOptions || []).includes(area)) {
+      return [area, ...filtered];
+    }
+
+    return filtered;
+  }, [areaOptions, areaSearch, area]);
+
+  const availableStandards = useMemo(() => getAvailableStandards(checklist), [checklist]);
+
+  const selectedStandards = useMemo(() => {
+    const allowed = new Set(availableStandards);
+    return (selectedStandardsState || []).filter((std) => allowed.has(std));
+  }, [selectedStandardsState, availableStandards]);
+
+  const frequencyKey = useMemo(() => normalizeServiceToFreqKey(serviceType), [serviceType]);
+
+  const merged = useMemo(() => {
+    if (!checklist) return null;
+    if (!selectedStandards.length) return null;
+    return mergeQuestions(checklist, frequencyKey, selectedStandards);
+  }, [checklist, frequencyKey, selectedStandards]);
+
+  useEffect(() => {
+    if (!checklist) return;
+    setSelectedStandardsState((prev) => {
+      const allowed = getAvailableStandards(checklist);
+      const kept = (prev || []).filter((std) => allowed.includes(std));
+      return kept.length ? kept : defaultStandardsForChecklist(checklist);
+    });
+  }, [checklist]);
+
+  const questionRows = useMemo(() => {
+    if (!merged) return [];
+    const rows = [];
+    Object.keys(merged).forEach((std) => {
+      const list = merged[std] || [];
+      list.forEach((q, idx) => {
+        const qText = String(q?.question || "").trim();
+        if (!qText) return;
+        rows.push({
+          id: makeQid(std, qText, idx),
+          std,
+          question: qText,
+          extra: q?.extra ?? ""
+        });
+      });
+    });
+    return rows;
+  }, [merged]);
+
+  const [answers, setAnswers] = useState({});
+
+  const unansweredCount = useMemo(() => {
+    if (!questionRows.length) return 0;
+    return questionRows.filter((q) => !servicingResponseComplete(answers?.[q.id] || {}, q.std)).length;
+  }, [questionRows, answers]);
+
+  const completedCount = useMemo(
+    () => Math.max(0, questionRows.length - unansweredCount),
+    [questionRows.length, unansweredCount]
+  );
+
+  const defectsFoundCount = useMemo(() => {
+    return questionRows.filter((q) => {
+      const a = answers?.[q.id] || {};
+      return !isGeneralStd(q.std) && (String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer)) === "yes";
+    }).length;
+  }, [questionRows, answers]);
+
+  const photoMissingCount = useMemo(() => {
+    if (!questionRows.length) return 0;
+    return questionRows.reduce((count, q) => (
+      count + countMissingRequiredPhotos(answers?.[q.id] || {}, q.std)
+    ), 0);
+  }, [questionRows, answers]);
+
+  const progress = useMemo(() => (step === 3 ? 100 : Math.round(((step + 1) / 3) * 100)), [step]);
+
+  async function fetchJson(url) {
+    const res = await fetch(url, {
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+    return data;
+  }
+
+  async function cacheSet(key, value) {
+    if (!dbRef.current) return;
+    await idbPut(dbRef.current, "calloutCache", { key, value, updatedAt: new Date().toISOString() });
+  }
+
+  async function cacheGet(key) {
+    if (!dbRef.current) return null;
+    const rec = await idbGet(dbRef.current, "calloutCache", key);
+    return rec?.value ?? null;
+  }
+
+  async function apiJson(path, options = {}) {
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${authToken}`
+    };
+    if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+
+    const res = await fetch(path, { ...options, headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.message || `Request failed (HTTP ${res.status})`);
+    }
+    return data;
+  }
+
+  async function listServerDrafts() {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    const data = await apiJson("/api/callout/drafts");
+    return Array.isArray(data?.drafts) ? data.drafts : [];
+  }
+
+  async function saveServerDraft(rec) {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    const data = await apiJson("/api/callout/drafts", {
+      method: "POST",
+      body: JSON.stringify(rec)
+    });
+    return data?.draft || rec;
+  }
+
+  async function getServerDraft(key) {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    const data = await apiJson(`/api/callout/drafts/${encodeURIComponent(key)}`);
+    return data?.draft || null;
+  }
+
+  async function deleteServerDraft(key) {
+    if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
+    await apiJson(`/api/callout/drafts/${encodeURIComponent(key)}`, { method: "DELETE" });
+  }
+
+  async function getDraftRecord(key) {
+    if (authToken && navigator.onLine) {
+      try {
+        const serverRec = await getServerDraft(key);
+        if (serverRec) return serverRec;
+      } catch {
+        // fall back to local mirror
+      }
+    }
+    if (!dbRef.current) return null;
+    return await idbGet(dbRef.current, "calloutCache", key);
+  }
+
+  async function refreshJobs() {
+    if (!dbRef.current) return;
+    setLoadingJobs(true);
+    try {
+      const all = await idbGetAll(dbRef.current, "calloutJobs");
+      const sorted = (all || [])
+        .filter((job) => job && job.type === "callout_v2_generate")
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      setJobs(sorted);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingJobs(false);
+    }
+  }
+
+  // ✅ Drafts refresh
+  async function refreshDrafts() {
+    if (!dbRef.current) return;
+    setLoadingDrafts(true);
+    try {
+      const all = await idbGetAll(dbRef.current, "calloutCache");
+      const onlyDrafts = (all || [])
+        .filter((x) => x && typeof x.key === "string" && x.key.startsWith("callout_v2_draft_") && x.type === "calloutV2Draft")
+        .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+
+      if (authToken && navigator.onLine) {
+        try {
+          const serverDrafts = await listServerDrafts();
+          const byKey = new Map();
+          serverDrafts.forEach((d) => byKey.set(d.key, d));
+          onlyDrafts.forEach((d) => {
+            if (!byKey.has(d.key)) byKey.set(d.key, d);
+          });
+          setDrafts(Array.from(byKey.values()).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))));
+          return;
+        } catch {
+          // use local fallback below
+        }
+      }
+
+      setDrafts(onlyDrafts);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingDrafts(false);
+    }
+  }
+
+  function emitJobsEvent() {
+    try {
+      window.dispatchEvent(new Event("maintenix:callout-v2-jobs"));
+    } catch {}
+  }
+
+  async function loadListsAndChecklist() {
+    setErr("");
+    setInfo("");
+    if (!authToken) {
+      setErr("Not logged in.");
+      return;
+    }
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setChecklist(null);
+      setAreaOptions([]);
+      setServiceOptions([]);
+      setErr("Internet connection is required. Offline mode is temporarily disabled.");
+      return;
+    }
+
+    setLoadingLists(true);
+    setLoadingChecklist(true);
+
+    try {
+      const [areasRes, servicesRes, checklistRes] = await Promise.all([
+        fetchJson("/api/servicing/areas"),
+        fetchJson("/api/servicing/services"),
+        fetchJson(`/api/servicing/checklist?type=${encodeURIComponent(systemType)}`)
+      ]);
+
+      const areas = Array.isArray(areasRes?.areas) ? areasRes.areas : [];
+      const services = Array.isArray(servicesRes?.services) ? servicesRes.services : [];
+      const loadedChecklist = getChecklistPayload(checklistRes);
+
+      setAreaOptions(areas);
+      setServiceOptions(services);
+      setChecklist(loadedChecklist);
+
+      // Keep a local mirror for current draft/job implementation, but do not
+      // use it as an offline fallback while offline mode is disabled.
+      await cacheSet("areas", areas);
+      await cacheSet("services", services);
+      await cacheSet(`checklist_${systemType}`, loadedChecklist);
+    } catch (e) {
+      setChecklist(null);
+      setErr(String(e?.message || "Failed to load Call Out baseline data. Internet connection is required."));
+    } finally {
+      setLoadingLists(false);
+      setLoadingChecklist(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!canAccess) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setErr("Internet connection is required. Offline mode is temporarily disabled.");
+      return;
+    }
+    loadListsAndChecklist();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemType, online, canAccess]);
+
+  useEffect(() => {
+    if (dbReady) refreshJobs();
+    if (dbReady) refreshDrafts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbReady]);
+
+  useEffect(() => {
+    setErr("");
+    setHighlightMissing(false);
+    setHighlightMissingPhotos(false);
+  }, [step]);
+
+  function validatePreStart() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return "Internet connection is required. Offline mode is temporarily disabled.";
+    if (!area) return "Please select an Area.";
+    if (!serviceType) return "Please select a Service Type.";
+    if (!selectedStandards.length) return "Please select at least one standard.";
+    if (!checklist) return "Checklist is not loaded yet.";
+    return "";
+  }
+
+  function primeAnswers() {
+    setAnswers((prev) => {
+      const next = { ...(prev || {}) };
+      questionRows.forEach((q) => {
+        if (!next[q.id]) {
+          next[q.id] = {
+            answer: "",
+            defectsFound: "",
+            defects: [],
+            comment: "",
+            extra: {},
+            photoDataUrl: "",
+            photoFile: null
+          };
+        }
+      });
+      return next;
+    });
+  }
+
+  function updateAnswer(qid, patch) {
+    setAnswers((prev) => {
+      const current = prev?.[qid] || {
+        answer: "",
+        defectsFound: "",
+        defects: [],
+        comment: "",
+        extra: {},
+        photoDataUrl: "",
+        photoFile: null
+      };
+      return { ...prev, [qid]: { ...current, ...patch } };
+    });
+  }
+
+  function setDefectState(q, index, state) {
+    setAnswers((prev) => {
+      const current = prev?.[q.id] || {
+        answer: "",
+        defectsFound: "",
+        defects: [],
+        comment: "",
+        extra: {},
+        photoDataUrl: "",
+        photoFile: null
+      };
+      const existingDefects = normalizeDefects(current);
+      const defects = state === "yes"
+        ? (existingDefects.length ? existingDefects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
+        : [];
+      return {
+        ...prev,
+        [q.id]: {
+          ...current,
+          defectsFound: state,
+          answer: legacyAnswerForDefectState(q.std, state),
+          defects,
+          comment: state === "yes" ? defectsAsComment(defects) : "",
+          ...(state === "yes" ? {} : { photoDataUrl: "", photoFile: null })
+        }
+      };
+    });
+
+    if (state === "no" || state === "na") {
+      window.setTimeout(() => {
+        const nextQuestion = questionRows[index + 1];
+        if (!nextQuestion) return;
+        const nextCard = document.getElementById(`servicing-check-${nextQuestion.id}`);
+        if (nextCard) nextCard.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 180);
+    }
+  }
+
+  function setGeneralResponse(q, answer) {
+    const normalizedAnswer = String(answer || "").trim().toUpperCase();
+    const state = defectStateFromAnswer(normalizedAnswer);
+
+    setAnswers((prev) => {
+      const current = prev?.[q.id] || {
+        answer: "",
+        defectsFound: "",
+        defects: [],
+        comment: "",
+        extra: {},
+        photoDataUrl: "",
+        photoFile: null
+      };
+      const existingDefects = normalizeDefects(current);
+      const evidence = existingDefects[0] || { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+      const isYes = normalizedAnswer === "YES";
+
+      return {
+        ...prev,
+        [q.id]: {
+          ...current,
+          answer: normalizedAnswer,
+          defectsFound: state,
+          defects: isYes ? [{ ...evidence, finding: "" }] : [],
+          comment: isYes ? "" : String(current.comment || ""),
+          ...(isYes ? {} : { photoDataUrl: "", photoFile: null })
+        }
+      };
+    });
+
+    if (normalizedAnswer === "YES") {
+      openDefectCamera(q.id, 0);
+      return;
+    }
+
+    window.setTimeout(() => {
+      const input = document.getElementById(`servicing-general-comment-${q.id}`);
+      if (input && typeof input.focus === "function") input.focus();
+    }, 120);
+  }
+
+  function updateDefectFinding(qid, defectIndex, value) {
+    setAnswers((prev) => {
+      const current = prev?.[qid] || {};
+      const defects = normalizeDefects(current);
+      if (!defects[defectIndex]) {
+        defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+      }
+      defects[defectIndex] = { ...defects[defectIndex], finding: value };
+      return {
+        ...prev,
+        [qid]: {
+          ...current,
+          defects,
+          comment: defectsAsComment(defects)
+        }
+      };
+    });
+  }
+
+  // ---- Photos (one photo per defect, captured before defect text) ----
   const isMobile = useMemo(() => isMobileDevice(), []);
 
-  // ---- Form fields ----
-  const [area, setArea] = useState("");
-  const [systemType, setSystemType] = useState("");
+  function openDefectCamera(qid, defectIndex) {
+    defectCameraTargetRef.current = { qid, defectIndex };
+    const input = defectCameraInputRef.current;
+    if (input && typeof input.click === "function") input.click();
+  }
 
-  const [timeCallLogged, setTimeCallLogged] = useState(""); // datetime-local
-  const [callLoggedByName, setCallLoggedByName] = useState("");
-  const [callLoggedByRole, setCallLoggedByRole] = useState("");
+  function addDefect(qid) {
+    const newIndex = normalizeDefects(answers?.[qid] || {}).length;
+    setAnswers((prev) => {
+      const current = prev?.[qid] || {};
+      const defects = normalizeDefects(current);
+      const nextDefects = [...defects, { finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
+      return { ...prev, [qid]: { ...current, defects: nextDefects, comment: defectsAsComment(nextDefects) } };
+    });
+    // Same user gesture: immediately repeat the workflow by opening the camera.
+    openDefectCamera(qid, newIndex);
+  }
 
-  const [clientDefectDesc, setClientDefectDesc] = useState("");
+  function removeDefect(qid, defectIndex) {
+    setAnswers((prev) => {
+      const current = prev?.[qid] || {};
+      const defects = normalizeDefects(current).filter((_, index) => index !== defectIndex);
+      const nextDefects = defects.length
+        ? defects
+        : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
+      const first = nextDefects[0] || {};
+      return {
+        ...prev,
+        [qid]: {
+          ...current,
+          defects: nextDefects,
+          comment: defectsAsComment(nextDefects),
+          photoDataUrl: first.photoDataUrl || "",
+          photoFile: first.photoFile || null
+        }
+      };
+    });
+  }
 
-  const [timeArrival, setTimeArrival] = useState(""); // datetime-local
-  const [responderDefectDesc, setResponderDefectDesc] = useState("");
+  const onDefectPhotoSelected = async (qid, defectIndex, file) => {
+    if (!file) return;
+    if (!String(file.type || "").startsWith("image/")) {
+      setErr("Please select an image file.");
+      return;
+    }
+    if (file.size > CLIENT_MAX_PHOTO_BYTES) {
+      setErr(`Photo is too large (${bytesToMb(file.size)}MB). Please choose a smaller image.`);
+      return;
+    }
 
-  const [couldRectify, setCouldRectify] = useState(""); // YES/NO
-  const [actionTaken, setActionTaken] = useState("");
-  const [materialsRequired, setMaterialsRequired] = useState("");
+    const prepared = await compressImageFile(file);
+    if (prepared?.size > CLIENT_MAX_PHOTO_BYTES) {
+      setErr(`Photo is still too large after compression (${bytesToMb(prepared.size)}MB). Please choose a smaller image.`);
+      return;
+    }
 
-  const [timeDeparture, setTimeDeparture] = useState(""); // datetime-local
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      setAnswers((prev) => {
+        const current = prev?.[qid] || {};
+        const defects = normalizeDefects(current);
+        if (!defects[defectIndex]) {
+          defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+        }
+        defects[defectIndex] = {
+          ...defects[defectIndex],
+          photoDataUrl: dataUrl,
+          photoFile: prepared
+        };
+        const first = defects[0] || {};
+        return {
+          ...prev,
+          [qid]: {
+            ...current,
+            defects,
+            comment: defectsAsComment(defects),
+            // Mirror defect 1 for compatibility with old drafts/backends.
+            photoDataUrl: first.photoDataUrl || "",
+            photoFile: first.photoFile || null
+          }
+        };
+      });
 
-  const [jobcardCreated, setJobcardCreated] = useState(""); // YES/NO
-  const [jobcardNumber, setJobcardNumber] = useState("");
-  const [noJobcardReason, setNoJobcardReason] = useState("");
+      window.setTimeout(() => {
+        const input = document.getElementById(`servicing-defect-${qid}-${defectIndex}`);
+        if (input && typeof input.focus === "function") input.focus();
+      }, 120);
+    };
+    reader.onerror = () => setErr("Failed to read selected photo.");
+    reader.readAsDataURL(prepared);
+  };
 
-  // ---- Photos ----
-  const photoInputRef = useRef(null);
-  const [photos, setPhotos] = useState([]); // {id, file, dataUrl, description, name}
+  function clearDefectPhoto(qid, defectIndex) {
+    setAnswers((prev) => {
+      const current = prev?.[qid] || {};
+      const defects = normalizeDefects(current);
+      if (!defects[defectIndex]) return prev;
+      defects[defectIndex] = {
+        ...defects[defectIndex],
+        photoDataUrl: "",
+        photoFile: null
+      };
+      const first = defects[0] || {};
+      return {
+        ...prev,
+        [qid]: {
+          ...current,
+          defects,
+          photoDataUrl: first.photoDataUrl || "",
+          photoFile: first.photoFile || null
+        }
+      };
+    });
+  }
 
-  // ---- UI feedback ----
-  const [banner, setBanner] = useState({ show: false, variant: "info", text: "" });
-  const [busy, setBusy] = useState(false);
+  // ---- Signature: init + redraw ----
+  function initSignatureCanvasIfNeeded() {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  // Workflow: 0=Call Details, 1=Attendance, 2=Review, 3=Draft creation progress.
-  const [step, setStep] = useState(0);
-  const [attendanceQuestion, setAttendanceQuestion] = useState(0);
-  const attendanceQuestionCount = 6;
-  const [draftProgress, setDraftProgress] = useState(0);
-  const [draftProgressText, setDraftProgressText] = useState("");
+    sigCtxRef.current = ctx;
+    resizeCanvasToCSS(canvas, ctx);
 
-  // ---- Jobs / Drafts widgets ----
-  const [jobs, setJobs] = useState([]);
-  const [drafts, setDrafts] = useState([]);
+    // white background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Load jobs + drafts on mount, and refresh periodically + on events
+    // stroke
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#111";
+  }
+
   useEffect(() => {
-    let cancelled = false;
+    if (step !== 2) return;
 
-    const loadJobs = async () => {
-      try {
-        const db = await openDb();
-        const allJobs = await idbGetAll(db, STORE_JOBS);
-        if (cancelled) return;
+    const t = window.setTimeout(() => {
+      initSignatureCanvasIfNeeded();
 
-        const migratedJobs = [];
-        for (const raw of allJobs || []) {
-          const { migrated, changed } = migrateCalloutJob(raw);
-          if (!migrated) continue;
-          migratedJobs.push(migrated);
-          if (changed) {
-            try {
-              await idbPut(db, STORE_JOBS, migrated);
-            } catch {
-              // ignore
-            }
-          }
-        }
+      // redraw saved signature if exists
+      if (signatureDataUrl && sigCanvasRef.current && sigCtxRef.current) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = sigCanvasRef.current;
+          const ctx = sigCtxRef.current;
+          if (!canvas || !ctx) return;
 
-        const sorted = migratedJobs
-          .slice()
-          .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+          resizeCanvasToCSS(canvas, ctx);
 
-        setJobs(sorted);
-      } catch {
-        // ignore
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const dpr = window.devicePixelRatio || 1;
+          const w = canvas.width / dpr;
+          const h = canvas.height / dpr;
+          ctx.drawImage(img, 0, 0, w, h);
+        };
+        img.src = signatureDataUrl;
       }
-    };
-
-    const loadDrafts = async () => {
-      try {
-        const db = await openDb();
-        const all = await idbGetAll(db, STORE_CACHE);
-        if (cancelled) return;
-
-        const migratedDrafts = [];
-        for (const raw of all || []) {
-          if (!raw || typeof raw.key !== "string" || !raw.key.startsWith("callout_draft_")) continue;
-
-          const { migrated, changed } = migrateCalloutDraft(raw);
-          if (!migrated) continue;
-          migratedDrafts.push(migrated);
-
-          if (changed) {
-            try {
-              await idbPut(db, STORE_CACHE, migrated);
-            } catch {
-              // ignore
-            }
-          }
-        }
-
-        const onlyDrafts = migratedDrafts.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-        setDrafts(onlyDrafts);
-      } catch {
-        // ignore
-      }
-    };
-
-    const refreshAll = async () => {
-      await loadJobs();
-      await loadDrafts();
-    };
-
-    refreshAll();
-
-    const onJobsEvent = () => refreshAll();
-    window.addEventListener("maintenix:callout-jobs", onJobsEvent);
-
-    // small poll so UI reflects background runner updates even without events
-    const t = setInterval(refreshAll, 4000);
+    }, 0);
 
     return () => {
-      cancelled = true;
-      window.removeEventListener("maintenix:callout-jobs", onJobsEvent);
-      clearInterval(t);
+      window.clearTimeout(t);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
-  const triggerPhotoPicker = () => {
-    if (photoInputRef.current && typeof photoInputRef.current.click === "function") {
-      photoInputRef.current.click();
-    }
-  };
+  function beginSignature(e) {
+    const canvas = sigCanvasRef.current;
+    const ctx = sigCtxRef.current;
+    if (!canvas || !ctx) return;
 
-  const onPhotosSelected = async (fileList) => {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
+    if (e?.preventDefault) e.preventDefault();
 
-    const preparedFiles = [];
-    for (const f of files) {
-      if (!String(f?.type || "").startsWith("image/")) {
-        setBanner({ show: true, variant: "warning", text: "Please select image files only." });
-        continue;
-      }
-      if (f.size > CLIENT_MAX_PHOTO_BYTES) {
-        setBanner({ show: true, variant: "warning", text: `Skipped ${f.name || "photo"}: too large (${bytesToMb(f.size)}MB).` });
-        continue;
-      }
-      const prepared = await compressImageFile(f);
-      if (prepared?.size > CLIENT_MAX_PHOTO_BYTES) {
-        setBanner({ show: true, variant: "warning", text: `Skipped ${f.name || "photo"}: still too large after compression (${bytesToMb(prepared.size)}MB).` });
-        continue;
-      }
-      preparedFiles.push(prepared);
-    }
+    resizeCanvasToCSS(canvas, ctx);
 
-    const readers = preparedFiles.map(
-      (f) =>
-        new Promise((resolve) => {
-          const r = new FileReader();
-          r.onload = () =>
-            resolve({
-              id: makePhotoId(),
-              file: f,
-              name: f?.name || "photo.jpg",
-              dataUrl: String(r.result || ""),
-              description: ""
-            });
-          r.onerror = () => resolve(null);
-          r.readAsDataURL(f);
-        })
-    );
+    const p = getCanvasPoint(e, canvas);
+    sigIsDrawingRef.current = true;
+    sigLastRef.current = p;
 
-    const newOnes = (await Promise.all(readers)).filter(Boolean);
-    if (newOnes.length) setPhotos((prev) => [...(prev || []), ...newOnes]);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
 
-    // allow re-selecting the same file
-    try {
-      if (photoInputRef.current) photoInputRef.current.value = "";
-    } catch {}
-  };
+    setSignatureTouched(true);
+  }
 
-  const updatePhoto = (id, patch) => {
-    setPhotos((prev) => (prev || []).map((p) => (p.id === id ? { ...p, ...patch } : p)));
-  };
+  function moveSignature(e) {
+    const canvas = sigCanvasRef.current;
+    const ctx = sigCtxRef.current;
+    if (!canvas || !ctx) return;
+    if (!sigIsDrawingRef.current) return;
 
-  const removePhoto = (id) => {
-    setPhotos((prev) => (prev || []).filter((p) => p.id !== id));
-  };
+    if (e?.preventDefault) e.preventDefault();
 
-  function resetForm(message = "") {
-    setArea("");
-    setSystemType("");
-    setTimeCallLogged("");
-    setCallLoggedByName("");
-    setCallLoggedByRole("");
-    setClientDefectDesc("");
-    setTimeArrival("");
-    setResponderDefectDesc("");
-    setCouldRectify("");
-    setActionTaken("");
-    setMaterialsRequired("");
-    setTimeDeparture("");
-    setJobcardCreated("");
-    setJobcardNumber("");
-    setNoJobcardReason("");
-    setPhotos([]);
-    setStep(0);
-    setAttendanceQuestion(0);
+    const p = getCanvasPoint(e, canvas);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+
+    sigLastRef.current = p;
+  }
+
+  function endSignature() {
+    if (!sigIsDrawingRef.current) return;
+    sigIsDrawingRef.current = false;
+  }
+
+  function clearSignature() {
+    const canvas = sigCanvasRef.current;
+    const ctx = sigCtxRef.current;
+    if (!canvas || !ctx) return;
+
+    resizeCanvasToCSS(canvas, ctx);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#111";
+
+    setSignatureDataUrl("");
+    setSignatureTouched(false);
     setDraftProgress(0);
     setDraftProgressText("");
-    if (message) {
-      setBanner({ show: true, variant: "success", text: message });
+  }
+
+  function captureSignatureNow() {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return signatureDataUrl || "";
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      setSignatureDataUrl(dataUrl);
+      return dataUrl;
+    } catch {
+      return signatureDataUrl || "";
     }
   }
 
-  function buildPayload() {
-    // Keep payload aligned with your UI fields
-    return {
-      area: area || "",
-      systemType: systemType || "",
-
-      timeCallLogged: timeCallLogged || "",
-      callLoggedByName: callLoggedByName || "",
-      callLoggedByRole: callLoggedByRole || "",
-
-      clientDefectDesc: clientDefectDesc || "",
-
-      timeArrival: timeArrival || "",
-      responderDefectDesc: responderDefectDesc || "",
-
-      couldRectify: couldRectify || "",
-      actionTaken: couldRectify === "YES" ? (actionTaken || "") : "",
-      materialsRequired: couldRectify === "NO" ? (materialsRequired || "") : "",
-
-      timeDeparture: timeDeparture || "",
-
-      jobcardCreated: jobcardCreated || "",
-      jobcardNumber: jobcardCreated === "YES" ? (jobcardNumber || "") : "",
-      noJobcardReason: jobcardCreated === "NO" ? (noJobcardReason || "") : "",
-      correctionOfReport: correctionContext?.correctionOf || "",
-      correctionReason: correctionContext?.reason || "",
-
-      photos: (photos || []).map(sanitizePhotoForStorage)
-    };
-  }
-
-  function loadPayloadIntoForm(v) {
-    const payload = v || {};
-    setArea(payload.area || "");
-    setSystemType(payload.systemType || "");
-
-    setTimeCallLogged(payload.timeCallLogged || "");
-    setCallLoggedByName(payload.callLoggedByName || "");
-    setCallLoggedByRole(payload.callLoggedByRole || "");
-
-    setClientDefectDesc(payload.clientDefectDesc || "");
-
-    setTimeArrival(payload.timeArrival || "");
-    setResponderDefectDesc(payload.responderDefectDesc || "");
-
-    setCouldRectify(payload.couldRectify || "");
-    setActionTaken(payload.actionTaken || "");
-    setMaterialsRequired(payload.materialsRequired || "");
-
-    setTimeDeparture(payload.timeDeparture || "");
-
-    setJobcardCreated(payload.jobcardCreated || "");
-    setJobcardNumber(payload.jobcardNumber || "");
-    setNoJobcardReason(payload.noJobcardReason || "");
-
-    setPhotos(Array.isArray(payload.photos) ? payload.photos.map((p) => ({ ...p, file: null })) : []);
-  }
-
-  function validatePayloadForQueue(payload) {
-    const p = payload || {};
-    if (!String(p.area || "").trim()) return "Area is required.";
-    if (!String(p.systemType || "").trim()) return "System type is required.";
-    if (!p.timeCallLogged) return "Time of call logged is required.";
-    if (!String(p.clientDefectDesc || "").trim()) return "Client description of the defect is required.";
-    if (!p.timeArrival) return "Time of responder arrival is required.";
-    if (!p.couldRectify) return "Please select whether the defect could be rectified.";
-    if (p.couldRectify === "YES" && !String(p.actionTaken || "").trim()) return "Action taken is required when rectified = Yes.";
-    if (p.couldRectify === "NO" && !String(p.materialsRequired || "").trim()) return "Materials required is required when rectified = No.";
-    if (!p.timeDeparture) return "Time of responder departure is required.";
-    if (!p.jobcardCreated) return "Please select whether a jobcard was created.";
-    if (p.jobcardCreated === "YES" && !String(p.jobcardNumber || "").trim()) return "Jobcard number is required when jobcard created = Yes.";
-    if (p.jobcardCreated === "NO" && !String(p.noJobcardReason || "").trim()) return "Reason is required when jobcard created = No.";
-    return "";
-  }
-
-  function validateForQueue() {
-    return validatePayloadForQueue(buildPayload());
-  }
-
-  function validateCallDetailsStep() {
-    if (!area.trim()) return "Area is required.";
-    if (!systemType.trim()) return "System type is required.";
-    if (!timeCallLogged) return "Time of call logged is required.";
-    if (!clientDefectDesc.trim()) return "Client description of the defect is required.";
-    return "";
-  }
-
-  function validateAttendanceStep() {
-    const payload = buildPayload();
-    if (!payload.timeArrival) return "Time of responder arrival is required.";
-    if (!payload.couldRectify) return "Please select whether the defect could be rectified.";
-    if (payload.couldRectify === "YES" && !String(payload.actionTaken || "").trim()) return "Action taken is required when rectified = Yes.";
-    if (payload.couldRectify === "NO" && !String(payload.materialsRequired || "").trim()) return "Materials required is required when rectified = No.";
-    if (!payload.timeDeparture) return "Time of responder departure is required.";
-    if (!payload.jobcardCreated) return "Please select whether a jobcard was created.";
-    if (payload.jobcardCreated === "YES" && !String(payload.jobcardNumber || "").trim()) return "Jobcard number is required when jobcard created = Yes.";
-    if (payload.jobcardCreated === "NO" && !String(payload.noJobcardReason || "").trim()) return "Reason is required when jobcard created = No.";
-    return "";
-  }
-
-  function validateAttendanceQuestion(index) {
-    if (index === 0 && !timeArrival) return "Time of responder arrival is required.";
-    if (index === 2) {
-      if (!couldRectify) return "Please select whether the defect could be rectified.";
-      if (couldRectify === "YES" && !actionTaken.trim()) return "Action taken is required when the defect was rectified.";
-      if (couldRectify === "NO" && !materialsRequired.trim()) return "Materials required is required when the defect could not be rectified.";
-    }
-    if (index === 3 && !timeDeparture) return "Time of responder departure is required.";
-    if (index === 4) {
-      if (!jobcardCreated) return "Please select whether a jobcard was created.";
-      if (jobcardCreated === "YES" && !jobcardNumber.trim()) return "Jobcard number is required when a jobcard was created.";
-      if (jobcardCreated === "NO" && !noJobcardReason.trim()) return "A reason is required when no jobcard was created.";
-    }
-    return "";
-  }
-
-  function attendanceQuestionIsComplete(index) {
-    if (index === 0) return !!timeArrival;
-    if (index === 1) return !!responderDefectDesc.trim();
-    if (index === 2) {
-      if (couldRectify === "YES") return !!actionTaken.trim();
-      if (couldRectify === "NO") return !!materialsRequired.trim();
-      return false;
-    }
-    if (index === 3) return !!timeDeparture;
-    if (index === 4) {
-      if (jobcardCreated === "YES") return !!jobcardNumber.trim();
-      if (jobcardCreated === "NO") return !!noJobcardReason.trim();
-      return false;
-    }
-    if (index === 5) return photos.length > 0;
-    return false;
-  }
-
-  function nextStep() {
-    setBanner({ show: false, variant: "info", text: "" });
+  function next() {
+    setErr("");
+    setInfo("");
 
     if (step === 0) {
-      const err = validateCallDetailsStep();
-      if (err) {
-        setBanner({ show: true, variant: "warning", text: err });
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      const msg = validatePreStart();
+      if (msg) {
+        setErr(msg);
         return;
       }
-      setAttendanceQuestion(0);
+      primeAnswers();
+      setHighlightMissing(false);
       setStep(1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     if (step === 1) {
-      const questionError = validateAttendanceQuestion(attendanceQuestion);
-      if (questionError) {
-        setBanner({ show: true, variant: "warning", text: questionError });
+      if (unansweredCount > 0) {
+        setErr(`Please complete every checklist item and all required photo/comment/defect fields before continuing. Incomplete: ${unansweredCount}`);
+        setHighlightMissing(true);
+        setHighlightMissingPhotos(false);
+
+        if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
-      if (attendanceQuestion < attendanceQuestionCount - 1) {
-        setAttendanceQuestion((current) => current + 1);
+      if (photoMissingCount > 0) {
+        setErr(`Please take required photos before continuing. Missing: ${photoMissingCount}`);
+        setHighlightMissing(false);
+        setHighlightMissingPhotos(true);
+
+        if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
-      const err = validateAttendanceStep();
-      if (err) {
-        setBanner({ show: true, variant: "warning", text: err });
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-
+      setHighlightMissing(false);
+      setHighlightMissingPhotos(false);
       setStep(2);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // Review is submitted with the dedicated Submit button.
+    setHighlightMissing(false);
+  }
+
+  function back() {
+    setErr("");
+    setInfo("");
+    setStep((s) => Math.max(0, s - 1));
+  }
+
+  async function downloadFile(url, fileName) {
+    setErr("");
+    setInfo("");
+
+    if (!authToken) {
+      setErr("Not logged in.");
+      return;
+    }
+    if (!url) {
+      setErr("No download URL returned by server.");
+      return;
+    }
+
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErr(data?.message || `Download failed (HTTP ${res.status}).`);
+        return;
+      }
+
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName || "callout_report.docx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      setErr("Download failed (API not reachable).");
     }
   }
 
-  function backStep() {
-    setBanner({ show: false, variant: "info", text: "" });
+  // ---------------------------
+  // ✅ Server background job flow
+  // ---------------------------
+  async function submitJobToServer(job) {
+    if (!authToken) throw new Error("Not logged in.");
+    if (!navigator.onLine) throw new Error("Offline");
 
-    if (step === 1 && attendanceQuestion > 0) {
-      setAttendanceQuestion((current) => Math.max(0, current - 1));
-    } else if (step === 2) {
-      setAttendanceQuestion(attendanceQuestionCount - 1);
-      setStep(1);
-    } else {
-      setStep((current) => Math.max(0, current - 1));
-    }
+    const reportId = String(job?.reportId || job?.payload?.reportId || "").trim();
+    if (!reportId) throw new Error("Missing reportId.");
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const payload = { ...(job.payload || {}), reportId };
+
+    const fd = new FormData();
+    fd.append("payload", JSON.stringify(payload));
+
+    const attachments = Array.isArray(job.attachments) ? job.attachments : [];
+    attachments.forEach((a) => {
+      if (!a?.field || !a?.blob) return;
+      try {
+        fd.append(String(a.field), a.blob, a.fileName || `${a.field}.jpg`);
+      } catch {
+        // ignore
+      }
+    });
+
+    const res = await fetch("/api/callout/submit-payload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: fd
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || `Submit failed (HTTP ${res.status})`);
+
+    return {
+      reportId: data.reportId || reportId,
+      serverStatus: data.status || "pending"
+    };
   }
 
-  const saveDraftRecord = async (nameOverride) => {
-    const db = await openDb();
-    const payload = buildPayload();
+  async function pollServerStatus(reportId) {
+    if (!authToken) throw new Error("Not logged in.");
+    const rid = String(reportId || "").trim();
+    if (!rid) throw new Error("Missing reportId.");
+
+    const res = await fetch(`/api/callout/status/${encodeURIComponent(rid)}`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || `Status failed (HTTP ${res.status})`);
+    return data;
+  }
+
+  function stripPayloadOnSuccess(job) {
+    // Requirement: remove payload JSON/cache after success, but keep download info + summary
+    return {
+      ...job,
+      payload: null,
+      attachments: [],
+      error: "",
+      lastUpdateAt: new Date().toISOString()
+    };
+  }
+
+  // Call Out report generation will be re-enabled after the cloned checklist is
+  // replaced with the final Call Out questions and report payload mapping.
+
+  // ✅ Draft record build/load helpers
+  function buildDraftValue(signatureOverride = signatureDataUrl || "") {
+    const cleanAnswers = {};
+    Object.keys(answers || {}).forEach((k) => {
+      const a = answers?.[k] || {};
+      const normalizedDefects = normalizeDefects(a).map((defect, defectIndex) => ({
+        finding: defect.finding || "",
+        photoDataUrl: defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl || "" : ""),
+        photoFile: null,
+        photoField: defect.photoField || ""
+      }));
+      cleanAnswers[k] = {
+        answer: a.answer || "",
+        defectsFound: a.defectsFound || defectStateFromAnswer(a.answer),
+        defects: normalizedDefects,
+        comment: defectsAsComment(normalizedDefects) || a.comment || "",
+        extra: a.extra || {},
+        photoDataUrl: normalizedDefects[0]?.photoDataUrl || a.photoDataUrl || "",
+        photoFile: null
+      };
+    });
+
+    return {
+      step,
+      area,
+      serviceType,
+      systemType,
+      selectedStandards,
+      nfpa72: selectedStandards.includes("NFPA 72"),
+      nfpa2001: selectedStandards.includes("NFPA 2001"),
+      areaSearch,
+      answers: cleanAnswers,
+      signatureDataUrl: signatureOverride || "",
+      signatureTouched: false,
+      questionRowsSnapshot: (questionRows || []).map((q) => ({
+        id: q.id,
+        std: q.std,
+        question: q.question,
+        extra: q.extra || ""
+      }))
+    };
+  }
+
+  function loadDraftValueIntoForm(value) {
+    const v = value || {};
+    setArea(v.area || "");
+    setServiceType(v.serviceType || "");
+    setSystemType(v.systemType === "conveyor" ? "conveyor" : "substation");
+    const draftStandards = standardsFromDraftValue(v);
+    setSelectedStandardsState(draftStandards);
+    setAreaSearch(v.areaSearch || "");
+    setAreaOpen(false);
+
+    setAnswers(v.answers || {});
+    setSignatureDataUrl(v.signatureDataUrl || "");
+    setSignatureTouched(false);
+
+    // safest: return user to start (they can Next through)
+    setStep(0);
+
+    setHighlightMissing(false);
+    setHighlightMissingPhotos(false);
+  }
+
+  function buildDraftNameFromValue(value, uniqueSource) {
+    const v = value || {};
+    return buildServerStyleBaseName(v.area, v.serviceType, new Date().toISOString(), uniqueSource || Date.now());
+  }
+
+  async function saveDraftRecord(nameOverride, valueOverride) {
+    if (!dbRef.current) throw new Error("Offline storage not available in this browser.");
 
     const key = makeDraftKey();
-    const name =
-      String(nameOverride || "").trim() ||
-      String(area || "").trim() ||
-      `Draft ${new Date().toLocaleString()}`;
+    const value = valueOverride || buildDraftValue();
+    const name = String(nameOverride || "").trim() || buildDraftNameFromValue(value, key);
 
-    await idbPut(db, STORE_CACHE, {
+    const rec = {
       key,
-      type: "calloutDraft",
-      schemaVersion: JOB_SCHEMA_VERSION,
+      type: "calloutV2Draft",
       name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      value: payload
-    });
+      value
+    };
 
-    // refresh drafts widget
+    let saved = rec;
+    if (authToken && navigator.onLine) {
+      try {
+        saved = await saveServerDraft(rec);
+      } catch (e) {
+        console.warn("Failed to save draft on server; keeping browser fallback.", e);
+      }
+    }
+
+    await idbPut(dbRef.current, "calloutCache", saved);
+    await refreshDrafts();
+    return saved.key || key;
+  }
+
+  async function loadDraft(draftKey) {
+    setErr("");
+    setInfo("");
+    if (!dbRef.current) return;
+
     try {
-      const all = await idbGetAll(db, STORE_CACHE);
+      const rec = await getDraftRecord(draftKey);
+      if (!rec || !rec.value) {
+        setErr("Draft not found.");
+        return;
+      }
+      loadDraftValueIntoForm(rec.value);
+      setInfo(`Draft loaded: ${rec.name || draftKey}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setErr(String(e?.message || "Failed to load draft."));
+    }
+  }
 
-      const migratedDrafts = [];
-      for (const raw of all || []) {
-        if (!raw || typeof raw.key !== "string" || !raw.key.startsWith("callout_draft_")) continue;
+  async function renameDraft(draftKey) {
+    const newName = window.prompt("Draft name:", "");
+    if (newName === null) return;
+    const name = String(newName || "").trim();
+    if (!name) return;
 
-        const { migrated, changed } = migrateCalloutDraft(raw);
-        if (!migrated) continue;
-        migratedDrafts.push(migrated);
+    setErr("");
+    setInfo("");
+    if (!dbRef.current) return;
 
-        if (changed) {
-          try {
-            await idbPut(db, STORE_CACHE, migrated);
-          } catch {
-            // ignore
-          }
+    try {
+      const rec = await getDraftRecord(draftKey);
+      if (!rec) {
+        setErr("Draft not found.");
+        return;
+      }
+      let updated = {
+        ...rec,
+        name,
+        updatedAt: new Date().toISOString()
+      };
+      if (authToken && navigator.onLine) {
+        try {
+          updated = await saveServerDraft(updated);
+        } catch (e) {
+          console.warn("Failed to rename draft on server; keeping browser fallback.", e);
         }
       }
+      await idbPut(dbRef.current, "calloutCache", updated);
+      await refreshDrafts();
+      setInfo("Draft renamed.");
+    } catch (e) {
+      setErr(String(e?.message || "Failed to rename draft."));
+    }
+  }
 
-      const onlyDrafts = migratedDrafts.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-      setDrafts(onlyDrafts);
-    } catch {}
+  async function deleteDraft(draftKey) {
+    const ok = window.confirm("Delete this draft?");
+    if (!ok) return;
 
-    return key;
-  };
+    setErr("");
+    setInfo("");
+    if (!dbRef.current) return;
 
-  const submitReviewAndSaveDraft = async () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      if (authToken && navigator.onLine) {
+        try {
+          await deleteServerDraft(draftKey);
+        } catch (e) {
+          console.warn("Failed to delete draft on server; removing browser copy.", e);
+        }
+      }
+      await idbDelete(dbRef.current, "calloutCache", draftKey);
+      await refreshDrafts();
+      setInfo("Draft deleted.");
+    } catch (e) {
+      setErr(String(e?.message || "Failed to delete draft."));
+    }
+  }
 
-    if (!online) {
-      setBanner({ show: true, variant: "warning", text: "Internet connection is required to submit this call-out." });
+  function makeSelectedStandardsFromValue(v) {
+    return standardsFromDraftValue(v);
+  }
+
+  function buildQuestionRowsForDraftValue(v) {
+    const snap = Array.isArray(v?.questionRowsSnapshot) ? v.questionRowsSnapshot : [];
+    if (snap.length) {
+      return snap
+        .map((q, idx) => ({
+          id: q?.id || makeQid(q?.std || "General", q?.question || `Question ${idx + 1}`, idx),
+          std: q?.std || "General",
+          question: String(q?.question || "").trim(),
+          extra: q?.extra || ""
+        }))
+        .filter((q) => q.question);
+    }
+
+    const draftStandards = makeSelectedStandardsFromValue(v);
+    const draftFrequencyKey = normalizeServiceToFreqKey(v?.serviceType);
+    if (!checklist || !draftStandards.length) return [];
+
+    const draftMerged = mergeQuestions(checklist, draftFrequencyKey, draftStandards);
+    const rows = [];
+    Object.keys(draftMerged || {}).forEach((std) => {
+      const list = draftMerged[std] || [];
+      list.forEach((q, idx) => {
+        const qText = String(q?.question || "").trim();
+        if (!qText) return;
+        rows.push({
+          id: makeQid(std, qText, idx),
+          std,
+          question: qText,
+          extra: q?.extra ?? ""
+        });
+      });
+    });
+    return rows;
+  }
+
+  function validateDraftValueForGeneration(v, draftQuestionRows) {
+    if (!v?.area) return "Draft is missing Area.";
+    if (!v?.serviceType) return "Draft is missing Service Type.";
+
+    const standards = makeSelectedStandardsFromValue(v);
+    if (!standards.length) return "Draft is missing selected standards.";
+    if (!draftQuestionRows.length) {
+      return "Draft questions are unavailable. Open the draft and save it again, then try Generate.";
+    }
+
+    const draftAnswers = v?.answers || {};
+    const incomplete = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {}, q.std)).length;
+    if (incomplete > 0) {
+      return `Draft is incomplete. Checklist items still need a response or required photo/comment/defect detail: ${incomplete}`;
+    }
+
+    const missingPhotos = draftQuestionRows.reduce((count, q) => (
+      count + countMissingRequiredPhotos(draftAnswers?.[q.id] || {}, q.std)
+    ), 0);
+    if (missingPhotos > 0) return `Draft is incomplete. Missing required photos: ${missingPhotos}`;
+    return "";
+  }
+
+  async function enqueueCallOutJobFromValue() {
+    setErr("");
+    setInfo(
+      "Report generation is temporarily disabled on the Call Out baseline clone until the Call Out question set and report mapping are defined."
+    );
+  }
+
+  async function submitReviewAndSaveDraft() {
+    setErr("");
+    setInfo("");
+
+    if (draftSubmitting) return;
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setErr("Internet connection is required to submit this call-out checklist.");
       return;
     }
 
-    const err = validateForQueue();
-    if (err) {
-      setBanner({ show: true, variant: "warning", text: err });
+    if (!dbRef.current) {
+      setErr("Draft storage is not available in this browser.");
       return;
     }
 
-    setBusy(true);
+    if (unansweredCount > 0) {
+      setErr(`Please complete every checklist item before submitting. Incomplete: ${unansweredCount}`);
+      setHighlightMissing(true);
+      setStep(1);
+      return;
+    }
+
+    if (photoMissingCount > 0) {
+      setErr(`Please take all required photos before submitting. Missing: ${photoMissingCount}`);
+      setHighlightMissingPhotos(true);
+      setStep(1);
+      return;
+    }
+
+    setDraftSubmitting(true);
     setDraftProgress(10);
     setDraftProgressText("Preparing call-out draft…");
     setStep(3);
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
     try {
-      setDraftProgress(35);
-      setDraftProgressText("Collecting call-out details and photos…");
+      let capturedSignature = signatureDataUrl || "";
+      if (signatureTouched) {
+        capturedSignature = captureSignatureNow() || capturedSignature;
+      }
 
-      const draftName = String(area || "").trim() || `Call Out ${new Date().toLocaleString()}`;
+      setDraftProgress(35);
+      setDraftProgressText("Collecting checklist responses and evidence…");
+
+      const value = buildDraftValue(capturedSignature);
+      const name = buildDraftNameFromValue(value, Date.now());
 
       setDraftProgress(65);
       setDraftProgressText("Saving draft…");
 
-      await saveDraftRecord(draftName);
+      await saveDraftRecord(name, value);
 
       setDraftProgress(100);
       setDraftProgressText("Draft created successfully.");
 
       await new Promise((resolve) => window.setTimeout(resolve, 650));
-      resetForm(`Draft saved: ${draftName}`);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+
+      resetToStart(`Draft saved: ${name}`);
     } catch (e) {
+      setDraftProgress(0);
+      setDraftProgressText("");
       setStep(2);
-      setDraftProgress(0);
-      setDraftProgressText("");
-      setBanner({ show: true, variant: "danger", text: `Failed to save draft: ${e?.message || "Unknown error"}` });
+      setErr(String(e?.message || "Failed to save draft."));
     } finally {
-      setBusy(false);
+      setDraftSubmitting(false);
     }
-  };
+  }
 
-  const loadDraft = async (draftKey) => {
-    setBusy(true);
+  async function generateFromDraft(draftKey) {
+    setErr("");
+    setInfo("");
+
+    if (!dbRef.current) return;
+
     try {
-      const db = await openDb();
-      const d = await idbGet(db, STORE_CACHE, draftKey);
-      if (!d || !d.value) {
-        setBanner({ show: true, variant: "warning", text: "Draft not found." });
+      const rec = await getDraftRecord(draftKey);
+      if (!rec || !rec.value) {
+        setErr("Draft not found.");
         return;
       }
 
-      loadPayloadIntoForm(d.value);
-      setStep(0);
-      setAttendanceQuestion(0);
-      setDraftProgress(0);
-      setDraftProgressText("");
-      setBanner({ show: true, variant: "success", text: `Draft loaded: ${d.name || draftKey}` });
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      await enqueueCallOutJobFromValue(rec.value, rec.name || "", rec.key || draftKey);
     } catch (e) {
-      setBanner({ show: true, variant: "danger", text: `Failed to load draft: ${e?.message || "Unknown error"}` });
-    } finally {
-      setBusy(false);
+      setErr(String(e?.message || "Failed to generate from draft."));
     }
-  };
+  }
 
-  const renameDraft = async (draftKey) => {
-    const newName = window.prompt("Draft name:", "");
-    if (newName === null) return; // cancelled
-    const name = String(newName || "").trim();
-    if (!name) return;
+  async function removeJob(id) {
+    if (!dbRef.current) return;
+    await idbDelete(dbRef.current, "calloutJobs", id);
+    await refreshJobs();
+    emitJobsEvent();
+  }
 
-    setBusy(true);
-    try {
-      const db = await openDb();
-      const d = await idbGet(db, STORE_CACHE, draftKey);
-      if (!d) {
-        setBanner({ show: true, variant: "warning", text: "Draft not found." });
-        return;
-      }
+  async function retryJob(id) {
+    if (!dbRef.current) return;
+    const job = await idbGet(dbRef.current, "calloutJobs", id);
+    if (!job) return;
+    const updated = { ...job, status: "queued", error: "", lastUpdateAt: new Date().toISOString() };
+    await idbPut(dbRef.current, "calloutJobs", updated);
+    await refreshJobs();
+    setInfo("Job re-queued.");
+    emitJobsEvent();
+  }
 
-      await idbPut(db, STORE_CACHE, {
-        ...d,
-        schemaVersion: JOB_SCHEMA_VERSION,
-        name,
-        updatedAt: new Date().toISOString()
-      });
+  function resetToStart(message = "") {
+    setErr("");
+    setInfo(message);
+    setStep(0);
+    setArea("");
+    setAreaSearch("");
+    setAreaOpen(false);
+    setServiceType("");
+    setSelectedStandardsState(defaultStandardsForChecklist(checklist));
+    setAnswers({});
+    setHighlightMissing(false);
+    setHighlightMissingPhotos(false);
 
-      const all = await idbGetAll(db, STORE_CACHE);
+    setSignatureDataUrl("");
+    setSignatureTouched(false);
+    setDraftProgress(0);
+    setDraftProgressText("");
+  }
 
-      const migratedDrafts = [];
-      for (const raw of all || []) {
-        if (!raw || typeof raw.key !== "string" || !raw.key.startsWith("callout_draft_")) continue;
-
-        const { migrated, changed } = migrateCalloutDraft(raw);
-        if (!migrated) continue;
-        migratedDrafts.push(migrated);
-
-        if (changed) {
-          try {
-            await idbPut(db, STORE_CACHE, migrated);
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      const onlyDrafts = migratedDrafts.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-      setDrafts(onlyDrafts);
-    } catch (e) {
-      setBanner({ show: true, variant: "danger", text: `Failed to rename draft: ${e?.message || "Unknown error"}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const deleteDraft = async (draftKey) => {
-    const ok = window.confirm("Delete this draft?");
-    if (!ok) return;
-
-    setBusy(true);
-    try {
-      const db = await openDb();
-      await idbDelete(db, STORE_CACHE, draftKey);
-
-      const all = await idbGetAll(db, STORE_CACHE);
-
-      const migratedDrafts = [];
-      for (const raw of all || []) {
-        if (!raw || typeof raw.key !== "string" || !raw.key.startsWith("callout_draft_")) continue;
-
-        const { migrated, changed } = migrateCalloutDraft(raw);
-        if (!migrated) continue;
-        migratedDrafts.push(migrated);
-
-        if (changed) {
-          try {
-            await idbPut(db, STORE_CACHE, migrated);
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      const onlyDrafts = migratedDrafts.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-      setDrafts(onlyDrafts);
-    } catch (e) {
-      setBanner({ show: true, variant: "danger", text: `Failed to delete draft: ${e?.message || "Unknown error"}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const generateFromDraft = async (draftKey) => {
-    if (!online) {
-      setBanner({ show: true, variant: "warning", text: "Internet connection is required to generate a call-out report." });
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const db = await openDb();
-      const draft = await idbGet(db, STORE_CACHE, draftKey);
-      if (!draft?.value) {
-        setBanner({ show: true, variant: "warning", text: "Draft not found." });
-        return;
-      }
-
-      const payload = draft.value || {};
-      const err = validatePayloadForQueue(payload);
-      if (err) {
-        setBanner({ show: true, variant: "warning", text: `Draft is incomplete. ${err}` });
-        return;
-      }
-
-      const reportId = makeReportId();
-      const jobId = makeJobId();
-      const job = {
-        id: jobId,
-        type: "callout",
-        schemaVersion: JOB_SCHEMA_VERSION,
-        createdAt: new Date().toISOString(),
-        status: "queued",
-        reportId,
-        payload: { ...payload, reportId },
-        retries: 0,
-        error: "",
-        lastUpdateAt: new Date().toISOString()
-      };
-
-      await idbPut(db, STORE_JOBS, job);
-      window.dispatchEvent(new CustomEvent("maintenix:callout-jobs"));
-      setBanner({ show: true, variant: "success", text: `Draft queued for report generation. Report ID: ${reportId}` });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (e) {
-      setBanner({ show: true, variant: "danger", text: `Failed to generate from draft: ${e?.message || "Unknown error"}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clearDoneJobs = async () => {
-    const doneCount = (jobs || []).filter((j) => String(j?.status || "").toLowerCase() === "done").length;
-    if (!doneCount) {
-      setBanner({ show: true, variant: "info", text: "No done jobs to clear." });
-      return;
-    }
-
-    const ok = window.confirm(`Clear ${doneCount} done job(s) from the queue list?`);
-    if (!ok) return;
-
-    setBusy(true);
-    try {
-      const db = await openDb();
-      const allJobs = await idbGetAll(db, STORE_JOBS);
-
-      const doneJobs = (allJobs || []).filter((j) => String(j?.status || "").toLowerCase() === "done");
-      for (const j of doneJobs) {
-        await idbDelete(db, STORE_JOBS, j.id);
-      }
-
-      const remaining = (allJobs || [])
-        .filter((j) => String(j?.status || "").toLowerCase() !== "done")
-        .slice();
-
-      const migratedRemaining = [];
-      for (const raw of remaining || []) {
-        const { migrated, changed } = migrateCalloutJob(raw);
-        if (!migrated) continue;
-        migratedRemaining.push(migrated);
-        if (changed) {
-          try {
-            await idbPut(db, STORE_JOBS, migrated);
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      const sorted = migratedRemaining.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-      setJobs(sorted);
-
-      try {
-        window.dispatchEvent(new CustomEvent("maintenix:callout-jobs"));
-      } catch {}
-
-      setBanner({ show: true, variant: "success", text: `Cleared ${doneJobs.length} done job(s).` });
-    } catch (e) {
-      setBanner({ show: true, variant: "danger", text: `Failed to clear done jobs: ${e?.message || "Unknown error"}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const stopJob = async (jobId) => {
-    setBusy(true);
-    try {
-      const db = await openDb();
-      const j = await idbGet(db, STORE_JOBS, jobId);
-      if (!j) {
-        setBanner({ show: true, variant: "warning", text: "Job not found." });
-        return;
-      }
-
-      const { migrated } = migrateCalloutJob(j);
-      if (!migrated) {
-        setBanner({ show: true, variant: "warning", text: "Job not found." });
-        return;
-      }
-
-      const updated = {
-        ...migrated,
-        status: "stopped",
-        stoppedAt: new Date().toISOString(),
-        lastUpdateAt: new Date().toISOString()
-      };
-
-      await idbPut(db, STORE_JOBS, updated);
-
-      setJobs((prev) => (prev || []).map((x) => (x && x.id === jobId ? updated : x)));
-
-      try {
-        window.dispatchEvent(new CustomEvent("maintenix:callout-jobs"));
-      } catch {}
-    } catch (e) {
-      setBanner({ show: true, variant: "danger", text: `Failed to stop job: ${e?.message || "Unknown error"}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeJob = async (jobId) => {
-    setBusy(true);
-    try {
-      const db = await openDb();
-      await idbDelete(db, STORE_JOBS, jobId);
-
-      setJobs((prev) => (prev || []).filter((x) => x && x.id !== jobId));
-
-      try {
-        window.dispatchEvent(new CustomEvent("maintenix:callout-jobs"));
-      } catch {}
-    } catch (e) {
-      setBanner({ show: true, variant: "danger", text: `Failed to remove job: ${e?.message || "Unknown error"}` });
-    } finally {
-      setBusy(false);
-    }
-  };
+  if (!canAccess) {
+    return <Alert variant="danger">Access denied.</Alert>;
+  }
 
   return (
     <>
+      <input
+        ref={defectCameraInputRef}
+        type="file"
+        accept="image/*"
+        {...(isMobile ? { capture: "environment" } : {})}
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files && e.target.files[0];
+          const target = defectCameraTargetRef.current || {};
+          if (file && target.qid) onDefectPhotoSelected(target.qid, Number(target.defectIndex || 0), file);
+          try { e.target.value = ""; } catch {}
+        }}
+      />
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
         <div>
           <h4 className="mb-0">Call Out</h4>
-          <small className="text-muted">Workflow (Call Details → Attendance → Review → Submit)</small>
-
+          <small className="text-muted">Baseline workflow (Pre-Start → Checklist → Review → Submit)</small>
           {!online ? (
             <div className="mt-1">
-              <Badge bg="warning" text="dark">
-                Offline
-              </Badge>
+              <Badge bg="warning" text="dark">Offline</Badge>
               <span className="text-muted small ms-2">Internet connection is required. Offline mode is temporarily disabled.</span>
             </div>
           ) : null}
         </div>
 
-        <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
+        <div className="d-flex align-items-center" style={{ gap: 8 }}>
           <Badge bg="info">{step === 3 ? "Saving Draft" : `Step ${step + 1} / 3`}</Badge>
-          {online ? <Badge bg="success">Online</Badge> : <Badge bg="secondary">Offline</Badge>}
+
+          <CallOutButton
+            variant="outline-secondary"
+            onClick={loadListsAndChecklist}
+            disabled={loadingLists || loadingChecklist || submitting || draftSubmitting}
+          >
+            {loadingLists || loadingChecklist ? (
+              <>
+                <Spinner className="me-2" /> Loading…
+              </>
+            ) : (
+              "Refresh"
+            )}
+          </CallOutButton>
+
+          <CallOutButton
+            variant="outline-primary"
+            onClick={refreshJobs}
+            disabled={!dbReady || loadingJobs || draftSubmitting}
+          >
+            {loadingJobs ? (
+              <>
+                <Spinner className="me-2" /> Jobs…
+              </>
+            ) : (
+              "Jobs"
+            )}
+          </CallOutButton>
         </div>
       </div>
 
-      {banner?.show ? (
-        <Alert
-          variant={banner.variant || "info"}
-          className="mb-3"
-          onClose={() => setBanner((b) => ({ ...(b || {}), show: false }))}
-          dismissible
-        >
-          {banner.text}
-        </Alert>
-      ) : null}
-
-      {correctionContext ? (
-        <Alert variant="warning" className="mb-3">
-          Creating corrected follow-up for <strong>{correctionContext.correctionOf}</strong>
-          {correctionContext.reason ? <div className="mt-1">Reject reason: {correctionContext.reason}</div> : null}
-        </Alert>
-      ) : null}
-
-      {/* Jobs + Drafts widgets */}
-      {step !== 3 ? (
-      <Row className="g-3 mb-3">
-        <Col xs={12} lg={6}>
-          <Card border="light" className="shadow-sm h-100">
-            <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
-              <div>
-                <h5 className="mb-0">Queued Jobs</h5>
-                <small className="text-muted">Latest call-out report jobs</small>
-              </div>
-
-              {/* Right-side: total + clear done */}
-              <div className="d-flex flex-column align-items-end" style={{ gap: 6 }}>
-                <Badge bg="info">{jobs.length}</Badge>
-                <Button
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={clearDoneJobs}
-                  disabled={busy || !jobs.some((j) => String(j?.status || "").toLowerCase() === "done")}
-                >
-                  Clear done
-                </Button>
-              </div>
-            </Card.Header>
-
-            <Card.Body>
-              {!jobs.length ? (
-                <div className="text-muted small">No jobs yet.</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {jobs.slice(0, 8).map((j) => {
-                    const s = String(j?.status || "").toLowerCase();
-                    const showStop = isActiveJobStatus(s) && s !== "done" && s !== "error" && s !== "stopped";
-                    const showRemove = s === "stopped";
-
-                    return (
-                      <div
-                        key={j.id}
-                        style={{
-                          border: "1px solid #e9ecef",
-                          borderRadius: 10,
-                          padding: 10
-                        }}
-                      >
-                        <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
-                          <div style={{ minWidth: 200 }}>
-                            <div className="fw-bold">{j.reportId}</div>
-                            <div className="text-muted small">Created: {formatDateTimeLocal(j.createdAt)}</div>
-                          </div>
-
-                          <div className="d-flex align-items-center" style={{ gap: 10, flexWrap: "wrap" }}>
-                            <div>{badgeForStatus(j.status)}</div>
-
-                            {showStop ? (
-                              <Button size="sm" variant="outline-warning" onClick={() => stopJob(j.id)} disabled={busy}>
-                                Stop
-                              </Button>
-                            ) : null}
-
-                            {showRemove ? (
-                              <Button size="sm" variant="outline-danger" onClick={() => removeJob(j.id)} disabled={busy}>
-                                Remove
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {s === "error" ? (
-                          <div className="mt-2 text-danger small">
-                            {j.error ? String(j.error) : "Error (no message)"}
-                          </div>
-                        ) : null}
-
-                        {s === "stopped" ? (
-                          <div className="mt-2 text-muted small">Stopped: {formatDateTimeLocal(j.stoppedAt)}</div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col xs={12} lg={6}>
-          <Card border="light" className="shadow-sm h-100">
-            <Card.Header>
-              <h5 className="mb-0">Saved Drafts</h5>
-              <small className="text-muted">Save multiple drafts and load any one later</small>
-            </Card.Header>
-            <Card.Body>
-              {!drafts.length ? (
-                <div className="text-muted small">No saved drafts.</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {drafts.slice(0, 8).map((d) => (
-                    <div
-                      key={d.key}
-                      style={{
-                        border: "1px solid #e9ecef",
-                        borderRadius: 10,
-                        padding: 10
-                      }}
-                    >
-                      <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
-                        <div style={{ minWidth: 200 }}>
-                          <div className="fw-bold">{d.name || d.key}</div>
-                          <div className="text-muted small">Updated: {formatDateTimeLocal(d.updatedAt || d.createdAt)}</div>
-                        </div>
-                        <div className="d-flex" style={{ gap: 8, flexWrap: "wrap" }}>
-                          <Button size="sm" variant="primary" onClick={() => loadDraft(d.key)} disabled={busy}>
-                            Load
-                          </Button>
-                          <Button size="sm" variant="success" onClick={() => generateFromDraft(d.key)} disabled={busy}>
-                            Generate
-                          </Button>
-                          <Button size="sm" variant="outline-secondary" onClick={() => renameDraft(d.key)} disabled={busy}>
-                            Rename
-                          </Button>
-                          <Button size="sm" variant="outline-danger" onClick={() => deleteDraft(d.key)} disabled={busy}>
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {drafts.length > 8 ? <div className="text-muted small mt-2">Showing latest 8 drafts.</div> : null}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-      ) : null}
-
-      {step === 0 ? (
       <Card border="light" className="shadow-sm mb-3">
-        <Card.Header>
-          <h5 className="mb-0">Call Details</h5>
-        </Card.Header>
         <Card.Body>
-          <Row className="g-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Area</Form.Label>
-                <Form.Control value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g., Pump Room / Warehouse" />
-              </Form.Group>
-            </Col>
+          <div className="mb-2">
+            <ProgressBar now={progress} label={`${progress}%`} style={{ height: "20px" }} />
+          </div>
 
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>System type</Form.Label>
-                <Form.Control value={systemType} onChange={(e) => setSystemType(e.target.value)} placeholder="e.g., Sprinkler / Gas Suppression / Detection" />
-              </Form.Group>
-            </Col>
+          <div ref={topRef} />
 
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Time of call logged
-                  <div className="text-muted small">Time call received and recorded (hh:mm / date)</div>
-                </Form.Label>
-                <Form.Control type="datetime-local" value={timeCallLogged} onChange={(e) => setTimeCallLogged(e.target.value)} />
-              </Form.Group>
-            </Col>
-
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Call logged by
-                  <div className="text-muted small">Call received/recorded by (name and role/department)</div>
-                </Form.Label>
-                <Row className="g-2">
-                  <Col xs={12} md={6}>
-                    <Form.Control value={callLoggedByName} onChange={(e) => setCallLoggedByName(e.target.value)} placeholder="Name" />
-                  </Col>
-                  <Col xs={12} md={6}>
-                    <Form.Control value={callLoggedByRole} onChange={(e) => setCallLoggedByRole(e.target.value)} placeholder="Role / Department" />
-                  </Col>
-                </Row>
-              </Form.Group>
-            </Col>
-
-            <Col md={12}>
-              <Form.Group>
-                <Form.Label>
-                  Client description of the defect
-                  <div className="text-muted small">Client-reported fault/defect description (as reported)</div>
-                </Form.Label>
-                <Form.Control as="textarea" rows={4} value={clientDefectDesc} onChange={(e) => setClientDefectDesc(e.target.value)} placeholder="What did the client report?" />
-              </Form.Group>
-            </Col>
-
-          </Row>
+          {err ? <Alert variant="danger" className="mb-2">{err}</Alert> : null}
+          {correctionContext ? (
+            <Alert variant="warning" className="mb-2">
+              Creating corrected follow-up for <strong>{correctionContext.correctionOf}</strong>
+              {correctionContext.reason ? <div className="mt-1">Reject reason: {correctionContext.reason}</div> : null}
+            </Alert>
+          ) : null}
+          {info ? <Alert variant="info" className="mb-0">{info}</Alert> : null}
+          {step === 0 ? (
+            <Alert variant="secondary" className="mt-2 mb-0">
+              Call Out is currently using the Servicing workflow as its clean baseline. The Call Out-specific pre-start fields, questions and report mapping will be replaced next.
+            </Alert>
+          ) : null}
         </Card.Body>
       </Card>
-      ) : null}
 
-      {step === 1 ? (
+      {/* JOB QUEUE (always visible, compact) */}
+      {dbReady && step !== 3 ? (
         <Card border="light" className="shadow-sm mb-3">
-          <Card.Header>
-            <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
-              <div>
-                <h5 className="mb-0">Attendance & Resolution</h5>
-                <small className="text-muted">Answer each attendance question in sequence</small>
-              </div>
-              <div className="text-end">
-                <Badge bg="info">Question {attendanceQuestion + 1} of {attendanceQuestionCount}</Badge>
-              </div>
-            </div>
-            <ProgressBar
-              className="mt-3"
-              now={Math.round(((attendanceQuestion + 1) / attendanceQuestionCount) * 100)}
-              style={{ height: "8px" }}
-            />
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <div className="fw-bold">Generation Queue</div>
+            <div className="text-muted small">{jobs.length} job(s)</div>
           </Card.Header>
-
           <Card.Body>
-            {attendanceQuestion === 0 ? (
-              <>
-                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
+            {!jobs.length ? (
+              <div className="text-muted small">No queued jobs.</div>
+            ) : (
+              jobs.slice(0, 10).map((j) => (
+                <div key={j.id} className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 10 }}>
                   <div>
-                    <div className="fw-bold" style={{ fontSize: 16 }}>Time of responder arrival on site</div>
-                    <div className="text-muted small mt-1">Record when the technician/responder arrived on site.</div>
+                    <div className="fw-bold">
+                      {j.summary?.area || "-"} • {j.summary?.serviceType || "-"}
+                    </div>
+                    <div className="text-muted small">
+                      {j.createdAt ? new Date(j.createdAt).toLocaleString() : ""} • {j.status}
+                      {j.reportId ? ` • ${j.reportId}` : ""}
+                      {j.error ? ` • ${j.error}` : ""}
+                      {j.schemaVersion ? ` • v${j.schemaVersion}` : ""}
+                    </div>
                   </div>
-                  <Badge bg={attendanceQuestionIsComplete(0) ? "success" : "secondary"}>
-                    {attendanceQuestionIsComplete(0) ? "Complete" : "Pending"}
-                  </Badge>
-                </div>
-                <Form.Control
-                  type="datetime-local"
-                  value={timeArrival}
-                  onChange={(e) => setTimeArrival(e.target.value)}
-                />
-              </>
-            ) : null}
 
-            {attendanceQuestion === 1 ? (
-              <>
-                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
-                  <div>
-                    <div className="fw-bold" style={{ fontSize: 16 }}>Responder description of defect</div>
-                    <div className="text-muted small mt-1">Record the technician assessment and confirmed fault description.</div>
+                  <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                    {j.status === "done" && j.result?.url ? (
+                      <CallOutButton
+                        variant="outline-primary"
+                        onClick={() => downloadFile(j.result.url, j.result.fileName)}
+                      >
+                        Download
+                      </CallOutButton>
+                    ) : null}
+
+                    {j.status === "error" ? (
+                      <CallOutButton variant="outline-warning" onClick={() => retryJob(j.id)}>
+                        Retry
+                      </CallOutButton>
+                    ) : null}
+
+                    <CallOutButton variant="outline-danger" onClick={() => removeJob(j.id)}>
+                      Remove
+                    </CallOutButton>
                   </div>
-                  <Badge bg={attendanceQuestionIsComplete(1) ? "success" : "secondary"}>
-                    {attendanceQuestionIsComplete(1) ? "Complete" : "Optional"}
-                  </Badge>
                 </div>
-                <Form.Control
-                  as="textarea"
-                  rows={4}
-                  value={responderDefectDesc}
-                  onChange={(e) => setResponderDefectDesc(e.target.value)}
-                  placeholder="What was found on site?"
-                />
-              </>
-            ) : null}
-
-            {attendanceQuestion === 2 ? (
-              <>
-                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
-                  <div>
-                    <div className="fw-bold" style={{ fontSize: 16 }}>Could the defect be rectified?</div>
-                    <div className="text-muted small mt-1">Confirm whether the fault could be rectified during this attendance.</div>
-                  </div>
-                  <Badge bg={attendanceQuestionIsComplete(2) ? "success" : "secondary"}>
-                    {attendanceQuestionIsComplete(2) ? "Complete" : "Pending"}
-                  </Badge>
-                </div>
-
-                <div className="d-flex flex-wrap mb-3" style={{ gap: 10 }}>
-                  <Button
-                    type="button"
-                    variant={couldRectify === "YES" ? "success" : "outline-success"}
-                    aria-pressed={couldRectify === "YES"}
-                    onClick={() => {
-                      setCouldRectify("YES");
-                      setMaterialsRequired("");
-                    }}
-                  >
-                    Yes
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={couldRectify === "NO" ? "danger" : "outline-danger"}
-                    aria-pressed={couldRectify === "NO"}
-                    onClick={() => {
-                      setCouldRectify("NO");
-                      setActionTaken("");
-                    }}
-                  >
-                    No
-                  </Button>
-                </div>
-
-                {couldRectify === "YES" ? (
-                  <Form.Group>
-                    <Form.Label>Action taken by responder <span className="text-danger">Required</span></Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={4}
-                      value={actionTaken}
-                      onChange={(e) => setActionTaken(e.target.value)}
-                      placeholder="Describe what was done and the outcome."
-                    />
-                  </Form.Group>
-                ) : null}
-
-                {couldRectify === "NO" ? (
-                  <Form.Group>
-                    <Form.Label>Equipment/material required <span className="text-danger">Required</span></Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={4}
-                      value={materialsRequired}
-                      onChange={(e) => setMaterialsRequired(e.target.value)}
-                      placeholder="List the equipment, parts or materials required to rectify the defect."
-                    />
-                  </Form.Group>
-                ) : null}
-              </>
-            ) : null}
-
-            {attendanceQuestion === 3 ? (
-              <>
-                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
-                  <div>
-                    <div className="fw-bold" style={{ fontSize: 16 }}>Time of responder departure from site</div>
-                    <div className="text-muted small mt-1">Record when the technician/responder departed from site.</div>
-                  </div>
-                  <Badge bg={attendanceQuestionIsComplete(3) ? "success" : "secondary"}>
-                    {attendanceQuestionIsComplete(3) ? "Complete" : "Pending"}
-                  </Badge>
-                </div>
-                <Form.Control
-                  type="datetime-local"
-                  value={timeDeparture}
-                  onChange={(e) => setTimeDeparture(e.target.value)}
-                />
-              </>
-            ) : null}
-
-            {attendanceQuestion === 4 ? (
-              <>
-                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
-                  <div>
-                    <div className="fw-bold" style={{ fontSize: 16 }}>Was a jobcard created for the call out?</div>
-                    <div className="text-muted small mt-1">Confirm whether a job card/work order was raised for this call-out.</div>
-                  </div>
-                  <Badge bg={attendanceQuestionIsComplete(4) ? "success" : "secondary"}>
-                    {attendanceQuestionIsComplete(4) ? "Complete" : "Pending"}
-                  </Badge>
-                </div>
-
-                <div className="d-flex flex-wrap mb-3" style={{ gap: 10 }}>
-                  <Button
-                    type="button"
-                    variant={jobcardCreated === "YES" ? "success" : "outline-success"}
-                    aria-pressed={jobcardCreated === "YES"}
-                    onClick={() => {
-                      setJobcardCreated("YES");
-                      setNoJobcardReason("");
-                    }}
-                  >
-                    Yes
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={jobcardCreated === "NO" ? "danger" : "outline-danger"}
-                    aria-pressed={jobcardCreated === "NO"}
-                    onClick={() => {
-                      setJobcardCreated("NO");
-                      setJobcardNumber("");
-                    }}
-                  >
-                    No
-                  </Button>
-                </div>
-
-                {jobcardCreated === "YES" ? (
-                  <Form.Group>
-                    <Form.Label>Jobcard number <span className="text-danger">Required</span></Form.Label>
-                    <Form.Control
-                      value={jobcardNumber}
-                      onChange={(e) => setJobcardNumber(e.target.value)}
-                      placeholder="e.g., JC-12345"
-                    />
-                  </Form.Group>
-                ) : null}
-
-                {jobcardCreated === "NO" ? (
-                  <Form.Group>
-                    <Form.Label>Reason no jobcard was raised <span className="text-danger">Required</span></Form.Label>
-                    <Form.Control
-                      as="textarea"
-                      rows={3}
-                      value={noJobcardReason}
-                      onChange={(e) => setNoJobcardReason(e.target.value)}
-                      placeholder="Record the reason / authorisation."
-                    />
-                  </Form.Group>
-                ) : null}
-              </>
-            ) : null}
-
-            {attendanceQuestion === 5 ? (
-              <>
-                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
-                  <div>
-                    <div className="fw-bold" style={{ fontSize: 16 }}>Pictures</div>
-                    <div className="text-muted small mt-1">Add supporting pictures and a description for each where available.</div>
-                  </div>
-                  <Badge bg={photos.length ? "success" : "secondary"}>
-                    {photos.length ? `${photos.length} added` : "Optional"}
-                  </Badge>
-                </div>
-
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  {...(isMobile ? { capture: "environment" } : {})}
-                  style={{ display: "none" }}
-                  onChange={(e) => onPhotosSelected(e.target.files)}
-                />
-
-                <div className="mb-3">
-                  <Button variant="primary" onClick={triggerPhotoPicker}>
-                    Add picture
-                  </Button>
-                </div>
-
-                {!photos.length ? (
-                  <div className="text-muted small">No pictures added.</div>
-                ) : (
-                  <Row className="g-3">
-                    {photos.map((p) => (
-                      <Col key={p.id} xs={12} md={6} lg={4}>
-                        <Card className="h-100">
-                          <Card.Body>
-                            {p.dataUrl ? (
-                              <img
-                                src={p.dataUrl}
-                                alt={p.name}
-                                style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }}
-                              />
-                            ) : null}
-
-                            <div className="mt-2 text-muted small" style={{ wordBreak: "break-word" }}>
-                              {p.name}
-                            </div>
-
-                            <Form.Group className="mt-2">
-                              <Form.Label className="small mb-1">Description</Form.Label>
-                              <Form.Control
-                                value={p.description || ""}
-                                onChange={(e) => updatePhoto(p.id, { description: e.target.value })}
-                                placeholder="Describe what this photo shows"
-                              />
-                            </Form.Group>
-
-                            <div className="d-flex justify-content-end mt-3">
-                              <Button variant="outline-danger" onClick={() => removePhoto(p.id)}>
-                                Remove
-                              </Button>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    ))}
-                  </Row>
-                )}
-              </>
-            ) : null}
+              ))
+            )}
+            <div className="text-muted small mt-2">
+              Generation is intentionally inactive for the baseline clone until the Call Out question and report mapping is defined.
+            </div>
           </Card.Body>
         </Card>
       ) : null}
 
-      {step === 2 ? (
+      {/* ✅ DRAFTS (always visible, compact) */}
+      {dbReady && step !== 3 ? (
         <Card border="light" className="shadow-sm mb-3">
           <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
-            <div>
-              <h5 className="mb-0">Review</h5>
-              <small className="text-muted">Review the call-out before creating the draft</small>
-            </div>
-            <Badge bg="info">{photos.length} photo(s)</Badge>
+            <div className="fw-bold">Saved Drafts</div>
+            <div className="text-muted small">{drafts.length} draft(s)</div>
           </Card.Header>
           <Card.Body>
-            <Alert variant="info">
-              Review the completed call-out, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Call Details.
-            </Alert>
+            {loadingDrafts ? (
+              <div className="text-muted small">
+                <Spinner className="me-2" /> Loading drafts…
+              </div>
+            ) : !drafts.length ? (
+              <div className="text-muted small">No saved drafts.</div>
+            ) : (
+              drafts.slice(0, 8).map((d) => (
+                <div key={d.key} className="d-flex justify-content-between align-items-start flex-wrap mb-2" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold">{d.name || d.key}</div>
+                    <div className="text-muted small">Updated: {formatDateTimeLocal(d.updatedAt || d.createdAt)}</div>
+                  </div>
 
-            <Row className="g-3">
-              <Col md={6}><strong>Area:</strong><div>{area || "-"}</div></Col>
-              <Col md={6}><strong>System type:</strong><div>{systemType || "-"}</div></Col>
-              <Col md={6}><strong>Call logged:</strong><div>{timeCallLogged ? formatDateTimeLocal(timeCallLogged) : "-"}</div></Col>
-              <Col md={6}><strong>Call logged by:</strong><div>{[callLoggedByName, callLoggedByRole].filter(Boolean).join(" • ") || "-"}</div></Col>
-              <Col md={12}><strong>Client defect description:</strong><div className="mt-1">{clientDefectDesc || "-"}</div></Col>
-              <Col md={6}><strong>Responder arrival:</strong><div>{timeArrival ? formatDateTimeLocal(timeArrival) : "-"}</div></Col>
-              <Col md={6}><strong>Responder departure:</strong><div>{timeDeparture ? formatDateTimeLocal(timeDeparture) : "-"}</div></Col>
-              <Col md={12}><strong>Responder defect description:</strong><div className="mt-1">{responderDefectDesc || "-"}</div></Col>
-              <Col md={6}><strong>Rectified:</strong><div>{couldRectify || "-"}</div></Col>
-              <Col md={6}><strong>Jobcard created:</strong><div>{jobcardCreated || "-"}</div></Col>
-              {couldRectify === "YES" ? <Col md={12}><strong>Action taken:</strong><div className="mt-1">{actionTaken || "-"}</div></Col> : null}
-              {couldRectify === "NO" ? <Col md={12}><strong>Materials required:</strong><div className="mt-1">{materialsRequired || "-"}</div></Col> : null}
-              {jobcardCreated === "YES" ? <Col md={12}><strong>Jobcard number:</strong><div>{jobcardNumber || "-"}</div></Col> : null}
-              {jobcardCreated === "NO" ? <Col md={12}><strong>No jobcard reason:</strong><div className="mt-1">{noJobcardReason || "-"}</div></Col> : null}
-            </Row>
+                  <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
+                    <CallOutButton variant="primary" onClick={() => loadDraft(d.key)} disabled={submitting}>
+                      Load
+                    </CallOutButton>
+                    <CallOutButton
+                      variant="success"
+                      onClick={() => generateFromDraft(d.key)}
+                      disabled={true}
+                      title="Generation will be enabled after the Call Out question/report mapping is defined."
+                    >
+                      Generate
+                    </CallOutButton>
+                    <CallOutButton variant="outline-secondary" onClick={() => renameDraft(d.key)} disabled={submitting}>
+                      Rename
+                    </CallOutButton>
+                    <CallOutButton variant="outline-danger" onClick={() => deleteDraft(d.key)} disabled={submitting}>
+                      Delete
+                    </CallOutButton>
+                  </div>
+                </div>
+              ))
+            )}
 
-            {photos.length ? (
-              <>
-                <hr />
-                <div className="fw-bold mb-2">Pictures</div>
-                <Row className="g-3">
-                  {photos.map((photo, index) => (
-                    <Col key={photo.id || index} xs={12} md={6} lg={4}>
-                      <Card className="h-100">
-                        <Card.Body>
-                          {photo.dataUrl ? <img src={photo.dataUrl} alt={photo.name || `Photo ${index + 1}`} style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }} /> : null}
-                          <div className="text-muted small mt-2">{photo.name || `Photo ${index + 1}`}</div>
-                          <div className="small mt-1">{photo.description || "No description"}</div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              </>
+            {drafts.length > 8 ? (
+              <div className="text-muted small mt-2">Showing latest 8 drafts.</div>
             ) : null}
+
+            <div className="text-muted small mt-2">
+              Submit the completed baseline checklist from Review to create a Call Out draft. Generate will be enabled after the Call Out-specific questions and report mapping are defined.
+            </div>
           </Card.Body>
         </Card>
       ) : null}
 
+      {/* STEP 1: PRESTART */}
+      {step === 0 ? (
+        <Card border="light" className="shadow-sm">
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">Pre-Start</h5>
+            <div className="text-muted small">
+              Frequency key: <span className="fw-bold">{frequencyKey}</span>
+            </div>
+          </Card.Header>
+          <Card.Body>
+            <Row className="g-3">
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>System Type</Form.Label>
+                  <Form.Select
+                    value={systemType}
+                    onChange={(e) => {
+                      const next = e.target.value === "conveyor" ? "conveyor" : "substation";
+                      setSystemType(next);
+                      setChecklist(null);
+                      setAnswers({});
+                      setSelectedStandardsState([]);
+                      setStep(0);
+                    }}
+                    disabled={loadingChecklist}
+                  >
+                    <option value="substation">Substation</option>
+                    <option value="conveyor">Conveyor</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Area</Form.Label>
+
+                  {/* ✅ UPDATED: Area dropdown with embedded search */}
+                  <div ref={areaBoxRef} style={{ position: "relative" }}>
+                    <Form.Control
+                      ref={areaInputRef}
+                      placeholder="Choose Area…"
+                      value={areaOpen ? areaSearch : (area || "")}
+                      disabled={loadingLists}
+                      onFocus={() => {
+                        if (!areaOpen) setAreaSearch("");
+                        setAreaOpen(true);
+                        window.setTimeout(() => {
+                          try {
+                            const el = areaInputRef.current;
+                            if (el && typeof el.select === "function") el.select();
+                          } catch {}
+                        }, 0);
+                      }}
+                      onClick={() => setAreaOpen(true)}
+                      onChange={(e) => {
+                        setAreaSearch(e.target.value);
+                        setAreaOpen(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setAreaOpen(false);
+                          return;
+                        }
+                        if (e.key === "Enter") {
+                          const first = (filteredAreaOptions || [])[0];
+                          if (first) {
+                            setArea(first);
+                            setAreaSearch("");
+                            setAreaOpen(false);
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        try {
+                          if (areaCloseTimerRef.current) window.clearTimeout(areaCloseTimerRef.current);
+                          areaCloseTimerRef.current = window.setTimeout(() => setAreaOpen(false), 120);
+                        } catch {
+                          setAreaOpen(false);
+                        }
+                      }}
+                    />
+
+                    {areaOpen ? (
+                      <div
+                        style={{
+                          position: "absolute",
+                          zIndex: 50,
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          background: "#fff",
+                          border: "1px solid #ced4da",
+                          borderTop: "none",
+                          borderRadius: "0 0 8px 8px",
+                          maxHeight: 260,
+                          overflowY: "auto",
+                          boxShadow: "0 8px 18px rgba(0,0,0,0.08)"
+                        }}
+                      >
+                        {filteredAreaOptions.length ? (
+                          filteredAreaOptions.map((opt) => (
+                            <div
+                              key={opt}
+                              role="button"
+                              tabIndex={0}
+                              onMouseDown={(ev) => {
+                                // prevent blur before click registers
+                                ev.preventDefault();
+                              }}
+                              onClick={() => {
+                                setArea(opt);
+                                setAreaSearch("");
+                                setAreaOpen(false);
+                              }}
+                              style={{
+                                padding: "10px 12px",
+                                cursor: "pointer",
+                                background: opt === area ? "rgba(13,110,253,0.08)" : "#fff",
+                                borderBottom: "1px solid rgba(0,0,0,0.06)"
+                              }}
+                            >
+                              <div className="fw-bold" style={{ fontSize: 14 }}>{opt}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ padding: "10px 12px" }} className="text-muted small">
+                            No areas match “{String(areaSearch || "").trim()}”.
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Service Type</Form.Label>
+                  <Form.Select value={serviceType} onChange={(e) => setServiceType(e.target.value)} disabled={loadingLists}>
+                    <option value="">Choose Service…</option>
+                    {serviceOptions.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+
+              <Col md={12}>
+                <Form.Label>Standards</Form.Label>
+                <div className="d-flex flex-wrap" style={{ gap: 14 }}>
+                  {availableStandards.length ? (
+                    availableStandards.map((std) => (
+                      <Form.Check
+                        key={std}
+                        type="checkbox"
+                        label={std}
+                        checked={selectedStandards.includes(std)}
+                        onChange={(e) => {
+                          const checked = !!e.target.checked;
+                          setSelectedStandardsState((prev) => {
+                            const cur = new Set(prev || []);
+                            if (checked) cur.add(std);
+                            else cur.delete(std);
+                            return Array.from(cur);
+                          });
+                        }}
+                      />
+                    ))
+                  ) : (
+                    <span className="text-muted small">Standards load from the selected checklist.</span>
+                  )}
+                </div>
+              </Col>
+
+              <Col md={12}>
+                {!checklist ? (
+                  <Alert variant="warning" className="mb-0">
+                    Checklist not loaded yet. Confirm backend route: <span className="fw-bold">GET /api/servicing/checklist</span>
+                  </Alert>
+                ) : (
+                  <Alert variant="success" className="mb-0">
+                    Checklist loaded for {systemType === "conveyor" ? "Conveyor" : "Substation"}.
+                  </Alert>
+                )}
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
+      ) : null}
+
+      {/* STEP 2: CHECKLIST */}
+      {step === 1 ? (
+        <>
+          <Card border="light" className="shadow-sm mb-3">
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 12 }}>
+                <div>
+                  <h5 className="mb-1">Checklist</h5>
+                  <div className="text-muted small">{systemType === "conveyor" ? "Conveyor" : "Substation"} • {area} • {serviceType}</div>
+                </div>
+                <div className="text-end">
+                  <div className="fw-bold">{completedCount} of {questionRows.length} completed</div>
+                  <div className="text-muted small">Defects found: {defectsFoundCount} • Required photos missing: {photoMissingCount}</div>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+
+          {!questionRows.length ? (
+            <Alert variant="warning" className="mb-0">No checklist items found for the selected frequency/standards.</Alert>
+          ) : (
+            questionRows.map((q, idx) => {
+              const a = answers?.[q.id] || { answer: "", defectsFound: "", defects: [], comment: "", photoDataUrl: "", photoFile: null };
+              const defectState = String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer);
+              const defects = normalizeDefects(a);
+              const visibleDefects = defectState === "yes"
+                ? (defects.length ? defects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
+                : [];
+              const isGeneralQuestion = isGeneralStd(q.std);
+              const generalAnswer = String(a.answer || "").trim().toUpperCase();
+              const generalEvidence = defects[0] || {};
+              const generalHasPhoto = generalPhotoPresent(a);
+              const generalPreview = generalEvidence.photoDataUrl || a.photoDataUrl || "";
+              const responseComplete = servicingResponseComplete(a, q.std);
+              const showMissing = (highlightMissing && !responseComplete) || (highlightMissingPhotos && countMissingRequiredPhotos(a, q.std) > 0);
+              const borderColor = showMissing
+                ? "#dc3545"
+                : isGeneralQuestion
+                  ? (responseComplete ? "#a3cfbb" : undefined)
+                  : defectState === "yes"
+                    ? "#f1aeb5"
+                    : defectState === "no"
+                      ? "#a3cfbb"
+                      : undefined;
+
+              return (
+                <Card id={`servicing-check-${q.id}`} key={q.id} className="mb-3 shadow-sm" style={borderColor ? { borderColor, borderWidth: 1 } : undefined}>
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
+                      <div style={{ flex: "1 1 520px" }}>
+                        <div className="text-muted small mb-1">Check {idx + 1} of {questionRows.length} • {q.std}</div>
+                        <div className="fw-bold" style={{ fontSize: 16 }}>{q.question}</div>
+                        {q.extra ? <div className="text-muted small mt-1">Additional reading: {q.extra}</div> : null}
+                      </div>
+                      {responseComplete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
+                    </div>
+
+                    {isGeneralQuestion ? (
+                      <>
+                        <div className="mt-3">
+                          <div className="fw-bold mb-2">Response</div>
+                          <div className="d-flex flex-wrap" style={{ gap: 12 }}>
+                            <ChecklistOptionPill
+                              active={generalAnswer === "YES"}
+                              tone="success"
+                              icon="✓"
+                              onClick={() => setGeneralResponse(q, "YES")}
+                            >
+                              YES
+                            </ChecklistOptionPill>
+                            <ChecklistOptionPill
+                              active={generalAnswer === "NO"}
+                              tone="danger"
+                              icon="✕"
+                              onClick={() => setGeneralResponse(q, "NO")}
+                            >
+                              NO
+                            </ChecklistOptionPill>
+                            <ChecklistOptionPill
+                              active={generalAnswer === "N/A"}
+                              tone="secondary"
+                              icon="—"
+                              onClick={() => setGeneralResponse(q, "N/A")}
+                            >
+                              N/A
+                            </ChecklistOptionPill>
+                          </div>
+                        </div>
+
+                        {generalAnswer === "YES" ? (
+                          <div className="mt-3 p-3" style={{ border: "1px solid #a3cfbb", borderRadius: 10, background: "#f7fff9" }}>
+                            <div className="fw-bold mb-2">Picture Evidence <span className="text-danger">Required</span></div>
+                            {!generalHasPhoto ? (
+                              <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
+                                <div className="text-muted small mb-3">A picture is mandatory when YES is selected.</div>
+                                <CallOutButton type="button" variant="primary" onClick={() => openDefectCamera(q.id, 0)}>Open camera</CallOutButton>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
+                                  <Badge bg="success">Picture captured</Badge>
+                                  <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                                    <CallOutButton type="button" variant="outline-primary" onClick={() => openDefectCamera(q.id, 0)}>Retake photo</CallOutButton>
+                                    <CallOutButton type="button" variant="outline-secondary" onClick={() => clearDefectPhoto(q.id, 0)}>Clear</CallOutButton>
+                                  </div>
+                                </div>
+                                {generalPreview ? (
+                                  <div className="mb-2">
+                                    <img
+                                      src={generalPreview}
+                                      alt="General check evidence"
+                                      style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }}
+                                    />
+                                  </div>
+                                ) : null}
+                              </>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {generalAnswer === "NO" || generalAnswer === "N/A" ? (
+                          <Form.Group className="mt-3">
+                            <Form.Label>Comment <span className="text-danger">Required</span></Form.Label>
+                            <Form.Control
+                              id={`servicing-general-comment-${q.id}`}
+                              as="textarea"
+                              rows={3}
+                              placeholder={generalAnswer === "NO" ? "Explain why the answer is NO" : "Explain why this item is not applicable"}
+                              value={a.comment || ""}
+                              onChange={(e) => updateAnswer(q.id, { comment: e.target.value })}
+                            />
+                            <Form.Text className="text-muted">A comment is mandatory when NO or N/A is selected.</Form.Text>
+                          </Form.Group>
+                        ) : null}
+
+                        {(highlightMissing || highlightMissingPhotos) && !responseComplete ? (
+                          <div className="text-danger small mt-2">
+                            {!generalAnswer
+                              ? "Choose YES, NO, or N/A."
+                              : generalAnswer === "YES"
+                                ? "A picture is required when YES is selected."
+                                : "A comment is required when NO or N/A is selected."}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                    <div className="mt-3">
+                      <div className="fw-bold mb-2">Were any defects found for this check?</div>
+                      <div className="d-flex flex-wrap" style={{ gap: 12 }}>
+                        <ChecklistOptionPill
+                          active={defectState === "no"}
+                          tone="success"
+                          icon="✓"
+                          onClick={() => setDefectState(q, idx, "no")}
+                        >
+                          No defects
+                        </ChecklistOptionPill>
+                        <ChecklistOptionPill
+                          active={defectState === "yes"}
+                          tone="danger"
+                          icon="✕"
+                          onClick={() => { setDefectState(q, idx, "yes"); openDefectCamera(q.id, 0); }}
+                        >
+                          Defects found
+                        </ChecklistOptionPill>
+                        <ChecklistOptionPill
+                          active={defectState === "na"}
+                          tone="secondary"
+                          icon="—"
+                          onClick={() => setDefectState(q, idx, "na")}
+                        >
+                          N/A
+                        </ChecklistOptionPill>
+                      </div>
+                    </div>
+
+                    {defectState === "yes" ? (
+                      <div className="mt-3 p-3" style={{ border: "1px solid #f1aeb5", borderRadius: 10, background: "#fff8f8" }}>
+                        <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
+                          <div>
+                            <div className="fw-bold">Defects</div>
+                            <div className="text-muted small">For each defect: take the photo first, then enter the defect description.</div>
+                          </div>
+                          <Badge bg="danger">{visibleDefects.length} defect{visibleDefects.length === 1 ? "" : "s"}</Badge>
+                        </div>
+
+                        {visibleDefects.map((defect, defectIndex) => {
+                          const hasPhoto = defectHasPhoto(defect, a, defectIndex);
+                          const preview = defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl || "" : "");
+                          const defectComplete = hasPhoto && !!String(defect.finding || "").trim();
+                          return (
+                            <div key={`${q.id}-defect-${defectIndex}`} className="mb-3 p-3 bg-white" style={{ border: "1px solid #dee2e6", borderRadius: 8 }}>
+                              <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
+                                <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                                  <div className="fw-bold">Defect {defectIndex + 1}</div>
+                                  {defectComplete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
+                                </div>
+                                {visibleDefects.length > 1 ? <CallOutButton type="button" variant="outline-danger" onClick={() => removeDefect(q.id, defectIndex)}>Remove defect</CallOutButton> : null}
+                              </div>
+
+                              {!hasPhoto ? (
+                                <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
+                                  <div className="fw-bold mb-1">1. Take the defect photo</div>
+                                  <div className="text-muted small mb-3">The defect description unlocks after a photo is captured.</div>
+                                  <CallOutButton type="button" variant="primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Open camera</CallOutButton>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
+                                    <div className="fw-bold">1. Defect photo captured</div>
+                                    <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                                      <CallOutButton type="button" variant="outline-primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Retake photo</CallOutButton>
+                                      <CallOutButton type="button" variant="outline-secondary" onClick={() => clearDefectPhoto(q.id, defectIndex)}>Clear</CallOutButton>
+                                    </div>
+                                  </div>
+                                  {preview ? <div className="mb-3"><img src={preview} alt={`Defect ${defectIndex + 1}`} style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }} /></div> : null}
+                                  <Form.Group>
+                                    <Form.Label>2. Defect <span className="text-danger">Required</span></Form.Label>
+                                    <Form.Control id={`servicing-defect-${q.id}-${defectIndex}`} as="textarea" rows={3} placeholder="Describe the defect found" value={defect.finding || ""} onChange={(e) => updateDefectFinding(q.id, defectIndex, e.target.value)} />
+                                    <Form.Text className="text-muted">This text is written to the call-out report comment column.</Form.Text>
+                                  </Form.Group>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <CallOutButton type="button" variant="outline-secondary" disabled={visibleDefects.some((defect, defectIndex) => !defectHasPhoto(defect, a, defectIndex) || !String(defect.finding || "").trim())} onClick={() => addDefect(q.id)}>Add another defect</CallOutButton>
+                        <div className="text-muted small mt-2">Adding another defect opens the camera again, then unlocks the next defect description.</div>
+                      </div>
+                    ) : null}
+
+                    {highlightMissing && !responseComplete ? (
+                      <div className="text-danger small mt-2">{defectState === "yes" ? "Each defect needs a photo first and then a defect description." : "Choose No defects, Defects found, or N/A."}</div>
+                    ) : null}
+
+                      </>
+                    )}
+                  </Card.Body>
+                </Card>
+              );
+            })
+          )}
+        </>
+      ) : null}
+
+      {/* STEP 3: REVIEW */}
+      {step === 2 ? (
+        <Card border="light" className="shadow-sm">
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">Review</h5>
+            <small className="text-muted">Incomplete: {unansweredCount} • Defects found: {defectsFoundCount}</small>
+          </Card.Header>
+          <Card.Body>
+            <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
+
+            <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
+            <div className="mb-2"><strong>System Type:</strong> {systemType === "conveyor" ? "Conveyor" : "Substation"}</div>
+            <div className="mb-2"><strong>Area:</strong> {area}</div>
+            <div className="mb-2"><strong>Service Type:</strong> {serviceType}</div>
+            <div className="mb-3">
+              <strong>Standards:</strong> {selectedStandards.length ? selectedStandards.join(", ") : "-"}
+            </div>
+
+            <hr />
+
+            {questionRows.map((q, idx) => {
+              const a = answers?.[q.id] || {};
+              const defectState = String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer);
+              const defects = normalizeDefects(a);
+              const isGeneralQuestion = isGeneralStd(q.std);
+              const generalAnswer = String(a.answer || "").trim().toUpperCase();
+              const label = isGeneralQuestion
+                ? (generalAnswer || "Pending")
+                : defectState === "yes"
+                  ? "Defects found"
+                  : defectState === "no"
+                    ? "No defects"
+                    : defectState === "na"
+                      ? "N/A"
+                      : "Pending";
+              const badgeVariant = isGeneralQuestion
+                ? (generalAnswer === "YES" ? "success" : generalAnswer ? "secondary" : "secondary")
+                : defectState === "yes"
+                  ? "danger"
+                  : defectState === "no"
+                    ? "success"
+                    : "secondary";
+
+              return (
+                <Card key={q.id} className="mb-3">
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
+                      <div>
+                        <div className="fw-bold">{idx + 1}. {q.question}</div>
+                        <div className="text-muted small">
+                          {isGeneralQuestion
+                            ? q.std
+                            : `${q.std} • Defect photos: ${defects.filter((defect, defectIndex) => defectHasPhoto(defect, a, defectIndex)).length}/${defects.length}`}
+                        </div>
+                      </div>
+                      <Badge bg={badgeVariant}>{label}</Badge>
+                    </div>
+
+                    {isGeneralQuestion ? (
+                      <div className="mt-2 p-2" style={{ background: "#f8f9fa", borderRadius: 8 }}>
+                        {generalAnswer === "YES" ? (
+                          <div className="small"><strong>Picture:</strong> {generalPhotoPresent(a) ? "Captured" : "Missing"}</div>
+                        ) : generalAnswer === "NO" || generalAnswer === "N/A" ? (
+                          <div className="small"><strong>Comment:</strong> {String(a.comment || "").trim() || "Missing"}</div>
+                        ) : (
+                          <div className="text-muted small">No response selected.</div>
+                        )}
+                      </div>
+                    ) : defectState === "yes" ? (
+                      <div className="mt-2">
+                        {defects.length ? defects.map((defect, defectIndex) => (
+                          <div key={`${q.id}-review-${defectIndex}`} className="mb-2 p-2" style={{ background: "#f8f9fa", borderRadius: 8 }}>
+                            <div className="fw-bold">Defect {defectIndex + 1}: {defect.finding || "Defect description required"}</div>
+                            <div className="small"><strong>Photo:</strong> {defectHasPhoto(defect, a, defectIndex) ? "Captured" : "Missing"}</div>
+                          </div>
+                        )) : <div className="text-muted small">{a.comment || "No defect details recorded."}</div>}
+                      </div>
+                    ) : null}
+                  </Card.Body>
+                </Card>
+              );
+            })}
+
+            <hr />
+
+            <Card className="mb-0">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold">Signature</div>
+                    <div className="text-muted small">Draw below (touch or mouse). The signature is saved with the draft when you press Submit.</div>
+                  </div>
+
+                  <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                    {signatureDataUrl ? <Badge bg="success">Captured</Badge> : <Badge bg="secondary">Not captured</Badge>}
+                    <CallOutButton variant="outline-secondary" onClick={clearSignature}>Clear</CallOutButton>
+                  </div>
+                </div>
+
+                <div
+                  className="mt-3"
+                  style={{
+                    border: "1px solid #ced4da",
+                    borderRadius: 8,
+                    background: "#fff",
+                    width: "100%",
+                    height: 220,
+                    touchAction: "none"
+                  }}
+                >
+                  <canvas
+                    ref={sigCanvasRef}
+                    style={{ width: "100%", height: "100%", display: "block", borderRadius: 8 }}
+                    onPointerDown={(e) => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch {} beginSignature(e); }}
+                    onPointerMove={moveSignature}
+                    onPointerUp={endSignature}
+                    onPointerCancel={endSignature}
+                    onMouseDown={beginSignature}
+                    onMouseMove={moveSignature}
+                    onMouseUp={endSignature}
+                    onMouseLeave={endSignature}
+                    onTouchStart={beginSignature}
+                    onTouchMove={moveSignature}
+                    onTouchEnd={endSignature}
+                    onTouchCancel={endSignature}
+                  />
+                </div>
+
+                <div className="text-muted small mt-2">
+                  Signature will be captured as PNG when you press Submit.
+                </div>
+              </Card.Body>
+            </Card>
+          </Card.Body>
+        </Card>
+      ) : null}
+
+      {/* STEP 4: DRAFT CREATION PROGRESS */}
       {step === 3 ? (
-        <Card border="light" className="shadow-sm mb-3">
+        <Card border="light" className="shadow-sm">
           <Card.Header>
             <h5 className="mb-0">Creating Draft</h5>
           </Card.Header>
           <Card.Body>
-            <ProgressBar
-              now={draftProgress}
-              label={`${draftProgress}%`}
-              animated={draftProgress > 0 && draftProgress < 100}
-              variant={draftProgress === 100 ? "success" : "primary"}
-              style={{ height: "20px" }}
-            />
-            <div className="d-flex align-items-center mt-3" style={{ gap: 10 }}>
+            <div className="mb-3">
+              <ProgressBar
+                now={draftProgress}
+                label={`${draftProgress}%`}
+                animated={draftProgress > 0 && draftProgress < 100}
+                variant={draftProgress === 100 ? "success" : "primary"}
+                style={{ height: "20px" }}
+              />
+            </div>
+
+            <div className="d-flex align-items-center" style={{ gap: 10 }}>
               {draftProgress < 100 ? <Spinner /> : <Badge bg="success">Saved</Badge>}
               <div className="fw-bold">{draftProgressText || "Preparing draft…"}</div>
             </div>
+
             <div className="text-muted small mt-2">
               Please wait. You will return to the Call Out start screen automatically once the draft has been saved.
             </div>
@@ -1696,30 +2589,34 @@ export default function CallOut() {
         </Card>
       ) : null}
 
+      {/* NAV BUTTONS */}
       {step < 3 ? (
         <div className="d-flex justify-content-between mt-3">
-          <Button variant="secondary" onClick={backStep} disabled={step === 0 || busy}>
+          <CallOutButton variant="secondary" onClick={back} disabled={step === 0 || draftSubmitting}>
             Back
-          </Button>
+          </CallOutButton>
 
           {step === 2 ? (
-            <Button variant="success" onClick={submitReviewAndSaveDraft} disabled={busy}>
-              {busy ? (
+            <CallOutButton
+              variant="success"
+              onClick={submitReviewAndSaveDraft}
+              disabled={draftSubmitting || unansweredCount > 0 || photoMissingCount > 0}
+            >
+              {draftSubmitting ? (
                 <>
                   <Spinner className="me-2" /> Submitting…
                 </>
               ) : (
                 "Submit"
               )}
-            </Button>
+            </CallOutButton>
           ) : (
-            <Button variant="primary" onClick={nextStep} disabled={busy}>
-              {step === 1 && attendanceQuestion === attendanceQuestionCount - 1 ? "Review" : "Next"}
-            </Button>
+            <CallOutButton variant="primary" onClick={next} disabled={draftSubmitting}>
+              Next
+            </CallOutButton>
           )}
         </div>
       ) : null}
-
     </>
   );
 }

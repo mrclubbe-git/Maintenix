@@ -490,8 +490,11 @@ export default function Servicing() {
   const defectCameraInputRef = useRef(null);
   const defectCameraTargetRef = useRef({ qid: "", defectIndex: 0 });
 
-  // Steps: 0=PreStart, 1=Questionnaire, 2=Review, 3=Final
+  // Steps: 0=PreStart, 1=Questionnaire, 2=Review, 3=Draft creation progress
   const [step, setStep] = useState(0);
+  const [draftSubmitting, setDraftSubmitting] = useState(false);
+  const [draftProgress, setDraftProgress] = useState(0);
+  const [draftProgressText, setDraftProgressText] = useState("");
 
   // Prestart
   const [area, setArea] = useState("");
@@ -665,7 +668,7 @@ export default function Servicing() {
     ), 0);
   }, [questionRows, answers]);
 
-  const progress = useMemo(() => Math.round(((step + 1) / 4) * 100), [step]);
+  const progress = useMemo(() => (step === 3 ? 100 : Math.round(((step + 1) / 3) * 100)), [step]);
 
   async function fetchJson(url) {
     const res = await fetch(url, {
@@ -1235,14 +1238,20 @@ export default function Servicing() {
 
     setSignatureDataUrl("");
     setSignatureTouched(false);
+    setDraftProgress(0);
+    setDraftProgressText("");
   }
 
   function captureSignatureNow() {
     const canvas = sigCanvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return signatureDataUrl || "";
     try {
-      setSignatureDataUrl(canvas.toDataURL("image/png"));
-    } catch {}
+      const dataUrl = canvas.toDataURL("image/png");
+      setSignatureDataUrl(dataUrl);
+      return dataUrl;
+    } catch {
+      return signatureDataUrl || "";
+    }
   }
 
   function next() {
@@ -1288,18 +1297,8 @@ export default function Servicing() {
       return;
     }
 
-    if (step === 2) {
-      // Capture signature only when leaving Review
-      if (signatureTouched) {
-        captureSignatureNow();
-      }
-      setHighlightMissing(false);
-      setStep(3);
-      return;
-    }
-
+    // Review is submitted with the dedicated Submit button.
     setHighlightMissing(false);
-    setStep((s) => Math.min(3, s + 1));
   }
 
   function back() {
@@ -1558,7 +1557,7 @@ export default function Servicing() {
   }, [dbReady, online, authToken, canAccess]);
 
   // ✅ Draft record build/load helpers
-  function buildDraftValue() {
+  function buildDraftValue(signatureOverride = signatureDataUrl || "") {
     const cleanAnswers = {};
     Object.keys(answers || {}).forEach((k) => {
       const a = answers?.[k] || {};
@@ -1589,7 +1588,7 @@ export default function Servicing() {
       nfpa2001: selectedStandards.includes("NFPA 2001"),
       areaSearch,
       answers: cleanAnswers,
-      signatureDataUrl: signatureDataUrl || "",
+      signatureDataUrl: signatureOverride || "",
       signatureTouched: false,
       questionRowsSnapshot: (questionRows || []).map((q) => ({
         id: q.id,
@@ -1927,41 +1926,72 @@ export default function Servicing() {
     }
   }
 
-  async function saveCurrentAsDraftOnly() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  async function submitReviewAndSaveDraft() {
+    setErr("");
+    setInfo("");
+
+    if (draftSubmitting) return;
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setErr("Internet connection is required to save a servicing draft.");
+      setErr("Internet connection is required to submit this servicing checklist.");
       return;
     }
 
     if (!dbRef.current) {
-      setErr("Offline storage not available in this browser.");
+      setErr("Draft storage is not available in this browser.");
       return;
     }
 
     if (unansweredCount > 0) {
-      setErr(`Please complete every checklist item and all required photo/comment/defect fields before saving. Incomplete: ${unansweredCount}`);
+      setErr(`Please complete every checklist item before submitting. Incomplete: ${unansweredCount}`);
+      setHighlightMissing(true);
+      setStep(1);
       return;
     }
 
     if (photoMissingCount > 0) {
-      setErr(`Please take required photos before saving the draft. Missing: ${photoMissingCount}`);
+      setErr(`Please take all required photos before submitting. Missing: ${photoMissingCount}`);
+      setHighlightMissingPhotos(true);
+      setStep(1);
       return;
     }
 
-    try {
-      if (!signatureDataUrl && signatureTouched) captureSignatureNow();
+    setDraftSubmitting(true);
+    setDraftProgress(10);
+    setDraftProgressText("Preparing servicing draft…");
+    setStep(3);
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
-      const value = {
-        ...buildDraftValue(),
-        signatureDataUrl: signatureDataUrl || ""
-      };
+    try {
+      let capturedSignature = signatureDataUrl || "";
+      if (signatureTouched) {
+        capturedSignature = captureSignatureNow() || capturedSignature;
+      }
+
+      setDraftProgress(35);
+      setDraftProgressText("Collecting checklist responses and evidence…");
+
+      const value = buildDraftValue(capturedSignature);
       const name = buildDraftNameFromValue(value, Date.now());
+
+      setDraftProgress(65);
+      setDraftProgressText("Saving draft…");
+
       await saveDraftRecord(name, value);
-      setInfo(`Draft saved: ${name}`);
+
+      setDraftProgress(100);
+      setDraftProgressText("Draft created successfully.");
+
+      await new Promise((resolve) => window.setTimeout(resolve, 650));
+
+      resetToStart(`Draft saved: ${name}`);
     } catch (e) {
+      setDraftProgress(0);
+      setDraftProgressText("");
+      setStep(2);
       setErr(String(e?.message || "Failed to save draft."));
+    } finally {
+      setDraftSubmitting(false);
     }
   }
 
@@ -2002,9 +2032,9 @@ export default function Servicing() {
     emitJobsEvent();
   }
 
-  function resetToStart() {
+  function resetToStart(message = "") {
     setErr("");
-    setInfo("");
+    setInfo(message);
     setStep(0);
     setArea("");
     setAreaSearch("");
@@ -2017,6 +2047,8 @@ export default function Servicing() {
 
     setSignatureDataUrl("");
     setSignatureTouched(false);
+    setDraftProgress(0);
+    setDraftProgressText("");
   }
 
   if (!canAccess) {
@@ -2041,7 +2073,7 @@ export default function Servicing() {
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
         <div>
           <h4 className="mb-0">Servicing</h4>
-          <small className="text-muted">Mobile workflow (Pre-Start → Checklist → Review → Final)</small>
+          <small className="text-muted">Mobile workflow (Pre-Start → Checklist → Review → Submit)</small>
           {!online ? (
             <div className="mt-1">
               <Badge bg="warning" text="dark">Offline</Badge>
@@ -2051,12 +2083,12 @@ export default function Servicing() {
         </div>
 
         <div className="d-flex align-items-center" style={{ gap: 8 }}>
-          <Badge bg="info">Step {step + 1} / 4</Badge>
+          <Badge bg="info">{step === 3 ? "Saving Draft" : `Step ${step + 1} / 3`}</Badge>
 
           <ServicingButton
             variant="outline-secondary"
             onClick={loadListsAndChecklist}
-            disabled={loadingLists || loadingChecklist || submitting}
+            disabled={loadingLists || loadingChecklist || submitting || draftSubmitting}
           >
             {loadingLists || loadingChecklist ? (
               <>
@@ -2070,7 +2102,7 @@ export default function Servicing() {
           <ServicingButton
             variant="outline-primary"
             onClick={refreshJobs}
-            disabled={!dbReady || loadingJobs}
+            disabled={!dbReady || loadingJobs || draftSubmitting}
           >
             {loadingJobs ? (
               <>
@@ -2103,7 +2135,7 @@ export default function Servicing() {
       </Card>
 
       {/* JOB QUEUE (always visible, compact) */}
-      {dbReady ? (
+      {dbReady && step !== 3 ? (
         <Card border="light" className="shadow-sm mb-3">
           <Card.Header className="d-flex justify-content-between align-items-center">
             <div className="fw-bold">Generation Queue</div>
@@ -2158,7 +2190,7 @@ export default function Servicing() {
       ) : null}
 
       {/* ✅ DRAFTS (always visible, compact) */}
-      {dbReady ? (
+      {dbReady && step !== 3 ? (
         <Card border="light" className="shadow-sm mb-3">
           <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
             <div className="fw-bold">Saved Drafts</div>
@@ -2202,7 +2234,7 @@ export default function Servicing() {
             ) : null}
 
             <div className="text-muted small mt-2">
-              Save the draft in the Final step, then use <strong>Generate</strong> here to queue report generation.
+              Submit the completed checklist from Review to create the draft, then use <strong>Generate</strong> here to queue report generation.
             </div>
           </Card.Body>
         </Card>
@@ -2653,7 +2685,7 @@ export default function Servicing() {
             <small className="text-muted">Incomplete: {unansweredCount} • Defects found: {defectsFoundCount}</small>
           </Card.Header>
           <Card.Body>
-            <Alert variant="info">Review screen before saving the draft.</Alert>
+            <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
 
             <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
             <div className="mb-2"><strong>System Type:</strong> {systemType === "conveyor" ? "Conveyor" : "Substation"}</div>
@@ -2735,7 +2767,7 @@ export default function Servicing() {
                 <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
                   <div>
                     <div className="fw-bold">Signature</div>
-                    <div className="text-muted small">Draw below (touch or mouse). Saved as PNG when you press Next.</div>
+                    <div className="text-muted small">Draw below (touch or mouse). The signature is saved with the draft when you press Submit.</div>
                   </div>
 
                   <div className="d-flex align-items-center" style={{ gap: 8 }}>
@@ -2774,7 +2806,7 @@ export default function Servicing() {
                 </div>
 
                 <div className="text-muted small mt-2">
-                  Signature will be captured as PNG when you press Next.
+                  Signature will be captured as PNG when you press Submit.
                 </div>
               </Card.Body>
             </Card>
@@ -2782,50 +2814,63 @@ export default function Servicing() {
         </Card>
       ) : null}
 
-      {/* STEP 4: FINAL */}
+      {/* STEP 4: DRAFT CREATION PROGRESS */}
       {step === 3 ? (
         <Card border="light" className="shadow-sm">
           <Card.Header>
-            <h5 className="mb-0">Final</h5>
+            <h5 className="mb-0">Creating Draft</h5>
           </Card.Header>
           <Card.Body>
-            <Alert variant="warning">
-              This step now saves a draft only. Use the <strong>Generate</strong> button in Saved Drafts to queue the report.
-            </Alert>
+            <div className="mb-3">
+              <ProgressBar
+                now={draftProgress}
+                label={`${draftProgress}%`}
+                animated={draftProgress > 0 && draftProgress < 100}
+                variant={draftProgress === 100 ? "success" : "primary"}
+                style={{ height: "20px" }}
+              />
+            </div>
 
-            <div className="d-flex flex-wrap" style={{ gap: 10 }}>
-              <ServicingButton variant="success" onClick={saveCurrentAsDraftOnly} disabled={submitting || unansweredCount > 0}>
-                {submitting ? (
-                  <>
-                    <Spinner className="me-2" /> Saving…
-                  </>
-                ) : (
-                  "Save Draft"
-                )}
-              </ServicingButton>
-
-              <ServicingButton variant="secondary" onClick={resetToStart} disabled={submitting}>
-                Start New
-              </ServicingButton>
+            <div className="d-flex align-items-center" style={{ gap: 10 }}>
+              {draftProgress < 100 ? <Spinner /> : <Badge bg="success">Saved</Badge>}
+              <div className="fw-bold">{draftProgressText || "Preparing draft…"}</div>
             </div>
 
             <div className="text-muted small mt-2">
-              Tip: If offline, drafts still save locally. Generated draft jobs stay queued and submit automatically when you’re back online.
+              Please wait. You will return to the Servicing start screen automatically once the draft has been saved.
             </div>
           </Card.Body>
         </Card>
       ) : null}
 
       {/* NAV BUTTONS */}
-      <div className="d-flex justify-content-between mt-3">
-        <ServicingButton variant="secondary" onClick={back} disabled={step === 0}>
-          Back
-        </ServicingButton>
+      {step < 3 ? (
+        <div className="d-flex justify-content-between mt-3">
+          <ServicingButton variant="secondary" onClick={back} disabled={step === 0 || draftSubmitting}>
+            Back
+          </ServicingButton>
 
-        <ServicingButton variant={step === 3 ? "secondary" : "primary"} onClick={step === 3 ? resetToStart : next}>
-          {step === 3 ? "Close" : "Next"}
-        </ServicingButton>
-      </div>
+          {step === 2 ? (
+            <ServicingButton
+              variant="success"
+              onClick={submitReviewAndSaveDraft}
+              disabled={draftSubmitting || unansweredCount > 0 || photoMissingCount > 0}
+            >
+              {draftSubmitting ? (
+                <>
+                  <Spinner className="me-2" /> Submitting…
+                </>
+              ) : (
+                "Submit"
+              )}
+            </ServicingButton>
+          ) : (
+            <ServicingButton variant="primary" onClick={next} disabled={draftSubmitting}>
+              Next
+            </ServicingButton>
+          )}
+        </div>
+      ) : null}
     </>
   );
 }

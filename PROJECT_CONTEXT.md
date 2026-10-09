@@ -584,3 +584,32 @@ Saved Drafts now mirrors the Servicing pattern with:
 Report generation is initiated from the saved draft rather than directly from the active form.
 
 The existing Call Out server-side queue/worker remains responsible for asynchronous report generation.
+
+
+## Call Out attendance — sequential question flow
+
+As of 2026-10-09, the Call Out **Attendance & Resolution** step is presented one question at a time instead of as one large form.
+
+The sequence is:
+
+1. Time of responder arrival
+2. Responder description of defect
+3. Could the defect be rectified?
+   - YES -> Action taken is required
+   - NO -> Equipment/material required is required
+4. Time of responder departure
+5. Was a jobcard created?
+   - YES -> Jobcard number is required
+   - NO -> Reason no jobcard was raised is required
+6. Pictures
+
+The attendance step shows:
+
+- Question X of 6
+- a small question progress bar
+- Complete / Pending / Optional status badges
+- Back and Next navigation between attendance questions
+- Review replaces Next on the final attendance question
+- Review Back returns to the final attendance question
+
+Pictures and the responder defect description remain optional, matching the pre-existing Call Out validation rules.

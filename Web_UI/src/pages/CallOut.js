@@ -363,6 +363,8 @@ export default function CallOut() {
 
   // Workflow: 0=Call Details, 1=Attendance, 2=Review, 3=Draft creation progress.
   const [step, setStep] = useState(0);
+  const [attendanceQuestion, setAttendanceQuestion] = useState(0);
+  const attendanceQuestionCount = 6;
   const [draftProgress, setDraftProgress] = useState(0);
   const [draftProgressText, setDraftProgressText] = useState("");
 
@@ -534,6 +536,7 @@ export default function CallOut() {
     setNoJobcardReason("");
     setPhotos([]);
     setStep(0);
+    setAttendanceQuestion(0);
     setDraftProgress(0);
     setDraftProgressText("");
     if (message) {
@@ -641,6 +644,40 @@ export default function CallOut() {
     return "";
   }
 
+  function validateAttendanceQuestion(index) {
+    if (index === 0 && !timeArrival) return "Time of responder arrival is required.";
+    if (index === 2) {
+      if (!couldRectify) return "Please select whether the defect could be rectified.";
+      if (couldRectify === "YES" && !actionTaken.trim()) return "Action taken is required when the defect was rectified.";
+      if (couldRectify === "NO" && !materialsRequired.trim()) return "Materials required is required when the defect could not be rectified.";
+    }
+    if (index === 3 && !timeDeparture) return "Time of responder departure is required.";
+    if (index === 4) {
+      if (!jobcardCreated) return "Please select whether a jobcard was created.";
+      if (jobcardCreated === "YES" && !jobcardNumber.trim()) return "Jobcard number is required when a jobcard was created.";
+      if (jobcardCreated === "NO" && !noJobcardReason.trim()) return "A reason is required when no jobcard was created.";
+    }
+    return "";
+  }
+
+  function attendanceQuestionIsComplete(index) {
+    if (index === 0) return !!timeArrival;
+    if (index === 1) return !!responderDefectDesc.trim();
+    if (index === 2) {
+      if (couldRectify === "YES") return !!actionTaken.trim();
+      if (couldRectify === "NO") return !!materialsRequired.trim();
+      return false;
+    }
+    if (index === 3) return !!timeDeparture;
+    if (index === 4) {
+      if (jobcardCreated === "YES") return !!jobcardNumber.trim();
+      if (jobcardCreated === "NO") return !!noJobcardReason.trim();
+      return false;
+    }
+    if (index === 5) return photos.length > 0;
+    return false;
+  }
+
   function nextStep() {
     setBanner({ show: false, variant: "info", text: "" });
 
@@ -651,18 +688,33 @@ export default function CallOut() {
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
+      setAttendanceQuestion(0);
       setStep(1);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     if (step === 1) {
+      const questionError = validateAttendanceQuestion(attendanceQuestion);
+      if (questionError) {
+        setBanner({ show: true, variant: "warning", text: questionError });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      if (attendanceQuestion < attendanceQuestionCount - 1) {
+        setAttendanceQuestion((current) => current + 1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       const err = validateAttendanceStep();
       if (err) {
         setBanner({ show: true, variant: "warning", text: err });
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
+
       setStep(2);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -670,7 +722,16 @@ export default function CallOut() {
 
   function backStep() {
     setBanner({ show: false, variant: "info", text: "" });
-    setStep((current) => Math.max(0, current - 1));
+
+    if (step === 1 && attendanceQuestion > 0) {
+      setAttendanceQuestion((current) => Math.max(0, current - 1));
+    } else if (step === 2) {
+      setAttendanceQuestion(attendanceQuestionCount - 1);
+      setStep(1);
+    } else {
+      setStep((current) => Math.max(0, current - 1));
+    }
+
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -780,6 +841,7 @@ export default function CallOut() {
 
       loadPayloadIntoForm(d.value);
       setStep(0);
+      setAttendanceQuestion(0);
       setDraftProgress(0);
       setDraftProgressText("");
       setBanner({ show: true, variant: "success", text: `Draft loaded: ${d.name || draftKey}` });
@@ -1276,183 +1338,284 @@ export default function CallOut() {
       ) : null}
 
       {step === 1 ? (
-        <>
-          <Card border="light" className="shadow-sm mb-3">
-            <Card.Header>
-              <h5 className="mb-0">Attendance & Resolution</h5>
-            </Card.Header>
-            <Card.Body>
-              <Row className="g-3">
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>
-                      Time of responder arrival on site
-                      <div className="text-muted small">Technician/responder on-site arrival time (hh:mm / date)</div>
-                    </Form.Label>
-                    <Form.Control type="datetime-local" value={timeArrival} onChange={(e) => setTimeArrival(e.target.value)} />
-                  </Form.Group>
-                </Col>
+        <Card border="light" className="shadow-sm mb-3">
+          <Card.Header>
+            <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
+              <div>
+                <h5 className="mb-0">Attendance & Resolution</h5>
+                <small className="text-muted">Answer each attendance question in sequence</small>
+              </div>
+              <div className="text-end">
+                <Badge bg="info">Question {attendanceQuestion + 1} of {attendanceQuestionCount}</Badge>
+              </div>
+            </div>
+            <ProgressBar
+              className="mt-3"
+              now={Math.round(((attendanceQuestion + 1) / attendanceQuestionCount) * 100)}
+              style={{ height: "8px" }}
+            />
+          </Card.Header>
 
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>
-                      Time of responder departure from site
-                      <div className="text-muted small">Technician/responder departure time (hh:mm / date)</div>
-                    </Form.Label>
-                    <Form.Control type="datetime-local" value={timeDeparture} onChange={(e) => setTimeDeparture(e.target.value)} />
-                  </Form.Group>
-                </Col>
+          <Card.Body>
+            {attendanceQuestion === 0 ? (
+              <>
+                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: 16 }}>Time of responder arrival on site</div>
+                    <div className="text-muted small mt-1">Record when the technician/responder arrived on site.</div>
+                  </div>
+                  <Badge bg={attendanceQuestionIsComplete(0) ? "success" : "secondary"}>
+                    {attendanceQuestionIsComplete(0) ? "Complete" : "Pending"}
+                  </Badge>
+                </div>
+                <Form.Control
+                  type="datetime-local"
+                  value={timeArrival}
+                  onChange={(e) => setTimeArrival(e.target.value)}
+                />
+              </>
+            ) : null}
 
-                <Col md={12}>
-                  <Form.Group>
-                    <Form.Label>
-                      Responder description of defect
-                      <div className="text-muted small">Technician assessment and confirmed fault description</div>
-                    </Form.Label>
-                    <Form.Control as="textarea" rows={4} value={responderDefectDesc} onChange={(e) => setResponderDefectDesc(e.target.value)} placeholder="What was found on site?" />
-                  </Form.Group>
-                </Col>
+            {attendanceQuestion === 1 ? (
+              <>
+                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: 16 }}>Responder description of defect</div>
+                    <div className="text-muted small mt-1">Record the technician assessment and confirmed fault description.</div>
+                  </div>
+                  <Badge bg={attendanceQuestionIsComplete(1) ? "success" : "secondary"}>
+                    {attendanceQuestionIsComplete(1) ? "Complete" : "Optional"}
+                  </Badge>
+                </div>
+                <Form.Control
+                  as="textarea"
+                  rows={4}
+                  value={responderDefectDesc}
+                  onChange={(e) => setResponderDefectDesc(e.target.value)}
+                  placeholder="What was found on site?"
+                />
+              </>
+            ) : null}
 
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>
-                      Could the defect be rectified?
-                      <div className="text-muted small">Rectification possible during this attendance? (Yes/No)</div>
-                    </Form.Label>
-                    <Form.Select value={couldRectify} onChange={(e) => setCouldRectify(e.target.value)}>
-                      <option value="">Select…</option>
-                      <option value="YES">Yes</option>
-                      <option value="NO">No</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
+            {attendanceQuestion === 2 ? (
+              <>
+                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: 16 }}>Could the defect be rectified?</div>
+                    <div className="text-muted small mt-1">Confirm whether the fault could be rectified during this attendance.</div>
+                  </div>
+                  <Badge bg={attendanceQuestionIsComplete(2) ? "success" : "secondary"}>
+                    {attendanceQuestionIsComplete(2) ? "Complete" : "Pending"}
+                  </Badge>
+                </div>
+
+                <div className="d-flex flex-wrap mb-3" style={{ gap: 10 }}>
+                  <Button
+                    type="button"
+                    variant={couldRectify === "YES" ? "success" : "outline-success"}
+                    aria-pressed={couldRectify === "YES"}
+                    onClick={() => {
+                      setCouldRectify("YES");
+                      setMaterialsRequired("");
+                    }}
+                  >
+                    Yes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={couldRectify === "NO" ? "danger" : "outline-danger"}
+                    aria-pressed={couldRectify === "NO"}
+                    onClick={() => {
+                      setCouldRectify("NO");
+                      setActionTaken("");
+                    }}
+                  >
+                    No
+                  </Button>
+                </div>
 
                 {couldRectify === "YES" ? (
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>
-                        Action taken by responder
-                        <div className="text-muted small">Corrective actions undertaken on site (work performed and outcome)</div>
-                      </Form.Label>
-                      <Form.Control as="textarea" rows={4} value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} placeholder="Describe what was done and outcome." />
-                    </Form.Group>
-                  </Col>
+                  <Form.Group>
+                    <Form.Label>Action taken by responder <span className="text-danger">Required</span></Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={4}
+                      value={actionTaken}
+                      onChange={(e) => setActionTaken(e.target.value)}
+                      placeholder="Describe what was done and the outcome."
+                    />
+                  </Form.Group>
                 ) : null}
 
                 {couldRectify === "NO" ? (
-                  <Col md={12}>
-                    <Form.Group>
-                      <Form.Label>
-                        List equipment/material to rectify the defect
-                        <div className="text-muted small">Items/parts/materials required (qty, specs, urgency)</div>
-                      </Form.Label>
-                      <Form.Control as="textarea" rows={4} value={materialsRequired} onChange={(e) => setMaterialsRequired(e.target.value)} placeholder="e.g., 1x solenoid valve 24VDC (urgent), 2x detector bases..." />
-                    </Form.Group>
-                  </Col>
-                ) : null}
-
-                <Col md={6}>
                   <Form.Group>
-                    <Form.Label>
-                      Was a jobcard created for the call out?
-                      <div className="text-muted small">Job card/work order raised for this call-out? (Yes/No)</div>
-                    </Form.Label>
-                    <Form.Select value={jobcardCreated} onChange={(e) => setJobcardCreated(e.target.value)}>
-                      <option value="">Select…</option>
-                      <option value="YES">Yes</option>
-                      <option value="NO">No</option>
-                    </Form.Select>
+                    <Form.Label>Equipment/material required <span className="text-danger">Required</span></Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={4}
+                      value={materialsRequired}
+                      onChange={(e) => setMaterialsRequired(e.target.value)}
+                      placeholder="List the equipment, parts or materials required to rectify the defect."
+                    />
                   </Form.Group>
-                </Col>
+                ) : null}
+              </>
+            ) : null}
+
+            {attendanceQuestion === 3 ? (
+              <>
+                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: 16 }}>Time of responder departure from site</div>
+                    <div className="text-muted small mt-1">Record when the technician/responder departed from site.</div>
+                  </div>
+                  <Badge bg={attendanceQuestionIsComplete(3) ? "success" : "secondary"}>
+                    {attendanceQuestionIsComplete(3) ? "Complete" : "Pending"}
+                  </Badge>
+                </div>
+                <Form.Control
+                  type="datetime-local"
+                  value={timeDeparture}
+                  onChange={(e) => setTimeDeparture(e.target.value)}
+                />
+              </>
+            ) : null}
+
+            {attendanceQuestion === 4 ? (
+              <>
+                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: 16 }}>Was a jobcard created for the call out?</div>
+                    <div className="text-muted small mt-1">Confirm whether a job card/work order was raised for this call-out.</div>
+                  </div>
+                  <Badge bg={attendanceQuestionIsComplete(4) ? "success" : "secondary"}>
+                    {attendanceQuestionIsComplete(4) ? "Complete" : "Pending"}
+                  </Badge>
+                </div>
+
+                <div className="d-flex flex-wrap mb-3" style={{ gap: 10 }}>
+                  <Button
+                    type="button"
+                    variant={jobcardCreated === "YES" ? "success" : "outline-success"}
+                    aria-pressed={jobcardCreated === "YES"}
+                    onClick={() => {
+                      setJobcardCreated("YES");
+                      setNoJobcardReason("");
+                    }}
+                  >
+                    Yes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={jobcardCreated === "NO" ? "danger" : "outline-danger"}
+                    aria-pressed={jobcardCreated === "NO"}
+                    onClick={() => {
+                      setJobcardCreated("NO");
+                      setJobcardNumber("");
+                    }}
+                  >
+                    No
+                  </Button>
+                </div>
 
                 {jobcardCreated === "YES" ? (
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>
-                        Jobcard number
-                        <div className="text-muted small">Job card/work order reference number</div>
-                      </Form.Label>
-                      <Form.Control value={jobcardNumber} onChange={(e) => setJobcardNumber(e.target.value)} placeholder="e.g., JC-12345" />
-                    </Form.Group>
-                  </Col>
+                  <Form.Group>
+                    <Form.Label>Jobcard number <span className="text-danger">Required</span></Form.Label>
+                    <Form.Control
+                      value={jobcardNumber}
+                      onChange={(e) => setJobcardNumber(e.target.value)}
+                      placeholder="e.g., JC-12345"
+                    />
+                  </Form.Group>
                 ) : null}
 
                 {jobcardCreated === "NO" ? (
-                  <Col md={12}>
-                    <Form.Group>
-                      <Form.Label>
-                        If no job card raised
-                        <div className="text-muted small">Record reason/authorisation (advice only / false alarm / no access / client declined)</div>
-                      </Form.Label>
-                      <Form.Control as="textarea" rows={3} value={noJobcardReason} onChange={(e) => setNoJobcardReason(e.target.value)} placeholder="Reason and authorisation" />
-                    </Form.Group>
-                  </Col>
+                  <Form.Group>
+                    <Form.Label>Reason no jobcard was raised <span className="text-danger">Required</span></Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={noJobcardReason}
+                      onChange={(e) => setNoJobcardReason(e.target.value)}
+                      placeholder="Record the reason / authorisation."
+                    />
+                  </Form.Group>
                 ) : null}
-              </Row>
-            </Card.Body>
-          </Card>
+              </>
+            ) : null}
 
-          <Card border="light" className="shadow-sm mb-3">
-            <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
-              <div>
-                <h5 className="mb-0">Pictures</h5>
-                <small className="text-muted">Add one or multiple pictures and a description for each</small>
-              </div>
+            {attendanceQuestion === 5 ? (
+              <>
+                <div className="d-flex justify-content-between align-items-start flex-wrap mb-3" style={{ gap: 10 }}>
+                  <div>
+                    <div className="fw-bold" style={{ fontSize: 16 }}>Pictures</div>
+                    <div className="text-muted small mt-1">Add supporting pictures and a description for each where available.</div>
+                  </div>
+                  <Badge bg={photos.length ? "success" : "secondary"}>
+                    {photos.length ? `${photos.length} added` : "Optional"}
+                  </Badge>
+                </div>
 
-              <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
-                <Badge bg="info">{photos.length} photo(s)</Badge>
-                <Button variant="primary" size="sm" onClick={triggerPhotoPicker}>
-                  Add picture
-                </Button>
-              </div>
-            </Card.Header>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  {...(isMobile ? { capture: "environment" } : {})}
+                  style={{ display: "none" }}
+                  onChange={(e) => onPhotosSelected(e.target.files)}
+                />
 
-            <Card.Body>
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                {...(isMobile ? { capture: "environment" } : {})}
-                style={{ display: "none" }}
-                onChange={(e) => onPhotosSelected(e.target.files)}
-              />
+                <div className="mb-3">
+                  <Button variant="primary" onClick={triggerPhotoPicker}>
+                    Add picture
+                  </Button>
+                </div>
 
-              {!photos.length ? (
-                <div className="text-muted small">No photos added.</div>
-              ) : (
-                <Row className="g-3">
-                  {photos.map((p) => (
-                    <Col key={p.id} xs={12} md={6} lg={4}>
-                      <Card className="h-100">
-                        <Card.Body>
-                          {p.dataUrl ? (
-                            <img src={p.dataUrl} alt={p.name} style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }} />
-                          ) : null}
+                {!photos.length ? (
+                  <div className="text-muted small">No pictures added.</div>
+                ) : (
+                  <Row className="g-3">
+                    {photos.map((p) => (
+                      <Col key={p.id} xs={12} md={6} lg={4}>
+                        <Card className="h-100">
+                          <Card.Body>
+                            {p.dataUrl ? (
+                              <img
+                                src={p.dataUrl}
+                                alt={p.name}
+                                style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }}
+                              />
+                            ) : null}
 
-                          <div className="mt-2 text-muted small" style={{ wordBreak: "break-word" }}>
-                            {p.name}
-                          </div>
+                            <div className="mt-2 text-muted small" style={{ wordBreak: "break-word" }}>
+                              {p.name}
+                            </div>
 
-                          <Form.Group className="mt-2">
-                            <Form.Label className="small mb-1">Description</Form.Label>
-                            <Form.Control value={p.description || ""} onChange={(e) => updatePhoto(p.id, { description: e.target.value })} placeholder="Describe what this photo shows" />
-                          </Form.Group>
+                            <Form.Group className="mt-2">
+                              <Form.Label className="small mb-1">Description</Form.Label>
+                              <Form.Control
+                                value={p.description || ""}
+                                onChange={(e) => updatePhoto(p.id, { description: e.target.value })}
+                                placeholder="Describe what this photo shows"
+                              />
+                            </Form.Group>
 
-                          <div className="d-flex justify-content-end mt-3">
-                            <Button variant="outline-danger" size="sm" onClick={() => removePhoto(p.id)}>
-                              Remove
-                            </Button>
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              )}
-            </Card.Body>
-          </Card>
-        </>
+                            <div className="d-flex justify-content-end mt-3">
+                              <Button variant="outline-danger" onClick={() => removePhoto(p.id)}>
+                                Remove
+                              </Button>
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                )}
+              </>
+            ) : null}
+          </Card.Body>
+        </Card>
       ) : null}
 
       {step === 2 ? (
@@ -1551,7 +1714,7 @@ export default function CallOut() {
             </Button>
           ) : (
             <Button variant="primary" onClick={nextStep} disabled={busy}>
-              Next
+              {step === 1 && attendanceQuestion === attendanceQuestionCount - 1 ? "Review" : "Next"}
             </Button>
           )}
         </div>

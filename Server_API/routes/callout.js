@@ -18,6 +18,7 @@ const DATA_DIR = path.join(__dirname, "..", "data");
 const CALLOUT_PAYLOADS_DIR = path.join(DATA_DIR, "callout-payloads");
 const CALLOUT_STATUS_DIR = path.join(DATA_DIR, "callout-status");
 const CALLOUT_QUEUE_DIR = path.join(DATA_DIR, "callout-queue");
+const CALLOUT_DRAFTS_DIR = path.join(DATA_DIR, "callout-drafts-v2");
 
 // Store callout photos separately from servicing
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
@@ -100,6 +101,121 @@ const upload = multer({
 });
 
 // -------------------- Routes --------------------
+
+// -------------------- Call Out V2 drafts --------------------
+
+function draftFilePath(userKey, draftId) {
+  return path.join(CALLOUT_DRAFTS_DIR, safeBasename(userKey), `${safeBasename(draftId)}.json`);
+}
+
+async function readDraftFile(filePath) {
+  try {
+    const raw = await fsp.readFile(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function publicDraft(rec) {
+  if (!rec || typeof rec !== "object") return null;
+  return {
+    key: String(rec.key || ""),
+    type: "calloutV2Draft",
+    name: String(rec.name || rec.key || ""),
+    createdAt: String(rec.createdAt || ""),
+    updatedAt: String(rec.updatedAt || ""),
+    value: rec.value && typeof rec.value === "object" ? rec.value : {}
+  };
+}
+
+router.get("/drafts", requireAuth, async (req, res) => {
+  try {
+    const userKey = userKeyFromReq(req);
+    const dir = path.join(CALLOUT_DRAFTS_DIR, userKey);
+    await ensureDir(dir);
+
+    const names = await fsp.readdir(dir).catch(() => []);
+    const drafts = [];
+    for (const name of names) {
+      if (!name.endsWith(".json")) continue;
+      const rec = await readDraftFile(path.join(dir, name));
+      if (!rec || rec.type !== "calloutV2Draft" || !String(rec.key || "").startsWith("callout_v2_draft_")) continue;
+      drafts.push(publicDraft(rec));
+    }
+
+    drafts.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+    return res.json({ ok: true, drafts });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e?.message || "Failed to list Call Out drafts." });
+  }
+});
+
+router.get("/drafts/:draftId", requireAuth, async (req, res) => {
+  try {
+    const userKey = userKeyFromReq(req);
+    const draftId = safeBasename(req.params.draftId || "");
+    if (!draftId || !draftId.startsWith("callout_v2_draft_")) {
+      return res.status(400).json({ ok: false, message: "Invalid draft id." });
+    }
+
+    const rec = await readDraftFile(draftFilePath(userKey, draftId));
+    if (!rec) return res.status(404).json({ ok: false, message: "Draft not found." });
+    return res.json({ ok: true, draft: publicDraft(rec) });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e?.message || "Failed to load Call Out draft." });
+  }
+});
+
+router.post("/drafts", requireAuth, async (req, res) => {
+  try {
+    const userKey = userKeyFromReq(req);
+    const body = req.body || {};
+    const now = new Date().toISOString();
+    const key = safeBasename(body.key || "");
+    if (!key || !key.startsWith("callout_v2_draft_")) {
+      return res.status(400).json({ ok: false, message: "Invalid Call Out draft id." });
+    }
+
+    const filePath = draftFilePath(userKey, key);
+    await ensureDir(path.dirname(filePath));
+    const existing = await readDraftFile(filePath) || {};
+    const rec = {
+      ...existing,
+      key,
+      type: "calloutV2Draft",
+      name: String(body.name || existing.name || key).trim() || key,
+      createdAt: existing.createdAt || body.createdAt || now,
+      updatedAt: now,
+      owner: ownerFromReq(req),
+      value: body.value && typeof body.value === "object" ? body.value : existing.value || {}
+    };
+
+    await fsp.writeFile(filePath, JSON.stringify(rec, null, 2), "utf8");
+    return res.json({ ok: true, draft: publicDraft(rec) });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e?.message || "Failed to save Call Out draft." });
+  }
+});
+
+router.delete("/drafts/:draftId", requireAuth, async (req, res) => {
+  try {
+    const userKey = userKeyFromReq(req);
+    const draftId = safeBasename(req.params.draftId || "");
+    if (!draftId || !draftId.startsWith("callout_v2_draft_")) {
+      return res.status(400).json({ ok: false, message: "Invalid draft id." });
+    }
+
+    await fsp.unlink(draftFilePath(userKey, draftId)).catch((e) => {
+      if (e?.code !== "ENOENT") throw e;
+    });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: e?.message || "Failed to delete Call Out draft." });
+  }
+});
+
+
 
 /**
  * POST /api/callout/submit-payload

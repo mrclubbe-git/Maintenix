@@ -1,84 +1,39 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, Row, Col, Button, Form, Alert, ProgressBar, Badge, Spinner } from "@themesberg/react-bootstrap";
 
-function ChecklistOptionPill({ active, tone, icon, children, onClick }) {
-  const [hovered, setHovered] = useState(false);
-
-  const palette = {
-    success: {
-      solid: "#239447",
-      border: "#239447",
-      text: "#187437",
-      hoverBg: "#e9f7ee"
-    },
-    danger: {
-      solid: "#e73d3d",
-      border: "#e73d3d",
-      text: "#c92d2d",
-      hoverBg: "#fdecec"
-    },
-    secondary: {
-      solid: "#6f7f91",
-      border: "#8c9aaa",
-      text: "#5f6d7c",
-      hoverBg: "#eef2f5"
-    }
-  };
-
-  const colours = palette[tone] || palette.secondary;
-  const isHover = hovered && !active;
-
+function ServicingButton({ variant = "primary", disabled = false, style, children, ...props }) {
   return (
     <Button
-      type="button"
-      variant="light"
-      aria-pressed={active}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setHovered(true)}
-      onBlur={() => setHovered(false)}
-      className="d-inline-flex align-items-center justify-content-center"
+      {...props}
+      variant={variant}
+      size="sm"
+      disabled={disabled}
       style={{
-        height: 38,
-        minWidth: 112,
-        padding: "0 16px",
-        borderRadius: 999,
-        border: `1px solid ${colours.border}`,
-        backgroundColor: active ? colours.solid : isHover ? colours.hoverBg : "#ffffff",
-        color: active ? "#ffffff" : colours.text,
-        fontSize: 14,
         fontWeight: 700,
-        lineHeight: 1,
-        letterSpacing: "0.01em",
-        gap: 7,
-        flex: "0 0 auto",
-        boxShadow: active
-          ? "0 4px 10px rgba(0, 0, 0, 0.16)"
-          : isHover
-            ? "0 3px 8px rgba(0, 0, 0, 0.10)"
-            : "0 1px 2px rgba(0, 0, 0, 0.05)",
-        transform: active || isHover ? "translateY(-1px)" : "translateY(0)",
-        transition: "transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease"
+        ...style
       }}
     >
-      <span
-        aria-hidden="true"
-        className="d-inline-flex align-items-center justify-content-center"
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          fontSize: 14,
-          lineHeight: 1,
-          fontWeight: 800,
-          color: active ? "#ffffff" : colours.text
-        }}
-      >
-        {icon}
-      </span>
-      <span>{children}</span>
+      {children}
     </Button>
+  );
+}
+
+function ChecklistOptionPill({ active, tone, icon, children, onClick }) {
+  return (
+    <ServicingButton
+      variant={active ? tone : `outline-${tone}`}
+      aria-pressed={active}
+      onClick={onClick}
+      style={{
+        minWidth: 0,
+        transition: "background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
+        boxShadow: active ? "0 2px 6px rgba(0, 0, 0, 0.14)" : undefined,
+        transform: active ? "translateY(-1px)" : undefined
+      }}
+    >
+      <span aria-hidden="true" className="me-1">{icon}</span>
+      <span>{children}</span>
+    </ServicingButton>
   );
 }
 
@@ -2098,35 +2053,33 @@ export default function Servicing() {
         <div className="d-flex align-items-center" style={{ gap: 8 }}>
           <Badge bg="info">Step {step + 1} / 4</Badge>
 
-          <Button
+          <ServicingButton
             variant="outline-secondary"
-            size="sm"
             onClick={loadListsAndChecklist}
             disabled={loadingLists || loadingChecklist || submitting}
           >
             {loadingLists || loadingChecklist ? (
               <>
-                <Spinner size="sm" className="me-2" /> Loading…
+                <Spinner className="me-2" /> Loading…
               </>
             ) : (
               "Refresh"
             )}
-          </Button>
+          </ServicingButton>
 
-          <Button
+          <ServicingButton
             variant="outline-primary"
-            size="sm"
             onClick={refreshJobs}
             disabled={!dbReady || loadingJobs}
           >
             {loadingJobs ? (
               <>
-                <Spinner size="sm" className="me-2" /> Jobs…
+                <Spinner className="me-2" /> Jobs…
               </>
             ) : (
               "Jobs"
             )}
-          </Button>
+          </ServicingButton>
         </div>
       </div>
 
@@ -2176,24 +2129,23 @@ export default function Servicing() {
 
                   <div className="d-flex align-items-center" style={{ gap: 8 }}>
                     {j.status === "done" && j.result?.url ? (
-                      <Button
+                      <ServicingButton
                         variant="outline-primary"
-                        size="sm"
                         onClick={() => downloadFile(j.result.url, j.result.fileName)}
                       >
                         Download
-                      </Button>
+                      </ServicingButton>
                     ) : null}
 
                     {j.status === "error" ? (
-                      <Button variant="outline-warning" size="sm" onClick={() => retryJob(j.id)}>
+                      <ServicingButton variant="outline-warning" onClick={() => retryJob(j.id)}>
                         Retry
-                      </Button>
+                      </ServicingButton>
                     ) : null}
 
-                    <Button variant="outline-danger" size="sm" onClick={() => removeJob(j.id)}>
+                    <ServicingButton variant="outline-danger" onClick={() => removeJob(j.id)}>
                       Remove
-                    </Button>
+                    </ServicingButton>
                   </div>
                 </div>
               ))
@@ -2215,7 +2167,7 @@ export default function Servicing() {
           <Card.Body>
             {loadingDrafts ? (
               <div className="text-muted small">
-                <Spinner size="sm" className="me-2" /> Loading drafts…
+                <Spinner className="me-2" /> Loading drafts…
               </div>
             ) : !drafts.length ? (
               <div className="text-muted small">No saved drafts.</div>
@@ -2228,18 +2180,18 @@ export default function Servicing() {
                   </div>
 
                   <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
-                    <Button variant="primary" size="sm" onClick={() => loadDraft(d.key)} disabled={submitting}>
+                    <ServicingButton variant="primary" onClick={() => loadDraft(d.key)} disabled={submitting}>
                       Load
-                    </Button>
-                    <Button variant="success" size="sm" onClick={() => generateFromDraft(d.key)} disabled={submitting}>
+                    </ServicingButton>
+                    <ServicingButton variant="success" onClick={() => generateFromDraft(d.key)} disabled={submitting}>
                       Generate
-                    </Button>
-                    <Button variant="outline-secondary" size="sm" onClick={() => renameDraft(d.key)} disabled={submitting}>
+                    </ServicingButton>
+                    <ServicingButton variant="outline-secondary" onClick={() => renameDraft(d.key)} disabled={submitting}>
                       Rename
-                    </Button>
-                    <Button variant="outline-danger" size="sm" onClick={() => deleteDraft(d.key)} disabled={submitting}>
+                    </ServicingButton>
+                    <ServicingButton variant="outline-danger" onClick={() => deleteDraft(d.key)} disabled={submitting}>
                       Delete
-                    </Button>
+                    </ServicingButton>
                   </div>
                 </div>
               ))
@@ -2541,15 +2493,15 @@ export default function Servicing() {
                             {!generalHasPhoto ? (
                               <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
                                 <div className="text-muted small mb-3">A picture is mandatory when YES is selected.</div>
-                                <Button type="button" variant="primary" onClick={() => openDefectCamera(q.id, 0)}>Open camera</Button>
+                                <ServicingButton type="button" variant="primary" onClick={() => openDefectCamera(q.id, 0)}>Open camera</ServicingButton>
                               </div>
                             ) : (
                               <>
                                 <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
                                   <Badge bg="success">Picture captured</Badge>
                                   <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                                    <Button type="button" variant="outline-primary" size="sm" onClick={() => openDefectCamera(q.id, 0)}>Retake photo</Button>
-                                    <Button type="button" variant="outline-secondary" size="sm" onClick={() => clearDefectPhoto(q.id, 0)}>Clear</Button>
+                                    <ServicingButton type="button" variant="outline-primary" onClick={() => openDefectCamera(q.id, 0)}>Retake photo</ServicingButton>
+                                    <ServicingButton type="button" variant="outline-secondary" onClick={() => clearDefectPhoto(q.id, 0)}>Clear</ServicingButton>
                                   </div>
                                 </div>
                                 {generalPreview ? (
@@ -2644,22 +2596,22 @@ export default function Servicing() {
                                   <div className="fw-bold">Defect {defectIndex + 1}</div>
                                   {defectComplete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
                                 </div>
-                                {visibleDefects.length > 1 ? <Button type="button" variant="outline-danger" size="sm" onClick={() => removeDefect(q.id, defectIndex)}>Remove defect</Button> : null}
+                                {visibleDefects.length > 1 ? <ServicingButton type="button" variant="outline-danger" onClick={() => removeDefect(q.id, defectIndex)}>Remove defect</ServicingButton> : null}
                               </div>
 
                               {!hasPhoto ? (
                                 <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
                                   <div className="fw-bold mb-1">1. Take the defect photo</div>
                                   <div className="text-muted small mb-3">The defect description unlocks after a photo is captured.</div>
-                                  <Button type="button" variant="primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Open camera</Button>
+                                  <ServicingButton type="button" variant="primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Open camera</ServicingButton>
                                 </div>
                               ) : (
                                 <>
                                   <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
                                     <div className="fw-bold">1. Defect photo captured</div>
                                     <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                                      <Button type="button" variant="outline-primary" size="sm" onClick={() => openDefectCamera(q.id, defectIndex)}>Retake photo</Button>
-                                      <Button type="button" variant="outline-secondary" size="sm" onClick={() => clearDefectPhoto(q.id, defectIndex)}>Clear</Button>
+                                      <ServicingButton type="button" variant="outline-primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Retake photo</ServicingButton>
+                                      <ServicingButton type="button" variant="outline-secondary" onClick={() => clearDefectPhoto(q.id, defectIndex)}>Clear</ServicingButton>
                                     </div>
                                   </div>
                                   {preview ? <div className="mb-3"><img src={preview} alt={`Defect ${defectIndex + 1}`} style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }} /></div> : null}
@@ -2674,7 +2626,7 @@ export default function Servicing() {
                           );
                         })}
 
-                        <Button type="button" variant="outline-secondary" size="sm" disabled={visibleDefects.some((defect, defectIndex) => !defectHasPhoto(defect, a, defectIndex) || !String(defect.finding || "").trim())} onClick={() => addDefect(q.id)}>Add another defect</Button>
+                        <ServicingButton type="button" variant="outline-secondary" disabled={visibleDefects.some((defect, defectIndex) => !defectHasPhoto(defect, a, defectIndex) || !String(defect.finding || "").trim())} onClick={() => addDefect(q.id)}>Add another defect</ServicingButton>
                         <div className="text-muted small mt-2">Adding another defect opens the camera again, then unlocks the next defect description.</div>
                       </div>
                     ) : null}
@@ -2788,7 +2740,7 @@ export default function Servicing() {
 
                   <div className="d-flex align-items-center" style={{ gap: 8 }}>
                     {signatureDataUrl ? <Badge bg="success">Captured</Badge> : <Badge bg="secondary">Not captured</Badge>}
-                    <Button variant="outline-secondary" size="sm" onClick={clearSignature}>Clear</Button>
+                    <ServicingButton variant="outline-secondary" onClick={clearSignature}>Clear</ServicingButton>
                   </div>
                 </div>
 
@@ -2842,19 +2794,19 @@ export default function Servicing() {
             </Alert>
 
             <div className="d-flex flex-wrap" style={{ gap: 10 }}>
-              <Button variant="success" onClick={saveCurrentAsDraftOnly} disabled={submitting || unansweredCount > 0}>
+              <ServicingButton variant="success" onClick={saveCurrentAsDraftOnly} disabled={submitting || unansweredCount > 0}>
                 {submitting ? (
                   <>
-                    <Spinner size="sm" className="me-2" /> Saving…
+                    <Spinner className="me-2" /> Saving…
                   </>
                 ) : (
                   "Save Draft"
                 )}
-              </Button>
+              </ServicingButton>
 
-              <Button variant="secondary" onClick={resetToStart} disabled={submitting}>
+              <ServicingButton variant="secondary" onClick={resetToStart} disabled={submitting}>
                 Start New
-              </Button>
+              </ServicingButton>
             </div>
 
             <div className="text-muted small mt-2">
@@ -2866,13 +2818,13 @@ export default function Servicing() {
 
       {/* NAV BUTTONS */}
       <div className="d-flex justify-content-between mt-3">
-        <Button variant="secondary" onClick={back} disabled={step === 0}>
+        <ServicingButton variant="secondary" onClick={back} disabled={step === 0}>
           Back
-        </Button>
+        </ServicingButton>
 
-        <Button variant={step === 3 ? "secondary" : "primary"} onClick={step === 3 ? resetToStart : next}>
+        <ServicingButton variant={step === 3 ? "secondary" : "primary"} onClick={step === 3 ? resetToStart : next}>
           {step === 3 ? "Close" : "Next"}
-        </Button>
+        </ServicingButton>
       </div>
     </>
   );

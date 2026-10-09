@@ -2047,6 +2047,8 @@ export default function Servicing() {
 
     setSignatureDataUrl("");
     setSignatureTouched(false);
+    setDraftProgress(0);
+    setDraftProgressText("");
   }
 
   if (!canAccess) {
@@ -2086,7 +2088,7 @@ export default function Servicing() {
           <ServicingButton
             variant="outline-secondary"
             onClick={loadListsAndChecklist}
-            disabled={loadingLists || loadingChecklist || submitting}
+            disabled={loadingLists || loadingChecklist || submitting || draftSubmitting}
           >
             {loadingLists || loadingChecklist ? (
               <>
@@ -2100,7 +2102,7 @@ export default function Servicing() {
           <ServicingButton
             variant="outline-primary"
             onClick={refreshJobs}
-            disabled={!dbReady || loadingJobs}
+            disabled={!dbReady || loadingJobs || draftSubmitting}
           >
             {loadingJobs ? (
               <>
@@ -2133,7 +2135,7 @@ export default function Servicing() {
       </Card>
 
       {/* JOB QUEUE (always visible, compact) */}
-      {dbReady ? (
+      {dbReady && step !== 3 ? (
         <Card border="light" className="shadow-sm mb-3">
           <Card.Header className="d-flex justify-content-between align-items-center">
             <div className="fw-bold">Generation Queue</div>
@@ -2188,7 +2190,7 @@ export default function Servicing() {
       ) : null}
 
       {/* ✅ DRAFTS (always visible, compact) */}
-      {dbReady ? (
+      {dbReady && step !== 3 ? (
         <Card border="light" className="shadow-sm mb-3">
           <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
             <div className="fw-bold">Saved Drafts</div>
@@ -2683,7 +2685,7 @@ export default function Servicing() {
             <small className="text-muted">Incomplete: {unansweredCount} • Defects found: {defectsFoundCount}</small>
           </Card.Header>
           <Card.Body>
-            <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong> to create the draft.</Alert>
+            <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
 
             <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
             <div className="mb-2"><strong>System Type:</strong> {systemType === "conveyor" ? "Conveyor" : "Substation"}</div>

@@ -520,3 +520,25 @@ Standard behavior:
 - icon-only controls retain compact zero-padding behavior while inheriting hover/active transitions
 
 New UI work should use the existing Bootstrap button variants and rely on this global standard instead of creating page-specific button dimensions.
+
+
+## Servicing workflow — Review submits draft
+
+As of 2026-10-09, the Servicing UI uses a three-step user workflow:
+
+1. Pre-Start
+2. Checklist
+3. Review
+
+The old user-facing Final step is no longer used for manual actions.
+
+On the Review screen:
+
+- the former **Next** button is replaced by **Submit**
+- pressing Submit captures the current signature (if drawn) and saves the servicing draft immediately
+- a transient **Creating Draft** progress screen is shown while the draft is being prepared/saved
+- once saving completes successfully, the workflow automatically returns to Pre-Start
+- Saved Drafts remains the place where the user later presses **Generate** to queue report generation
+- if draft creation fails, the UI returns to Review with the error instead of clearing the form
+
+The transient draft-creation progress screen is implementation step 4 internally, but the user-facing workflow is presented as 3 steps.

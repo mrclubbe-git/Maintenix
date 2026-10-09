@@ -6,6 +6,7 @@ function ServicingButton({ variant = "primary", disabled = false, style, childre
     <Button
       {...props}
       variant={variant}
+      size="sm"
       disabled={disabled}
       style={{
         fontWeight: 700,

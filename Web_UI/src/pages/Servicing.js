@@ -2,40 +2,77 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, Row, Col, Button, Form, Alert, ProgressBar, Badge, Spinner } from "@themesberg/react-bootstrap";
 
 function ChecklistOptionPill({ active, tone, icon, children, onClick }) {
-  const variant = active ? tone : `outline-${tone}`;
+  const [hovered, setHovered] = useState(false);
+
+  const palette = {
+    success: {
+      solid: "#239447",
+      border: "#239447",
+      text: "#187437",
+      hoverBg: "#e9f7ee"
+    },
+    danger: {
+      solid: "#e73d3d",
+      border: "#e73d3d",
+      text: "#c92d2d",
+      hoverBg: "#fdecec"
+    },
+    secondary: {
+      solid: "#6f7f91",
+      border: "#8c9aaa",
+      text: "#5f6d7c",
+      hoverBg: "#eef2f5"
+    }
+  };
+
+  const colours = palette[tone] || palette.secondary;
+  const isHover = hovered && !active;
 
   return (
     <Button
       type="button"
-      variant={variant}
+      variant="light"
       aria-pressed={active}
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       className="d-inline-flex align-items-center justify-content-center"
       style={{
+        height: 38,
+        minWidth: 112,
+        padding: "0 16px",
         borderRadius: 999,
-        minHeight: 46,
-        minWidth: 132,
-        padding: "10px 18px",
+        border: `1px solid ${colours.border}`,
+        backgroundColor: active ? colours.solid : isHover ? colours.hoverBg : "#ffffff",
+        color: active ? "#ffffff" : colours.text,
+        fontSize: 14,
         fontWeight: 700,
+        lineHeight: 1,
         letterSpacing: "0.01em",
-        gap: 8,
-        flex: "1 1 132px",
-        maxWidth: 210,
-        boxShadow: active ? "0 6px 16px rgba(0, 0, 0, 0.14)" : "0 1px 3px rgba(0, 0, 0, 0.06)",
-        transform: active ? "translateY(-1px)" : "none",
-        transition: "transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease"
+        gap: 7,
+        flex: "0 0 auto",
+        boxShadow: active
+          ? "0 4px 10px rgba(0, 0, 0, 0.16)"
+          : isHover
+            ? "0 3px 8px rgba(0, 0, 0, 0.10)"
+            : "0 1px 2px rgba(0, 0, 0, 0.05)",
+        transform: active || isHover ? "translateY(-1px)" : "translateY(0)",
+        transition: "transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease"
       }}
     >
       <span
         aria-hidden="true"
         className="d-inline-flex align-items-center justify-content-center"
         style={{
-          width: 22,
-          height: 22,
+          width: 20,
+          height: 20,
           borderRadius: "50%",
-          fontSize: 15,
+          fontSize: 14,
           lineHeight: 1,
-          fontWeight: 800
+          fontWeight: 800,
+          color: active ? "#ffffff" : colours.text
         }}
       >
         {icon}

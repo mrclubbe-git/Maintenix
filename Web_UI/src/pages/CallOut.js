@@ -1924,7 +1924,7 @@ export default function CallOut() {
               ))
             )}
             <div className="text-muted small mt-2">
-              When online, jobs submit to the server and the server worker generates in the background (even if you close the app).
+              Generation is intentionally inactive for the baseline clone until the Call Out question and report mapping is defined.
             </div>
           </Card.Body>
         </Card>
@@ -1980,7 +1980,7 @@ export default function CallOut() {
             ) : null}
 
             <div className="text-muted small mt-2">
-              Submit the completed checklist from Review to create the draft, then use <strong>Generate</strong> here to queue report generation.
+              Submit the completed baseline checklist from Review to create a Call Out draft. Generate will be enabled after the Call Out-specific questions and report mapping are defined.
             </div>
           </Card.Body>
         </Card>

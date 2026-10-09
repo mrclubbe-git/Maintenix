@@ -496,3 +496,27 @@ Current decision:
 - The current local IndexedDB-backed draft/job staging code may remain where required by the existing online workflow, but it must not be presented or used as an offline mode.
 
 When the overall site is complete, offline functionality can be deliberately reintroduced as a separate project phase.
+
+
+## Site-wide button standard
+
+As of 2026-10-09, the compact button style from the Servicing **Saved Drafts** widget is the approved site-wide button baseline.
+
+Global implementation lives in:
+
+`Web_UI/src/scss/volt.scss`
+
+Standard behavior:
+
+- compact Bootstrap small-button sizing
+- 14px / 0.875rem text
+- bold button labels
+- 0.25rem × 0.5rem padding
+- 0.375rem corner radius
+- consistent hover lift/shadow
+- consistent active/selected press state
+- consistent disabled behavior
+- existing Bootstrap semantic variants remain the color source (primary, success, outline-secondary, outline-danger, etc.)
+- icon-only controls retain compact zero-padding behavior while inheriting hover/active transitions
+
+New UI work should use the existing Bootstrap button variants and rely on this global standard instead of creating page-specific button dimensions.

@@ -1,6 +1,50 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, Row, Col, Button, Form, Alert, ProgressBar, Badge, Spinner } from "@themesberg/react-bootstrap";
 
+function ChecklistOptionPill({ active, tone, icon, children, onClick }) {
+  const variant = active ? tone : `outline-${tone}`;
+
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      aria-pressed={active}
+      onClick={onClick}
+      className="d-inline-flex align-items-center justify-content-center"
+      style={{
+        borderRadius: 999,
+        minHeight: 46,
+        minWidth: 132,
+        padding: "10px 18px",
+        fontWeight: 700,
+        letterSpacing: "0.01em",
+        gap: 8,
+        flex: "1 1 132px",
+        maxWidth: 210,
+        boxShadow: active ? "0 6px 16px rgba(0, 0, 0, 0.14)" : "0 1px 3px rgba(0, 0, 0, 0.06)",
+        transform: active ? "translateY(-1px)" : "none",
+        transition: "transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease"
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className="d-inline-flex align-items-center justify-content-center"
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          fontSize: 15,
+          lineHeight: 1,
+          fontWeight: 800
+        }}
+      >
+        {icon}
+      </span>
+      <span>{children}</span>
+    </Button>
+  );
+}
+
 function safeRole(x) {
   return String(x || "").trim().toUpperCase().replace(/\s+/g, "");
 }
@@ -2426,28 +2470,31 @@ export default function Servicing() {
                       <>
                         <div className="mt-3">
                           <div className="fw-bold mb-2">Response</div>
-                          <div className="d-flex flex-wrap" style={{ gap: 10 }}>
-                            <Button
-                              type="button"
-                              variant={generalAnswer === "YES" ? "success" : "outline-success"}
+                          <div className="d-flex flex-wrap" style={{ gap: 12 }}>
+                            <ChecklistOptionPill
+                              active={generalAnswer === "YES"}
+                              tone="success"
+                              icon="✓"
                               onClick={() => setGeneralResponse(q, "YES")}
                             >
                               YES
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={generalAnswer === "NO" ? "secondary" : "outline-secondary"}
+                            </ChecklistOptionPill>
+                            <ChecklistOptionPill
+                              active={generalAnswer === "NO"}
+                              tone="danger"
+                              icon="✕"
                               onClick={() => setGeneralResponse(q, "NO")}
                             >
                               NO
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={generalAnswer === "N/A" ? "secondary" : "outline-secondary"}
+                            </ChecklistOptionPill>
+                            <ChecklistOptionPill
+                              active={generalAnswer === "N/A"}
+                              tone="secondary"
+                              icon="—"
                               onClick={() => setGeneralResponse(q, "N/A")}
                             >
                               N/A
-                            </Button>
+                            </ChecklistOptionPill>
                           </div>
                         </div>
 
@@ -2511,10 +2558,31 @@ export default function Servicing() {
                       <>
                     <div className="mt-3">
                       <div className="fw-bold mb-2">Were any defects found for this check?</div>
-                      <div className="d-flex flex-wrap" style={{ gap: 10 }}>
-                        <Button type="button" variant={defectState === "no" ? "success" : "outline-success"} onClick={() => setDefectState(q, idx, "no")}>No defects</Button>
-                        <Button type="button" variant={defectState === "yes" ? "danger" : "outline-danger"} onClick={() => { setDefectState(q, idx, "yes"); openDefectCamera(q.id, 0); }}>Defects found</Button>
-                        <Button type="button" variant={defectState === "na" ? "secondary" : "outline-secondary"} onClick={() => setDefectState(q, idx, "na")}>N/A</Button>
+                      <div className="d-flex flex-wrap" style={{ gap: 12 }}>
+                        <ChecklistOptionPill
+                          active={defectState === "no"}
+                          tone="success"
+                          icon="✓"
+                          onClick={() => setDefectState(q, idx, "no")}
+                        >
+                          No defects
+                        </ChecklistOptionPill>
+                        <ChecklistOptionPill
+                          active={defectState === "yes"}
+                          tone="danger"
+                          icon="✕"
+                          onClick={() => { setDefectState(q, idx, "yes"); openDefectCamera(q.id, 0); }}
+                        >
+                          Defects found
+                        </ChecklistOptionPill>
+                        <ChecklistOptionPill
+                          active={defectState === "na"}
+                          tone="secondary"
+                          icon="—"
+                          onClick={() => setDefectState(q, idx, "na")}
+                        >
+                          N/A
+                        </ChecklistOptionPill>
                       </div>
                     </div>
 

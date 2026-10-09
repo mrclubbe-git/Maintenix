@@ -43,6 +43,51 @@
 // write your custom styles here!
 
 // =========================================================
+// Maintenix global button standard
+// Matches the compact Saved Draft action buttons used in Servicing.
+// =========================================================
+.btn,
+.btn.btn-sm,
+.btn.btn-md,
+.btn.btn-lg {
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+  font-weight: 700 !important;
+  border-radius: 0.375rem !important;
+  min-height: 31px;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease !important;
+}
+
+.btn:not(:disabled):not(.disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(38, 43, 64, 0.14);
+}
+
+.btn:not(:disabled):not(.disabled):active,
+.btn:not(:disabled):not(.disabled).active,
+.btn:not(:disabled):not(.disabled)[aria-pressed="true"] {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(38, 43, 64, 0.18);
+}
+
+.btn:disabled,
+.btn.disabled {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+// Keep icon-only controls compact while retaining the shared hover/active behavior.
+.btn-icon-only {
+  padding: 0 !important;
+}
+
+// =========================================================
 // Reports page helpers (opt-in via classNames)
 // =========================================================
 .reports-filter-actions {

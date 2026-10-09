@@ -613,3 +613,20 @@ The attendance step shows:
 - Review Back returns to the final attendance question
 
 Pictures and the responder defect description remain optional, matching the pre-existing Call Out validation rules.
+
+
+## Call Out V2 baseline — cloned from Servicing
+
+- As of 2026-10-09, the prior Call Out form/question UI has been replaced with a clean baseline cloned from the current Servicing page.
+- `Web_UI/src/pages/CallOut.js` now mirrors the Servicing page structure and UX.
+- User-facing flow is **Pre-Start → Checklist → Review → Submit**.
+- Review Submit creates the draft immediately, shows the same transient draft-creation progress screen, then returns to Pre-Start.
+- Saved Drafts mirrors Servicing with Load / Generate / Rename / Delete.
+- Generate is intentionally disabled for new Call Out V2 drafts until the Call Out-specific question set and report payload mapping are defined.
+- The Call Out V2 browser data is isolated in IndexedDB database `maintenix_callout_v2`.
+- V2 draft keys use the prefix `callout_v2_draft_` and type `calloutV2Draft`.
+- Existing/legacy Call Out drafts and jobs are not deleted or mixed into the V2 baseline UI.
+- The clean baseline temporarily reads the existing Servicing areas/services/checklist APIs solely so the copied UI remains functional until Call Out-specific pre-start data/questions are defined.
+- New server draft endpoints are provided under `/api/callout/drafts` and stored separately under `Server_API/data/callout-drafts-v2`.
+- The existing Call Out report worker/generator remains unchanged. It will be reconnected after the new Call Out question schema is finalized.
+- Servicing is not modified by this Call Out baseline rebuild.

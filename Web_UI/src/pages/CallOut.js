@@ -1276,177 +1276,183 @@ export default function CallOut() {
       ) : null}
 
       {step === 1 ? (
-      <>
-      <Card border="light" className="shadow-sm mb-3">
-        <Card.Header>
-          <h5 className="mb-0">Attendance & Resolution</h5>
-        </Card.Header>
-        <Card.Body>
-          <Row className="g-3">
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Time of responder arrival on site
-                  <div className="text-muted small">Technician/responder on-site arrival time (hh:mm / date)</div>
-                </Form.Label>
-                <Form.Control type="datetime-local" value={timeArrival} onChange={(e) => setTimeArrival(e.target.value)} />
-              </Form.Group>
-            </Col>
+        <>
+          <Card border="light" className="shadow-sm mb-3">
+            <Card.Header>
+              <h5 className="mb-0">Attendance & Resolution</h5>
+            </Card.Header>
+            <Card.Body>
+              <Row className="g-3">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Time of responder arrival on site
+                      <div className="text-muted small">Technician/responder on-site arrival time (hh:mm / date)</div>
+                    </Form.Label>
+                    <Form.Control type="datetime-local" value={timeArrival} onChange={(e) => setTimeArrival(e.target.value)} />
+                  </Form.Group>
+                </Col>
 
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Time of responder departure from site
-                  <div className="text-muted small">Technician/responder departure time (hh:mm / date)</div>
-                </Form.Label>
-                <Form.Control type="datetime-local" value={timeDeparture} onChange={(e) => setTimeDeparture(e.target.value)} />
-              </Form.Group>
-            </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Time of responder departure from site
+                      <div className="text-muted small">Technician/responder departure time (hh:mm / date)</div>
+                    </Form.Label>
+                    <Form.Control type="datetime-local" value={timeDeparture} onChange={(e) => setTimeDeparture(e.target.value)} />
+                  </Form.Group>
+                </Col>
 
-            <Col md={12}>
-              <Form.Group>
-                <Form.Label>
-                  Responder description of defect
-                  <div className="text-muted small">Technician assessment and confirmed fault description</div>
-                </Form.Label>
-                <Form.Control as="textarea" rows={4} value={responderDefectDesc} onChange={(e) => setResponderDefectDesc(e.target.value)} placeholder="What was found on site?" />
-              </Form.Group>
-            </Col>
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label>
+                      Responder description of defect
+                      <div className="text-muted small">Technician assessment and confirmed fault description</div>
+                    </Form.Label>
+                    <Form.Control as="textarea" rows={4} value={responderDefectDesc} onChange={(e) => setResponderDefectDesc(e.target.value)} placeholder="What was found on site?" />
+                  </Form.Group>
+                </Col>
 
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Could the defect be rectified?
-                  <div className="text-muted small">Rectification possible during this attendance? (Yes/No)</div>
-                </Form.Label>
-                <Form.Select value={couldRectify} onChange={(e) => setCouldRectify(e.target.value)}>
-                  <option value="">Select…</option>
-                  <option value="YES">Yes</option>
-                  <option value="NO">No</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Could the defect be rectified?
+                      <div className="text-muted small">Rectification possible during this attendance? (Yes/No)</div>
+                    </Form.Label>
+                    <Form.Select value={couldRectify} onChange={(e) => setCouldRectify(e.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="YES">Yes</option>
+                      <option value="NO">No</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
 
-            {couldRectify === "YES" ? (
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>
-                    Action taken by responder
-                    <div className="text-muted small">Corrective actions undertaken on site (work performed and outcome)</div>
-                  </Form.Label>
-                  <Form.Control as="textarea" rows={4} value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} placeholder="Describe what was done and outcome." />
-                </Form.Group>
-              </Col>
-            ) : null}
+                {couldRectify === "YES" ? (
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>
+                        Action taken by responder
+                        <div className="text-muted small">Corrective actions undertaken on site (work performed and outcome)</div>
+                      </Form.Label>
+                      <Form.Control as="textarea" rows={4} value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} placeholder="Describe what was done and outcome." />
+                    </Form.Group>
+                  </Col>
+                ) : null}
 
-            {couldRectify === "NO" ? (
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>
-                    List equipment/material to rectify the defect
-                    <div className="text-muted small">Items/parts/materials required (qty, specs, urgency)</div>
-                  </Form.Label>
-                  <Form.Control as="textarea" rows={4} value={materialsRequired} onChange={(e) => setMaterialsRequired(e.target.value)} placeholder="e.g., 1x solenoid valve 24VDC (urgent), 2x detector bases..." />
-                </Form.Group>
-              </Col>
-            ) : null}
+                {couldRectify === "NO" ? (
+                  <Col md={12}>
+                    <Form.Group>
+                      <Form.Label>
+                        List equipment/material to rectify the defect
+                        <div className="text-muted small">Items/parts/materials required (qty, specs, urgency)</div>
+                      </Form.Label>
+                      <Form.Control as="textarea" rows={4} value={materialsRequired} onChange={(e) => setMaterialsRequired(e.target.value)} placeholder="e.g., 1x solenoid valve 24VDC (urgent), 2x detector bases..." />
+                    </Form.Group>
+                  </Col>
+                ) : null}
 
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>
-                  Was a jobcard created for the call out?
-                  <div className="text-muted small">Job card/work order raised for this call-out? (Yes/No)</div>
-                </Form.Label>
-                <Form.Select value={jobcardCreated} onChange={(e) => setJobcardCreated(e.target.value)}>
-                  <option value="">Select…</option>
-                  <option value="YES">Yes</option>
-                  <option value="NO">No</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Was a jobcard created for the call out?
+                      <div className="text-muted small">Job card/work order raised for this call-out? (Yes/No)</div>
+                    </Form.Label>
+                    <Form.Select value={jobcardCreated} onChange={(e) => setJobcardCreated(e.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="YES">Yes</option>
+                      <option value="NO">No</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
 
-            {jobcardCreated === "YES" ? (
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>
-                    Jobcard number
-                    <div className="text-muted small">Job card/work order reference number</div>
-                  </Form.Label>
-                  <Form.Control value={jobcardNumber} onChange={(e) => setJobcardNumber(e.target.value)} placeholder="e.g., JC-12345" />
-                </Form.Group>
-              </Col>
-            ) : null}
+                {jobcardCreated === "YES" ? (
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>
+                        Jobcard number
+                        <div className="text-muted small">Job card/work order reference number</div>
+                      </Form.Label>
+                      <Form.Control value={jobcardNumber} onChange={(e) => setJobcardNumber(e.target.value)} placeholder="e.g., JC-12345" />
+                    </Form.Group>
+                  </Col>
+                ) : null}
 
-            {jobcardCreated === "NO" ? (
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>
-                    If no job card raised
-                    <div className="text-muted small">Record reason/authorisation (advice only / false alarm / no access / client declined)</div>
-                  </Form.Label>
-                  <Form.Control as="textarea" rows={3} value={noJobcardReason} onChange={(e) => setNoJobcardReason(e.target.value)} placeholder="Reason and authorisation" />
-                </Form.Group>
-              </Col>
-            ) : null}
-          </Row>
-        </Card.Body>
-      </Card>
+                {jobcardCreated === "NO" ? (
+                  <Col md={12}>
+                    <Form.Group>
+                      <Form.Label>
+                        If no job card raised
+                        <div className="text-muted small">Record reason/authorisation (advice only / false alarm / no access / client declined)</div>
+                      </Form.Label>
+                      <Form.Control as="textarea" rows={3} value={noJobcardReason} onChange={(e) => setNoJobcardReason(e.target.value)} placeholder="Reason and authorisation" />
+                    </Form.Group>
+                  </Col>
+                ) : null}
+              </Row>
+            </Card.Body>
+          </Card>
 
-      <Card border="light" className="shadow-sm mb-3">
-        <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
-          <div>
-            <h5 className="mb-0">Pictures</h5>
-            <small className="text-muted">Add one or multiple pictures and a description for each</small>
-          </div>
+          <Card border="light" className="shadow-sm mb-3">
+            <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 10 }}>
+              <div>
+                <h5 className="mb-0">Pictures</h5>
+                <small className="text-muted">Add one or multiple pictures and a description for each</small>
+              </div>
 
-          <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
-            <Badge bg="info">{photos.length} photo(s)</Badge>
-            <Button variant="primary" size="sm" onClick={triggerPhotoPicker}>
-              Add picture
-            </Button>
-          </div>
-        </Card.Header>
+              <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
+                <Badge bg="info">{photos.length} photo(s)</Badge>
+                <Button variant="primary" size="sm" onClick={triggerPhotoPicker}>
+                  Add picture
+                </Button>
+              </div>
+            </Card.Header>
 
-        <Card.Body>
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            {...(isMobile ? { capture: "environment" } : {})}
-            style={{ display: "none" }}
-            onChange={(e) => onPhotosSelected(e.target.files)}
-          />
+            <Card.Body>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                {...(isMobile ? { capture: "environment" } : {})}
+                style={{ display: "none" }}
+                onChange={(e) => onPhotosSelected(e.target.files)}
+              />
 
-          {!photos.length ? (
-            <div className="text-muted small">No photos added.</div>
-          ) : (
-            <Row className="g-3">
-              {photos.map((p) => (
-                <Col key={p.id} xs={12} md={6} lg={4}>
-                  <Card className="h-100">
-                    <Card.Body>
-                      {p.dataUrl ? (
-                        <img src={p.dataUrl} alt={p.name} style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }} />
-                      ) : null}
+              {!photos.length ? (
+                <div className="text-muted small">No photos added.</div>
+              ) : (
+                <Row className="g-3">
+                  {photos.map((p) => (
+                    <Col key={p.id} xs={12} md={6} lg={4}>
+                      <Card className="h-100">
+                        <Card.Body>
+                          {p.dataUrl ? (
+                            <img src={p.dataUrl} alt={p.name} style={{ width: "100%", borderRadius: 8, border: "1px solid #ced4da" }} />
+                          ) : null}
 
-                      <div className="mt-2 text-muted small" style={{ wordBreak: "break-word" }}>
-                        {p.name}
-                      </div>
+                          <div className="mt-2 text-muted small" style={{ wordBreak: "break-word" }}>
+                            {p.name}
+                          </div>
 
-                      <Form.Group className="mt-2">
-                        <Form.Label className="small mb-1">Description</Form.Label>
-                        <Form.Control value={p.description || ""} onChange={(e) => updatePhoto(p.id, { description: e.target.value })} placeholder="Describe what this photo shows" />
-                      </Form.Group>
+                          <Form.Group className="mt-2">
+                            <Form.Label className="small mb-1">Description</Form.Label>
+                            <Form.Control value={p.description || ""} onChange={(e) => updatePhoto(p.id, { description: e.target.value })} placeholder="Describe what this photo shows" />
+                          </Form.Group>
 
-                      <div className="d-flex justify-content-end mt-3">
-                        <Button variant="outline-danger" size="sm" onClick={() => removePhoto(p.id)}>
-                          Remove
-                        </Button>
-                      </div>
-                    </Card.Body>
-                  </Card>
-      </>
+                          <div className="d-flex justify-content-end mt-3">
+                            <Button variant="outline-danger" size="sm" onClick={() => removePhoto(p.id)}>
+                              Remove
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              )}
+            </Card.Body>
+          </Card>
+        </>
       ) : null}
 
       {step === 2 ? (
@@ -1550,14 +1556,6 @@ export default function CallOut() {
           )}
         </div>
       ) : null}
-
-                </Col>
-              ))}
-            </Row>
-          )}
-        </Card.Body>
-      </Card>
-
 
     </>
   );

@@ -766,3 +766,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Backend deployment ZIP created for the user: `/mnt/data/Maintenix_CallOut_Backend_Generator_Update_2026-10-11.zip`. It contains only `Server_API/calloutWorker.js`, placement/restart instructions, and SHA256.
 - Required server destination: `/home/charl/projects/maintenix-dev-api/Server_API/calloutWorker.js`.
 - Required template path remains: `/home/charl/projects/maintenix-dev-api/Server_API/data/templates/call_out_template.docx`.
+
+
+## Call Out frontend Generate deployment — 2026-10-11
+
+- Call Out V2 Generate support from main commit `852cc23c93a7623e1a7421bc87466c426d5bf3bb` has been synchronized to the `deploy` branch.
+- Deploy commit: `76c9f5c5118c8b18eeb8846c6e6c89d87490c15a`.
+- `Web_UI/src/pages/CallOut.js` on `deploy` now matches the current main blob `ade0a2b14882bed99b6d70e0403409e626f7aa5d`.
+- The GitHub Pages workflow is triggered by this `deploy` branch Web_UI change. Do not treat end-to-end Call Out generation as verified until the backend Call Out worker/template are installed and a real generation succeeds.

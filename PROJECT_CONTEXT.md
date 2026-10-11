@@ -774,3 +774,13 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Deploy commit: `76c9f5c5118c8b18eeb8846c6e6c89d87490c15a`.
 - `Web_UI/src/pages/CallOut.js` on `deploy` now matches the current main blob `ade0a2b14882bed99b6d70e0403409e626f7aa5d`.
 - The GitHub Pages workflow is triggered by this `deploy` branch Web_UI change. Do not treat end-to-end Call Out generation as verified until the backend Call Out worker/template are installed and a real generation succeeds.
+
+
+## Call Out image embedding fix — 2026-10-11
+
+- First live Call Out report tests populated questionnaire text correctly but rendered blank picture cells and printed the signature filename as text instead of embedding images.
+- Root cause: the deployed Draft V2 template uses ordinary `<<photo>>` / `<<signature>>` placeholders while `docxtemplater-image-module-free` requires image tags `<<%photo>>` / `<<%signature>>`.
+- Backend fix commit: `0b96604fdf0f075375cae6e66929283cbfea221d`.
+- `Server_API/calloutWorker.js` now upgrades the legacy plain image tags to image-module tags in the template ZIP at generation time, so the existing `call_out_template.docx` does not need to be replaced solely for this issue.
+- The worker now rejects missing/invalid technician signatures instead of silently writing a transparent placeholder, requires the DOCX image module, and fails explicitly when a referenced report image is missing on disk.
+- Backend must be updated/restarted with this worker commit before retesting Call Out report generation.

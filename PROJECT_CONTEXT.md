@@ -693,3 +693,24 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Main implementation commit: `215605cc56dea295ff35f3b0327f843234c21ec5`.
 - Deploy commit: `4dd1dea6232c8a46ea555711133650d7e9a7cf6c`.
 - GitHub Pages run: `38143796936` (verify completed success before describing this change as live).
+
+
+## Call Out questionnaire v1 — 2026-10-11
+
+- Replaced the temporary copied Servicing checklist on Call Out with a Call Out-specific sequential questionnaire.
+- Question 1: `Is the system defective?`
+  - Yes opens the camera immediately.
+  - At least one picture is required.
+  - Defect description is compulsory.
+  - An `Add picture` button allows additional evidence pictures.
+  - No currently completes Question 1 with no additional fields; extra No-path behavior will be added later.
+- Question 2 is only reached when Question 1 = Yes: `Could the defect be resolved?`
+  - Yes opens the camera immediately, requires at least one picture, and requires a description of what was done to repair the defect.
+  - No requires at least one repair requirement. Users can add/remove multiple requirement entries with `Add another requirement`.
+- Questionnaire is one question at a time. Back from Question 2 returns to Question 1; Back from Review returns to the last applicable question.
+- Draft schema now stores `system_defective` and `defect_resolved` answers with comments, picture evidence and repair requirements. Old copied Servicing checklist data is no longer used for the Call Out questionnaire.
+- Review shows the defect response, descriptions, picture counts, resolution response and repair requirements.
+- Call Out still saves browser-backed drafts and report generation remains disabled until final Call Out report mapping is defined.
+- Main implementation head: `cf938563280622fa073c4c035bdf215585745ac7`.
+- Deploy commit: `9958ae4de9ef55d02e06d3b0e61249842076aec9`.
+- GitHub Pages run: `38145545382` completed successfully, including deployment.

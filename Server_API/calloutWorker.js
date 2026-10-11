@@ -212,14 +212,49 @@ function writeSignatureImage(reportId, payload) {
   fs.mkdirSync(reportDir, { recursive: true });
 
   const parsed = parseImageDataUrl(payload?.signatureDataUrl || payload?.signature || "");
-  const ext = parsed?.ext || ".png";
-  const filename = `signature_${safeBasename(reportId)}${ext}`;
+  if (!parsed?.buffer?.length) {
+    throw new Error("Call Out report is missing a valid technician signature.");
+  }
+
+  const filename = `signature_${safeBasename(reportId)}${parsed.ext}`;
   const filePath = path.join(reportDir, filename);
-  fs.writeFileSync(
-    filePath,
-    parsed?.buffer || Buffer.from(TRANSPARENT_PNG_B64, "base64")
-  );
+  fs.writeFileSync(filePath, parsed.buffer);
   return filename;
+}
+
+function normalizeTemplateImageTags(zip) {
+  const targets = Object.keys(zip.files || {}).filter((name) =>
+    /^word\/(document|header\d+|footer\d+)\.xml$/i.test(name)
+  );
+
+  const replacements = [
+    ["&lt;&lt;photo&gt;&gt;", "&lt;&lt;%photo&gt;&gt;"],
+    ["&lt;&lt;signature&gt;&gt;", "&lt;&lt;%signature&gt;&gt;"],
+    ["<<photo>>", "<<%photo>>"],
+    ["<<signature>>", "<<%signature>>"]
+  ];
+
+  let changed = 0;
+
+  for (const name of targets) {
+    const entry = zip.file(name);
+    if (!entry) continue;
+
+    let xml = entry.asText();
+    let next = xml;
+
+    for (const [plainTag, imageTag] of replacements) {
+      if (!next.includes(plainTag)) continue;
+      next = next.split(plainTag).join(imageTag);
+    }
+
+    if (next !== xml) {
+      zip.file(name, next);
+      changed += 1;
+    }
+  }
+
+  return changed;
 }
 
 function buildTemplateData(payload, reportId) {
@@ -357,20 +392,25 @@ function loadBinary(p) {
 }
 
 function createImageModule(reportId) {
-  if (!ImageModule) return null;
+  if (!ImageModule) {
+    throw new Error("Missing DOCX image dependency: docxtemplater-image-module-free.");
+  }
 
   return new ImageModule({
     centered: false,
     fileType: "docx",
     getImage: (tagValue) => {
       const file = safeBasename(tagValue || "");
-      if (!file) return Buffer.from(TRANSPARENT_PNG_B64, "base64");
-      const imgPath = path.join(photosDirFor(reportId), file);
-      try {
-        return fs.readFileSync(imgPath);
-      } catch {
-        return Buffer.from(TRANSPARENT_PNG_B64, "base64");
+      if (!file) {
+        throw new Error("Call Out template requested an image without a filename.");
       }
+
+      const imgPath = path.join(photosDirFor(reportId), file);
+      if (!fs.existsSync(imgPath)) {
+        throw new Error(`Call Out report image is missing on the server: ${file}`);
+      }
+
+      return fs.readFileSync(imgPath);
     },
     getSize: (img, tagValue) => {
       const file = String(tagValue || "").toLowerCase();
@@ -396,6 +436,12 @@ async function generateDocxFromTemplate(reportId, payload) {
   const content = loadBinary(TEMPLATE_PATH);
   const zip = new PizZip(content);
 
+  // Draft V2 was initially created with ordinary <<photo>> / <<signature>>
+  // placeholders. Convert those legacy tags to image-module tags at runtime so
+  // existing deployed templates embed the actual images without a binary
+  // template replacement.
+  normalizeTemplateImageTags(zip);
+
   const opts = {
     paragraphLoop: true,
     linebreaks: true,
@@ -404,7 +450,7 @@ async function generateDocxFromTemplate(reportId, payload) {
   };
 
   const imageModule = createImageModule(reportId);
-  if (imageModule) opts.modules = [imageModule];
+  opts.modules = [imageModule];
 
   const doc = new Docxtemplater(zip, opts);
   const data = buildTemplateData(payload, reportId);

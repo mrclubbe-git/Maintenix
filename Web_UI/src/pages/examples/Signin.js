@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
 import { Col, Row, Form, Card, Button, Container, InputGroup, Alert, Spinner } from "@themesberg/react-bootstrap";
@@ -7,12 +7,10 @@ import { Link } from "react-router-dom";
 import { Routes } from "../../routes";
 import BgImage from "../../assets/img/illustrations/signin.svg";
 
-function safeJsonParse(str, fallback = null) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return fallback;
-  }
+function clearStoredAuth() {
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("authUser");
+  window.dispatchEvent(new Event("authUserUpdated"));
 }
 
 export default function Signin() {
@@ -21,13 +19,46 @@ export default function Signin() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
 
   useEffect(() => {
     const existingToken = localStorage.getItem("authToken") || "";
-    const existingUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
-    if (existingToken && existingUser?.email) {
-      window.location.hash = Routes.DashboardOverview.path;
+    if (!existingToken) return undefined;
+
+    let mounted = true;
+    const controller = new AbortController();
+
+    async function verifyExistingSession() {
+      try {
+        const res = await fetch("/api/profile/me", {
+          headers: { Authorization: `Bearer ${existingToken}` },
+          signal: controller.signal
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data?.user) {
+          localStorage.setItem("authUser", JSON.stringify(data.user));
+          window.dispatchEvent(new Event("authUserUpdated"));
+          if (mounted) window.location.hash = Routes.DashboardOverview.path;
+          return;
+        }
+
+        if (res.status === 401 || res.status === 403) {
+          clearStoredAuth();
+        }
+      } catch (e) {
+        if (e?.name === "AbortError") return;
+        // Stay on Sign In if the API cannot validate the stored token.
+      }
     }
+
+    verifyExistingSession();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
   }, []);
 
   async function onSubmit(e) {
@@ -35,12 +66,13 @@ export default function Signin() {
     setErr("");
     setSuccessMsg("");
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = String(emailRef.current?.value ?? email).trim().toLowerCase();
+    const currentPassword = String(passwordRef.current?.value ?? password);
     if (!cleanEmail || !cleanEmail.includes("@")) {
       setErr("Please enter a valid email address.");
       return;
     }
-    if (!password) {
+    if (!currentPassword) {
       setErr("Please enter your password.");
       return;
     }
@@ -50,7 +82,7 @@ export default function Signin() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, password })
+        body: JSON.stringify({ email: cleanEmail, password: currentPassword })
       });
 
       const data = await res.json().catch(() => ({}));
@@ -94,47 +126,54 @@ export default function Signin() {
                     {successMsg}
                     <div className="mt-2">
                       Redirecting to{" "}
-                      <Card.Link as={Link} to={Routes.Servicing.path} className="fw-bold">
-                        Servicing
+                      <Card.Link as={Link} to={Routes.DashboardOverview.path} className="fw-bold">
+                        Overview
                       </Card.Link>
                       …
                     </div>
                   </Alert>
                 ) : null}
 
-                <Form className="mt-4" onSubmit={onSubmit}>
-                  <Form.Group id="email" className="mb-4">
+                <Form className="mt-4" onSubmit={onSubmit} autoComplete="on">
+                  <Form.Group controlId="signin-email" className="mb-4">
                     <Form.Label>Your Email</Form.Label>
                     <InputGroup>
                       <InputGroup.Text>
                         <FontAwesomeIcon icon={faEnvelope} />
                       </InputGroup.Text>
                       <Form.Control
+                        ref={emailRef}
                         autoFocus
                         required
                         type="email"
-                        autoComplete="email"
+                        name="username"
+                        autoComplete="username"
+                        inputMode="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
                         placeholder="example@company.com"
-                        value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        onInput={(e) => setEmail(e.currentTarget.value)}
                         disabled={loading}
                       />
                     </InputGroup>
                   </Form.Group>
 
-                  <Form.Group id="password" className="mb-4">
+                  <Form.Group controlId="signin-password" className="mb-4">
                     <Form.Label>Your Password</Form.Label>
                     <InputGroup>
                       <InputGroup.Text>
                         <FontAwesomeIcon icon={faUnlockAlt} />
                       </InputGroup.Text>
                       <Form.Control
+                        ref={passwordRef}
                         required
                         type="password"
+                        name="password"
                         autoComplete="current-password"
                         placeholder="Password"
-                        value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        onInput={(e) => setPassword(e.currentTarget.value)}
                         disabled={loading}
                       />
                     </InputGroup>

@@ -739,3 +739,16 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Main commit: `3a6adee8680720b6181806dab85e2e686a938115`.
 - Deploy commit: `80c67b196be5929352e27afefec5c0f9bdf012ac`.
 - GitHub Pages run: `38146661534` (verify completed success before describing as live).
+
+
+## Call Out report template Draft V2 — 2026-10-11
+
+- Based on the approved Servicing report presentation and the Call Out Draft V1 template.
+- Completion date/time is now captured by the frontend at the instant Submit is pressed and stored in the draft as `callOutCompletedAt`, `callOutCompletedDate`, and `callOutCompletedTime`.
+- Main frontend commit: `2b52984c605c51e9ab6cc63578b75273efe3eb38`.
+- Deploy commit: `2126f83cc2143be2c45d06c65c55d31cfd658368`. GitHub Pages run `38153592164` must complete successfully before describing the frontend change as live.
+- Draft V2 template file generated at `/mnt/data/call_out_report_template_draft_v2.docx` for review; it is not yet wired into the Call Out worker.
+- Template metadata and sign-off use `<<callOutCompletedDate>> <<callOutCompletedTime>>`.
+- Repair outcome sections are mutually exclusive using template booleans: `<<#repairResolved>>...<</repairResolved>>` for Repair Evidence and `<<#repairOutstanding>>...<</repairOutstanding>>` for Repair Requirements. The generator must set exactly one of these true when Question 2 is answered; if Question 2 is not applicable, both should be false.
+- The Questionnaire Summary uses `<<resolutionSummary>>` so the generator can provide outcome-specific supporting detail.
+- Both resolved and outstanding visual variants were rendered and checked successfully.

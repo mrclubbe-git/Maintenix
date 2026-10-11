@@ -66,15 +66,6 @@ function readCorrectionContextFromHash() {
   }
 }
 
-function normalizeServiceToFreqKey(serviceLabel) {
-  const s = String(serviceLabel || "").trim().toLowerCase();
-  if (s === "weekly") return "weekly";
-  if (s === "monthly") return "monthly";
-  if (s === "3-monthly" || s === "3monthly" || s === "quarterly") return "quarterly";
-  if (s === "annual" || s === "yearly") return "annual";
-  return "monthly";
-}
-
 function mergeQuestions(checklist, frequencyKey, standards) {
   const freqOrder = ["weekly", "monthly", "quarterly", "annual"];
   const idx = Math.max(0, freqOrder.indexOf(frequencyKey));
@@ -114,16 +105,6 @@ function getAvailableStandards(checklist) {
 
 function defaultStandardsForChecklist(checklist) {
   return getAvailableStandards(checklist);
-}
-
-function standardsFromDraftValue(v) {
-  if (Array.isArray(v?.selectedStandards)) return v.selectedStandards.filter(Boolean);
-
-  // Backward compatibility for older drafts saved before dynamic standards.
-  const out = [];
-  if (v?.nfpa72) out.push("NFPA 72");
-  if (v?.nfpa2001) out.push("NFPA 2001");
-  return out;
 }
 
 function makeQid(std, qText, idx) {
@@ -504,10 +485,6 @@ export default function CallOut() {
   const areaBoxRef = useRef(null); // ✅ outside click detection
   const areaInputRef = useRef(null); // ✅ focus/select behavior
   const areaCloseTimerRef = useRef(null); // ✅ blur delay to allow click
-  const [serviceType, setServiceType] = useState("Call Out");
-  const [systemType, setSystemType] = useState("substation");
-  const [selectedStandardsState, setSelectedStandardsState] = useState([]);
-  // Legacy draft booleans are still read by standardsFromDraftValue().
 
   // Loaded lists
   const [areaOptions, setAreaOptions] = useState([]);
@@ -634,29 +611,14 @@ export default function CallOut() {
     }
   }
 
-  const availableStandards = useMemo(() => getAvailableStandards(checklist), [checklist]);
-
-  const selectedStandards = useMemo(() => {
-    const allowed = new Set(availableStandards);
-    return (selectedStandardsState || []).filter((std) => allowed.has(std));
-  }, [selectedStandardsState, availableStandards]);
-
-  const frequencyKey = useMemo(() => normalizeServiceToFreqKey(serviceType), [serviceType]);
+  // Temporary only: the copied questionnaire still needs a fixed baseline until
+  // the Call Out-specific question set replaces it. These are not Pre-Start fields.
+  const baselineStandards = useMemo(() => defaultStandardsForChecklist(checklist), [checklist]);
 
   const merged = useMemo(() => {
-    if (!checklist) return null;
-    if (!selectedStandards.length) return null;
-    return mergeQuestions(checklist, frequencyKey, selectedStandards);
-  }, [checklist, frequencyKey, selectedStandards]);
-
-  useEffect(() => {
-    if (!checklist) return;
-    setSelectedStandardsState((prev) => {
-      const allowed = getAvailableStandards(checklist);
-      const kept = (prev || []).filter((std) => allowed.includes(std));
-      return kept.length ? kept : defaultStandardsForChecklist(checklist);
-    });
-  }, [checklist]);
+    if (!checklist || !baselineStandards.length) return null;
+    return mergeQuestions(checklist, "monthly", baselineStandards);
+  }, [checklist, baselineStandards]);
 
   const questionRows = useMemo(() => {
     if (!merged) return [];
@@ -837,8 +799,6 @@ export default function CallOut() {
       const loadedChecklist = getChecklistPayload(checklistRes);
 
       setAreaOptions(areas);
-      setSystemType("substation");
-      setServiceType("Call Out");
       setChecklist(loadedChecklist);
 
       // Keep a local mirror for the current draft implementation.
@@ -861,7 +821,7 @@ export default function CallOut() {
     }
     loadListsAndChecklist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemType, online, canAccess]);
+  }, [online, canAccess]);
 
   useEffect(() => {
     if (dbReady) refreshJobs();
@@ -878,8 +838,6 @@ export default function CallOut() {
   function validatePreStart() {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return "Internet connection is required. Offline mode is temporarily disabled.";
     if (!area) return "Please select an Area.";
-    if (!checklist) return "Call Out checklist is not loaded yet.";
-    if (!selectedStandards.length || !questionRows.length) return "Call Out checklist is not ready yet.";
     return "";
   }
 
@@ -1444,11 +1402,6 @@ export default function CallOut() {
     return {
       step,
       area,
-      serviceType,
-      systemType,
-      selectedStandards,
-      nfpa72: selectedStandards.includes("NFPA 72"),
-      nfpa2001: selectedStandards.includes("NFPA 2001"),
       areaSearch,
       answers: cleanAnswers,
       signatureDataUrl: signatureOverride || "",
@@ -1465,10 +1418,6 @@ export default function CallOut() {
   function loadDraftValueIntoForm(value) {
     const v = value || {};
     setArea(v.area || "");
-    setServiceType("Call Out");
-    setSystemType("substation");
-    const draftStandards = standardsFromDraftValue(v);
-    setSelectedStandardsState(draftStandards.length ? draftStandards : defaultStandardsForChecklist(checklist));
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
@@ -1485,7 +1434,7 @@ export default function CallOut() {
 
   function buildDraftNameFromValue(value, uniqueSource) {
     const v = value || {};
-    return buildServerStyleBaseName(v.area, v.serviceType, new Date().toISOString(), uniqueSource || Date.now());
+    return buildServerStyleBaseName(v.area, "CallOut", new Date().toISOString(), uniqueSource || Date.now());
   }
 
   async function saveDraftRecord(nameOverride, valueOverride) {
@@ -1576,10 +1525,6 @@ export default function CallOut() {
     }
   }
 
-  function makeSelectedStandardsFromValue(v) {
-    return standardsFromDraftValue(v);
-  }
-
   function buildQuestionRowsForDraftValue(v) {
     const snap = Array.isArray(v?.questionRowsSnapshot) ? v.questionRowsSnapshot : [];
     if (snap.length) {
@@ -1593,11 +1538,10 @@ export default function CallOut() {
         .filter((q) => q.question);
     }
 
-    const draftStandards = makeSelectedStandardsFromValue(v);
-    const draftFrequencyKey = normalizeServiceToFreqKey(v?.serviceType);
+    const draftStandards = defaultStandardsForChecklist(checklist);
     if (!checklist || !draftStandards.length) return [];
 
-    const draftMerged = mergeQuestions(checklist, draftFrequencyKey, draftStandards);
+    const draftMerged = mergeQuestions(checklist, "monthly", draftStandards);
     const rows = [];
     Object.keys(draftMerged || {}).forEach((std) => {
       const list = draftMerged[std] || [];
@@ -1617,10 +1561,6 @@ export default function CallOut() {
 
   function validateDraftValueForGeneration(v, draftQuestionRows) {
     if (!v?.area) return "Draft is missing Area.";
-    if (!v?.serviceType) return "Draft is missing Service Type.";
-
-    const standards = makeSelectedStandardsFromValue(v);
-    if (!standards.length) return "Draft is missing selected standards.";
     if (!draftQuestionRows.length) {
       return "Draft questions are unavailable. Open the draft and save it again, then try Generate.";
     }
@@ -1758,9 +1698,6 @@ export default function CallOut() {
     setArea("");
     setAreaSearch("");
     setAreaOpen(false);
-    setServiceType("Call Out");
-    setSystemType("substation");
-    setSelectedStandardsState(defaultStandardsForChecklist(checklist));
     setAnswers({});
     setHighlightMissing(false);
     setHighlightMissingPhotos(false);
@@ -1793,7 +1730,7 @@ export default function CallOut() {
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
         <div>
           <h4 className="mb-0">Call Out</h4>
-          <small className="text-muted">Baseline workflow (Pre-Start → Checklist → Review → Submit)</small>
+          <small className="text-muted">Pre-Start → Checklist → Review → Submit</small>
           {!online ? (
             <div className="mt-1">
               <Badge bg="warning" text="dark">Offline</Badge>
@@ -1851,11 +1788,6 @@ export default function CallOut() {
             </Alert>
           ) : null}
           {info ? <Alert variant="info" className="mb-0">{info}</Alert> : null}
-          {step === 0 ? (
-            <Alert variant="secondary" className="mt-2 mb-0">
-              Call Out now uses its own Pre-Start with the shared global Area list. The copied checklist questions and report mapping will be replaced next.
-            </Alert>
-          ) : null}
         </Card.Body>
       </Card>
 
@@ -1874,7 +1806,7 @@ export default function CallOut() {
                 <div key={j.id} className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 10 }}>
                   <div>
                     <div className="fw-bold">
-                      {j.summary?.area || "-"} • {j.summary?.serviceType || "-"}
+                      {j.summary?.area || "-"} • Call Out
                     </div>
                     <div className="text-muted small">
                       {j.createdAt ? new Date(j.createdAt).toLocaleString() : ""} • {j.status}
@@ -1980,7 +1912,7 @@ export default function CallOut() {
             <Row className="g-3">
               <Col md={12}>
                 <Form.Group>
-                  <Form.Label>Area</Form.Label>
+                  <Form.Label>Area <span className="text-danger">*</span></Form.Label>
                   <div className="text-muted small mb-2">
                     Choose an existing area or add it to the shared area list if it is not available.
                   </div>
@@ -2107,17 +2039,6 @@ export default function CallOut() {
                 </Form.Group>
               </Col>
 
-              <Col md={12}>
-                {!checklist ? (
-                  <Alert variant="warning" className="mb-0">
-                    Call Out baseline checklist is still loading.
-                  </Alert>
-                ) : (
-                  <Alert variant="success" className="mb-0">
-                    Area list and Call Out baseline are ready.
-                  </Alert>
-                )}
-              </Col>
             </Row>
           </Card.Body>
         </Card>

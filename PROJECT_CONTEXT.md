@@ -657,3 +657,13 @@ Pictures and the responder defect description remain optional, matching the pre-
 - `Server_API/routes/servicing.js` now implements `POST /areas`, writing to the same canonical `Server_API/data/templates/areas.txt` used by both Servicing and Call Out.
 - If both add-area endpoints return 404, the UI reports that the API server update/restart is required instead of showing a generic failure.
 - During the Call Out V2 baseline stage, Call Out draft operations use the isolated browser store only, so the UI does not repeatedly call an undeployed `/api/callout/drafts` route. Server draft sync will be re-enabled after the Call Out API/report mapping is finalized.
+
+
+## Sign-in recovery and autofill hardening — 2026-10-11
+
+- Root cause of the repeated 401 loop was a stale browser auth token after the API session store was reset/empty. The backend correctly returned 401; the frontend redirected to Sign In without clearing the rejected token, while Sign In trusted the same stored token and redirected back.
+- `Web_UI/src/pages/HomePage.js` now clears `authToken` and `authUser` when `/api/profile/me` returns 401/403 before redirecting to Sign In. Network/API failures do not erase the stored session.
+- `Web_UI/src/pages/examples/Signin.js` now validates an existing token with `/api/profile/me` before redirecting to Overview. Rejected stored tokens are cleared instead of being trusted from localStorage.
+- Sign-in email/password controls are browser-autofill friendly: standard `name` and `autocomplete` attributes, uncontrolled DOM values backed by refs, and submit reads the actual DOM field values so password-manager/browser autofill is not lost when React state events are skipped.
+- The login success message now says it is redirecting to Overview, matching the actual route.
+- Deploy commit for these frontend fixes: `616bfa6c351ad319e95fde4608bdf6fa46635ef8`. GitHub Pages run: `38140934710` (must be verified successful before describing as live).

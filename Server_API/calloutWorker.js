@@ -8,6 +8,7 @@ const { findOldestQueuedJobSync, claimJobSync } = require("./lib/jobQueue");
 let PizZip = null;
 let Docxtemplater = null;
 let ImageModule = null;
+let sizeOf = null;
 
 try {
   PizZip = require("pizzip");
@@ -16,9 +17,15 @@ try {
   Docxtemplater = require("docxtemplater");
 } catch {}
 try {
-  // Image module used by the Call Out report template.
   ImageModule = require("docxtemplater-image-module-free");
-} catch {}
+} catch {
+  ImageModule = null;
+}
+try {
+  sizeOf = require("image-size");
+} catch {
+  sizeOf = null;
+}
 
 const DATA_DIR = path.join(__dirname, "data");
 const TEMPLATES_DIR = path.join(DATA_DIR, "templates");
@@ -184,6 +191,10 @@ function photosDirFor(reportId) {
 const TRANSPARENT_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0J0AAAAASUVORK5CYII=";
 
+function cmToPx(cm) {
+  return Math.round((cm / 2.54) * 96);
+}
+
 function normalizeAnswer(value) {
   return String(value || "").trim().toUpperCase();
 }
@@ -212,14 +223,16 @@ function writeSignatureImage(reportId, payload) {
   fs.mkdirSync(reportDir, { recursive: true });
 
   const parsed = parseImageDataUrl(payload?.signatureDataUrl || payload?.signature || "");
-  if (!parsed?.buffer?.length) {
-    throw new Error("Call Out report is missing a valid technician signature.");
-  }
-
-  const filename = `signature_${safeBasename(reportId)}${parsed.ext}`;
+  const ext = parsed?.ext || ".png";
+  const filename = `signature_${safeBasename(reportId)}${ext}`;
   const filePath = path.join(reportDir, filename);
-  fs.writeFileSync(filePath, parsed.buffer);
-  return filename;
+
+  fs.writeFileSync(
+    filePath,
+    parsed?.buffer || Buffer.from(TRANSPARENT_PNG_B64, "base64")
+  );
+
+  return filePath;
 }
 
 function normalizeTemplateImageTags(zip) {
@@ -294,7 +307,9 @@ function buildTemplateData(payload, reportId) {
     .filter((photo) => photo.kind === "defect" || photo.questionId === "system_defective")
     .map((photo, index) => ({
       no: index + 1,
-      photo: photo.filename,
+      photo: photo.filename
+        ? path.join(photosDirFor(reportId), photo.filename)
+        : "",
       comment: photo.comment
     }));
 
@@ -302,7 +317,9 @@ function buildTemplateData(payload, reportId) {
     .filter((photo) => photo.kind === "repair" || photo.questionId === "defect_resolved")
     .map((photo, index) => ({
       no: index + 1,
-      photo: photo.filename,
+      photo: photo.filename
+        ? path.join(photosDirFor(reportId), photo.filename)
+        : "",
       comment: photo.comment
     }));
 
@@ -383,7 +400,8 @@ function buildTemplateData(payload, reportId) {
     repairPictures: repairResolved ? repairPictures : [],
     repairRequirements: repairOutstanding ? repairRequirements : [],
     signature,
-    "%signature": signature
+    "%signature": signature,
+    "%%signature": signature
   };
 }
 
@@ -391,31 +409,57 @@ function loadBinary(p) {
   return fs.readFileSync(p, "binary");
 }
 
-function createImageModule(reportId) {
-  if (!ImageModule) {
-    throw new Error("Missing DOCX image dependency: docxtemplater-image-module-free.");
-  }
-
+function makeImageModule() {
   return new ImageModule({
     centered: false,
-    fileType: "docx",
     getImage: (tagValue) => {
-      const file = safeBasename(tagValue || "");
-      if (!file) {
-        throw new Error("Call Out template requested an image without a filename.");
-      }
+      const p = String(tagValue || "").trim();
+      if (!p) return Buffer.from(TRANSPARENT_PNG_B64, "base64");
 
-      const imgPath = path.join(photosDirFor(reportId), file);
-      if (!fs.existsSync(imgPath)) {
-        throw new Error(`Call Out report image is missing on the server: ${file}`);
+      try {
+        if (!fs.existsSync(p)) {
+          return Buffer.from(TRANSPARENT_PNG_B64, "base64");
+        }
+        return fs.readFileSync(p);
+      } catch {
+        return Buffer.from(TRANSPARENT_PNG_B64, "base64");
       }
-
-      return fs.readFileSync(imgPath);
     },
     getSize: (img, tagValue) => {
-      const file = String(tagValue || "").toLowerCase();
-      if (file.includes("signature_")) return [240, 90];
-      return [210, 145];
+      const p = String(tagValue || "").trim();
+      const isSignature =
+        /signature_.*\.(png|jpe?g)$/i.test(p);
+
+      const photoBoxW = cmToPx(3.2);
+      const photoBoxH = cmToPx(4.0);
+      const sigBoxW = 240;
+      const sigBoxH = 90;
+
+      let w = 0;
+      let h = 0;
+      if (sizeOf) {
+        try {
+          const dim = sizeOf(img);
+          w = Number(dim?.width || 0);
+          h = Number(dim?.height || 0);
+        } catch {
+          w = 0;
+          h = 0;
+        }
+      }
+
+      if (!w || !h) {
+        return isSignature ? [sigBoxW, sigBoxH] : [photoBoxW, photoBoxH];
+      }
+
+      const boxW = isSignature ? sigBoxW : photoBoxW;
+      const boxH = isSignature ? sigBoxH : photoBoxH;
+      const scale = Math.min(boxW / w, boxH / h);
+
+      return [
+        Math.max(1, Math.round(w * scale)),
+        Math.max(1, Math.round(h * scale))
+      ];
     }
   });
 }
@@ -449,10 +493,20 @@ async function generateDocxFromTemplate(reportId, payload) {
     nullGetter: () => ""
   };
 
-  const imageModule = createImageModule(reportId);
-  opts.modules = [imageModule];
+  let doc = null;
+  if (ImageModule) {
+    try {
+      doc = new Docxtemplater(zip, { ...opts, modules: [makeImageModule()] });
+    } catch {
+      doc = new Docxtemplater(zip, opts);
+      if (typeof doc.attachModule === "function") {
+        doc.attachModule(makeImageModule());
+      }
+    }
+  } else {
+    doc = new Docxtemplater(zip, opts);
+  }
 
-  const doc = new Docxtemplater(zip, opts);
   const data = buildTemplateData(payload, reportId);
   doc.render(data);
 

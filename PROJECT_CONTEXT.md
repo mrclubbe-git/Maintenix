@@ -680,3 +680,16 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Main shared Area API frontend commit: `4b5afae12ddd044395fec8d606221dee5ef8f5f0`.
 - Deploy commit: `a020ac1fad028531d625a64a679abfdb22bb44b9`.
 - GitHub Pages run: `38142377672` (verify completed success before describing this change as live).
+
+
+## Call Out start timestamp — 2026-10-11
+
+- Call Out Pre-Start remains Area-only.
+- When the technician presses Next from Pre-Start for the first time, the frontend records the Call Out start timestamp using the technician/browser local date and time.
+- Stored draft fields: `callOutStartAt` (offset-aware local timestamp), `callOutStartDate` (YYYY-MM-DD), and `callOutStartTime` (HH:mm:ss).
+- Navigating back to Pre-Start and pressing Next again does not overwrite the original Call Out start timestamp. Starting/resetting a new Call Out clears it.
+- Loading a draft restores these fields; older drafts without them capture a new start timestamp when Next is pressed.
+- Review displays Call Out Start Date and Call Out Start Time.
+- Main implementation commit: `215605cc56dea295ff35f3b0327f843234c21ec5`.
+- Deploy commit: `4dd1dea6232c8a46ea555711133650d7e9a7cf6c`.
+- GitHub Pages run: `38143796936` (verify completed success before describing this change as live).

@@ -1340,7 +1340,7 @@ export default function CallOut() {
   // replaced with the final Call Out questions and report payload mapping.
 
   // ✅ Draft record build/load helpers
-  function buildDraftValue(signatureOverride = signatureDataUrl || "") {
+  function buildDraftValue(signatureOverride = signatureDataUrl || "", completionOverride = null) {
     const cleanAnswers = {};
     questionRows.forEach((q) => {
       const a = { ...emptyCallOutAnswer(q.id), ...(answers?.[q.id] || {}) };
@@ -1357,12 +1357,17 @@ export default function CallOut() {
       };
     });
 
+    const completed = completionOverride || null;
+
     return {
       step,
       area,
       callOutStartAt,
       callOutStartDate,
       callOutStartTime,
+      callOutCompletedAt: completed?.at || "",
+      callOutCompletedDate: completed?.date || "",
+      callOutCompletedTime: completed?.time || "",
       areaSearch,
       answers: cleanAnswers,
       signatureDataUrl: signatureOverride || "",
@@ -1562,7 +1567,8 @@ export default function CallOut() {
       setDraftProgress(35);
       setDraftProgressText("Collecting Call Out responses and evidence…");
 
-      const value = buildDraftValue(capturedSignature);
+      const completed = localCallOutTimestamp();
+      const value = buildDraftValue(capturedSignature, completed);
       const name = buildDraftNameFromValue(value, Date.now());
 
       setDraftProgress(65);

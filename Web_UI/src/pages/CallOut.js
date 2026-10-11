@@ -123,6 +123,61 @@ function localCallOutTimestamp(value = new Date()) {
   };
 }
 
+const CALL_OUT_QUESTIONS = [
+  { id: "system_defective", question: "Is the system defective?" },
+  { id: "defect_resolved", question: "Could the defect be resolved?" }
+];
+
+function emptyCallOutAnswer(questionId) {
+  return questionId === "defect_resolved"
+    ? { answer: "", comment: "", photos: [], requirements: [""] }
+    : { answer: "", comment: "", photos: [], requirements: [] };
+}
+
+function normalizeCallOutPhotos(record) {
+  const photos = Array.isArray(record?.photos) ? record.photos : [];
+  return photos
+    .map((photo) => ({
+      dataUrl: String(photo?.dataUrl || ""),
+      file: photo?.file || null,
+      name: String(photo?.name || "")
+    }))
+    .filter((photo) => photo.dataUrl || photo.file);
+}
+
+function normalizeRequirements(record) {
+  return Array.isArray(record?.requirements)
+    ? record.requirements.map((value) => String(value || ""))
+    : [];
+}
+
+function callOutResponseComplete(questionId, record) {
+  const answer = String(record?.answer || "").trim().toUpperCase();
+
+  if (questionId === "system_defective") {
+    if (answer === "NO") return true;
+    if (answer !== "YES") return false;
+    return !!String(record?.comment || "").trim() && normalizeCallOutPhotos(record).length > 0;
+  }
+
+  if (questionId === "defect_resolved") {
+    if (answer === "YES") {
+      return !!String(record?.comment || "").trim() && normalizeCallOutPhotos(record).length > 0;
+    }
+    if (answer === "NO") {
+      const requirements = normalizeRequirements(record);
+      return requirements.length > 0 && requirements.every((value) => value.trim());
+    }
+  }
+
+  return false;
+}
+
+function callOutMissingPhotos(questionId, record) {
+  const answer = String(record?.answer || "").trim().toUpperCase();
+  return answer === "YES" && normalizeCallOutPhotos(record).length === 0 ? 1 : 0;
+}
+
 function makeQid(std, qText, idx) {
   const base = `${std}__${idx}__${String(qText || "").slice(0, 40)}`;
   return base.replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -484,12 +539,14 @@ export default function CallOut() {
   const [highlightMissing, setHighlightMissing] = useState(false);
   const [highlightMissingPhotos, setHighlightMissingPhotos] = useState(false);
 
-  // Shared defect camera input. Keeping it mounted lets button taps open the camera immediately.
-  const defectCameraInputRef = useRef(null);
-  const defectCameraTargetRef = useRef({ qid: "", defectIndex: 0 });
+  // Shared Call Out photo inputs.
+  const callOutCameraInputRef = useRef(null);
+  const callOutPictureInputRef = useRef(null);
+  const callOutPhotoTargetRef = useRef({ qid: "" });
 
   // Steps: 0=PreStart, 1=Questionnaire, 2=Review, 3=Draft creation progress
   const [step, setStep] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
   const [draftSubmitting, setDraftSubmitting] = useState(false);
   const [draftProgress, setDraftProgress] = useState(0);
   const [draftProgressText, setDraftProgressText] = useState("");
@@ -509,12 +566,8 @@ export default function CallOut() {
   const [areaOptions, setAreaOptions] = useState([]);
   const [addingArea, setAddingArea] = useState(false);
 
-  // Checklist
-  // Temporary baseline: Call Out intentionally uses the Servicing checklist source
-  // until the Call Out-specific question set is defined.
-  const [checklist, setChecklist] = useState(null);
+  // Shared Area list
   const [loadingLists, setLoadingLists] = useState(false);
-  const [loadingChecklist, setLoadingChecklist] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -630,59 +683,31 @@ export default function CallOut() {
     }
   }
 
-  // Temporary only: the copied questionnaire still needs a fixed baseline until
-  // the Call Out-specific question set replaces it. These are not Pre-Start fields.
-  const baselineStandards = useMemo(() => defaultStandardsForChecklist(checklist), [checklist]);
+  const questionRows = CALL_OUT_QUESTIONS;
+  const [answers, setAnswers] = useState({
+    system_defective: emptyCallOutAnswer("system_defective"),
+    defect_resolved: emptyCallOutAnswer("defect_resolved")
+  });
 
-  const merged = useMemo(() => {
-    if (!checklist || !baselineStandards.length) return null;
-    return mergeQuestions(checklist, "monthly", baselineStandards);
-  }, [checklist, baselineStandards]);
+  const systemDefectiveAnswer = String(answers?.system_defective?.answer || "").trim().toUpperCase();
+  const applicableQuestionRows = systemDefectiveAnswer === "YES" ? questionRows : [questionRows[0]];
 
-  const questionRows = useMemo(() => {
-    if (!merged) return [];
-    const rows = [];
-    Object.keys(merged).forEach((std) => {
-      const list = merged[std] || [];
-      list.forEach((q, idx) => {
-        const qText = String(q?.question || "").trim();
-        if (!qText) return;
-        rows.push({
-          id: makeQid(std, qText, idx),
-          std,
-          question: qText,
-          extra: q?.extra ?? ""
-        });
-      });
-    });
-    return rows;
-  }, [merged]);
-
-  const [answers, setAnswers] = useState({});
-
-  const unansweredCount = useMemo(() => {
-    if (!questionRows.length) return 0;
-    return questionRows.filter((q) => !servicingResponseComplete(answers?.[q.id] || {}, q.std)).length;
-  }, [questionRows, answers]);
-
-  const completedCount = useMemo(
-    () => Math.max(0, questionRows.length - unansweredCount),
-    [questionRows.length, unansweredCount]
+  const unansweredCount = useMemo(
+    () => applicableQuestionRows.filter((q) => !callOutResponseComplete(q.id, answers?.[q.id] || {})).length,
+    [applicableQuestionRows, answers]
   );
 
-  const defectsFoundCount = useMemo(() => {
-    return questionRows.filter((q) => {
-      const a = answers?.[q.id] || {};
-      return !isGeneralStd(q.std) && (String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer)) === "yes";
-    }).length;
-  }, [questionRows, answers]);
+  const completedCount = useMemo(
+    () => Math.max(0, applicableQuestionRows.length - unansweredCount),
+    [applicableQuestionRows.length, unansweredCount]
+  );
 
-  const photoMissingCount = useMemo(() => {
-    if (!questionRows.length) return 0;
-    return questionRows.reduce((count, q) => (
-      count + countMissingRequiredPhotos(answers?.[q.id] || {}, q.std)
-    ), 0);
-  }, [questionRows, answers]);
+  const defectsFoundCount = systemDefectiveAnswer === "YES" ? 1 : 0;
+
+  const photoMissingCount = useMemo(
+    () => applicableQuestionRows.reduce((count, q) => count + callOutMissingPhotos(q.id, answers?.[q.id] || {}), 0),
+    [applicableQuestionRows, answers]
+  );
 
   const progress = useMemo(() => (step === 3 ? 100 : Math.round(((step + 1) / 3) * 100)), [step]);
 
@@ -792,7 +817,7 @@ export default function CallOut() {
     } catch {}
   }
 
-  async function loadListsAndChecklist() {
+  async function loadAreaList() {
     setErr("");
     setInfo("");
     if (!authToken) {
@@ -800,35 +825,20 @@ export default function CallOut() {
       return;
     }
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setChecklist(null);
       setAreaOptions([]);
       setErr("Internet connection is required. Offline mode is temporarily disabled.");
       return;
     }
 
     setLoadingLists(true);
-    setLoadingChecklist(true);
-
     try {
-      const [areas, checklistRes] = await Promise.all([
-        fetchGlobalAreas(authToken),
-        fetchJson("/api/servicing/checklist?type=substation")
-      ]);
-
-      const loadedChecklist = getChecklistPayload(checklistRes);
-
+      const areas = await fetchGlobalAreas(authToken);
       setAreaOptions(areas);
-      setChecklist(loadedChecklist);
-
-      // Keep a local mirror for the current draft implementation.
       await cacheSet("areas", areas);
-      await cacheSet("checklist_substation", loadedChecklist);
     } catch (e) {
-      setChecklist(null);
-      setErr(String(e?.message || "Failed to load Call Out baseline data. Internet connection is required."));
+      setErr(String(e?.message || "Failed to load the shared Area list."));
     } finally {
       setLoadingLists(false);
-      setLoadingChecklist(false);
     }
   }
 
@@ -838,7 +848,7 @@ export default function CallOut() {
       setErr("Internet connection is required. Offline mode is temporarily disabled.");
       return;
     }
-    loadListsAndChecklist();
+    loadAreaList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, canAccess]);
 
@@ -861,183 +871,104 @@ export default function CallOut() {
   }
 
   function primeAnswers() {
-    setAnswers((prev) => {
-      const next = { ...(prev || {}) };
-      questionRows.forEach((q) => {
-        if (!next[q.id]) {
-          next[q.id] = {
-            answer: "",
-            defectsFound: "",
-            defects: [],
-            comment: "",
-            extra: {},
-            photoDataUrl: "",
-            photoFile: null
-          };
-        }
-      });
-      return next;
-    });
+    setAnswers((prev) => ({
+      system_defective: { ...emptyCallOutAnswer("system_defective"), ...(prev?.system_defective || {}) },
+      defect_resolved: { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) }
+    }));
   }
 
-  function updateAnswer(qid, patch) {
+  function updateCallOutAnswer(qid, patch) {
     setAnswers((prev) => {
-      const current = prev?.[qid] || {
-        answer: "",
-        defectsFound: "",
-        defects: [],
-        comment: "",
-        extra: {},
-        photoDataUrl: "",
-        photoFile: null
-      };
+      const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
       return { ...prev, [qid]: { ...current, ...patch } };
     });
   }
 
-  function setDefectState(q, index, state) {
+  function selectCallOutAnswer(qid, answer) {
+    const normalized = String(answer || "").trim().toUpperCase();
+
     setAnswers((prev) => {
-      const current = prev?.[q.id] || {
-        answer: "",
-        defectsFound: "",
-        defects: [],
-        comment: "",
-        extra: {},
-        photoDataUrl: "",
-        photoFile: null
-      };
-      const existingDefects = normalizeDefects(current);
-      const defects = state === "yes"
-        ? (existingDefects.length ? existingDefects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
-        : [];
-      return {
-        ...prev,
-        [q.id]: {
-          ...current,
-          defectsFound: state,
-          answer: legacyAnswerForDefectState(q.std, state),
-          defects,
-          comment: state === "yes" ? defectsAsComment(defects) : "",
-          ...(state === "yes" ? {} : { photoDataUrl: "", photoFile: null })
+      const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
+      const next = { ...prev };
+
+      if (qid === "system_defective") {
+        next.system_defective = normalized === "YES"
+          ? { ...current, answer: "YES" }
+          : { ...emptyCallOutAnswer("system_defective"), answer: "NO" };
+
+        if (normalized === "NO") {
+          next.defect_resolved = emptyCallOutAnswer("defect_resolved");
         }
-      };
-    });
-
-    if (state === "no" || state === "na") {
-      window.setTimeout(() => {
-        const nextQuestion = questionRows[index + 1];
-        if (!nextQuestion) return;
-        const nextCard = document.getElementById(`servicing-check-${nextQuestion.id}`);
-        if (nextCard) nextCard.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 180);
-    }
-  }
-
-  function setGeneralResponse(q, answer) {
-    const normalizedAnswer = String(answer || "").trim().toUpperCase();
-    const state = defectStateFromAnswer(normalizedAnswer);
-
-    setAnswers((prev) => {
-      const current = prev?.[q.id] || {
-        answer: "",
-        defectsFound: "",
-        defects: [],
-        comment: "",
-        extra: {},
-        photoDataUrl: "",
-        photoFile: null
-      };
-      const existingDefects = normalizeDefects(current);
-      const evidence = existingDefects[0] || { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
-      const isYes = normalizedAnswer === "YES";
-
-      return {
-        ...prev,
-        [q.id]: {
-          ...current,
-          answer: normalizedAnswer,
-          defectsFound: state,
-          defects: isYes ? [{ ...evidence, finding: "" }] : [],
-          comment: isYes ? "" : String(current.comment || ""),
-          ...(isYes ? {} : { photoDataUrl: "", photoFile: null })
-        }
-      };
-    });
-
-    if (normalizedAnswer === "YES") {
-      openDefectCamera(q.id, 0);
-      return;
-    }
-
-    window.setTimeout(() => {
-      const input = document.getElementById(`servicing-general-comment-${q.id}`);
-      if (input && typeof input.focus === "function") input.focus();
-    }, 120);
-  }
-
-  function updateDefectFinding(qid, defectIndex, value) {
-    setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current);
-      if (!defects[defectIndex]) {
-        defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+      } else {
+        next.defect_resolved = normalized === "YES"
+          ? { ...current, answer: "YES", requirements: [] }
+          : {
+              ...emptyCallOutAnswer("defect_resolved"),
+              answer: "NO",
+              requirements: normalizeRequirements(current).length ? normalizeRequirements(current) : [""]
+            };
       }
-      defects[defectIndex] = { ...defects[defectIndex], finding: value };
+
+      return next;
+    });
+
+    if (normalized === "YES") {
+      window.setTimeout(() => openCallOutCamera(qid), 0);
+    } else if (qid === "defect_resolved" && normalized === "NO") {
+      window.setTimeout(() => {
+        const input = document.getElementById("callout-requirement-0");
+        if (input && typeof input.focus === "function") input.focus();
+      }, 120);
+    }
+  }
+
+  function updateRequirement(index, value) {
+    setAnswers((prev) => {
+      const current = { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) };
+      const requirements = normalizeRequirements(current);
+      requirements[index] = value;
+      return { ...prev, defect_resolved: { ...current, requirements } };
+    });
+  }
+
+  function addRequirement() {
+    setAnswers((prev) => {
+      const current = { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) };
+      const requirements = normalizeRequirements(current);
+      return { ...prev, defect_resolved: { ...current, requirements: [...requirements, ""] } };
+    });
+  }
+
+  function removeRequirement(index) {
+    setAnswers((prev) => {
+      const current = { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) };
+      const requirements = normalizeRequirements(current).filter((_, i) => i !== index);
       return {
         ...prev,
-        [qid]: {
+        defect_resolved: {
           ...current,
-          defects,
-          comment: defectsAsComment(defects)
+          requirements: requirements.length ? requirements : [""]
         }
       };
     });
   }
 
-  // ---- Photos (one photo per defect, captured before defect text) ----
   const isMobile = useMemo(() => isMobileDevice(), []);
 
-  function openDefectCamera(qid, defectIndex) {
-    defectCameraTargetRef.current = { qid, defectIndex };
-    const input = defectCameraInputRef.current;
+  function openCallOutCamera(qid) {
+    callOutPhotoTargetRef.current = { qid };
+    const input = callOutCameraInputRef.current;
     if (input && typeof input.click === "function") input.click();
   }
 
-  function addDefect(qid) {
-    const newIndex = normalizeDefects(answers?.[qid] || {}).length;
-    setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current);
-      const nextDefects = [...defects, { finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
-      return { ...prev, [qid]: { ...current, defects: nextDefects, comment: defectsAsComment(nextDefects) } };
-    });
-    // Same user gesture: immediately repeat the workflow by opening the camera.
-    openDefectCamera(qid, newIndex);
+  function openCallOutPicturePicker(qid) {
+    callOutPhotoTargetRef.current = { qid };
+    const input = callOutPictureInputRef.current;
+    if (input && typeof input.click === "function") input.click();
   }
 
-  function removeDefect(qid, defectIndex) {
-    setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current).filter((_, index) => index !== defectIndex);
-      const nextDefects = defects.length
-        ? defects
-        : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
-      const first = nextDefects[0] || {};
-      return {
-        ...prev,
-        [qid]: {
-          ...current,
-          defects: nextDefects,
-          comment: defectsAsComment(nextDefects),
-          photoDataUrl: first.photoDataUrl || "",
-          photoFile: first.photoFile || null
-        }
-      };
-    });
-  }
-
-  const onDefectPhotoSelected = async (qid, defectIndex, file) => {
-    if (!file) return;
+  const onCallOutPhotoSelected = async (qid, file) => {
+    if (!qid || !file) return;
     if (!String(file.type || "").startsWith("image/")) {
       setErr("Please select an image file.");
       return;
@@ -1057,59 +988,26 @@ export default function CallOut() {
     reader.onload = () => {
       const dataUrl = String(reader.result || "");
       setAnswers((prev) => {
-        const current = prev?.[qid] || {};
-        const defects = normalizeDefects(current);
-        if (!defects[defectIndex]) {
-          defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
-        }
-        defects[defectIndex] = {
-          ...defects[defectIndex],
-          photoDataUrl: dataUrl,
-          photoFile: prepared
-        };
-        const first = defects[0] || {};
+        const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
+        const photos = normalizeCallOutPhotos(current);
         return {
           ...prev,
           [qid]: {
             ...current,
-            defects,
-            comment: defectsAsComment(defects),
-            // Mirror defect 1 for compatibility with old drafts/backends.
-            photoDataUrl: first.photoDataUrl || "",
-            photoFile: first.photoFile || null
+            photos: [...photos, { dataUrl, file: prepared, name: prepared?.name || file?.name || "photo.jpg" }]
           }
         };
       });
-
-      window.setTimeout(() => {
-        const input = document.getElementById(`servicing-defect-${qid}-${defectIndex}`);
-        if (input && typeof input.focus === "function") input.focus();
-      }, 120);
     };
     reader.onerror = () => setErr("Failed to read selected photo.");
     reader.readAsDataURL(prepared);
   };
 
-  function clearDefectPhoto(qid, defectIndex) {
+  function removeCallOutPhoto(qid, photoIndex) {
     setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current);
-      if (!defects[defectIndex]) return prev;
-      defects[defectIndex] = {
-        ...defects[defectIndex],
-        photoDataUrl: "",
-        photoFile: null
-      };
-      const first = defects[0] || {};
-      return {
-        ...prev,
-        [qid]: {
-          ...current,
-          defects,
-          photoDataUrl: first.photoDataUrl || "",
-          photoFile: first.photoFile || null
-        }
-      };
+      const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
+      const photos = normalizeCallOutPhotos(current).filter((_, index) => index !== photoIndex);
+      return { ...prev, [qid]: { ...current, photos } };
     });
   }
 
@@ -1778,10 +1676,10 @@ export default function CallOut() {
 
           <CallOutButton
             variant="outline-secondary"
-            onClick={loadListsAndChecklist}
-            disabled={loadingLists || loadingChecklist || submitting || draftSubmitting}
+            onClick={loadAreaList}
+            disabled={loadingLists || submitting || draftSubmitting}
           >
-            {loadingLists || loadingChecklist ? (
+            {loadingLists ? (
               <>
                 <Spinner className="me-2" /> Loading…
               </>

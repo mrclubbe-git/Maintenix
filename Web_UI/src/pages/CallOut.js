@@ -1154,35 +1154,39 @@ export default function CallOut() {
         setCallOutStartTime(started.time);
       }
       primeAnswers();
+      setQuestionIndex(0);
       setHighlightMissing(false);
       setStep(1);
       return;
     }
 
     if (step === 1) {
-      if (unansweredCount > 0) {
-        setErr(`Please complete every checklist item and all required photo/comment/defect fields before continuing. Incomplete: ${unansweredCount}`);
+      const currentQuestion = questionRows[questionIndex] || questionRows[0];
+      const currentAnswer = answers?.[currentQuestion.id] || {};
+
+      if (!callOutResponseComplete(currentQuestion.id, currentAnswer)) {
         setHighlightMissing(true);
-        setHighlightMissingPhotos(false);
-
-        if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-
-      if (photoMissingCount > 0) {
-        setErr(`Please take required photos before continuing. Missing: ${photoMissingCount}`);
-        setHighlightMissing(false);
-        setHighlightMissingPhotos(true);
-
-        if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        setHighlightMissingPhotos(callOutMissingPhotos(currentQuestion.id, currentAnswer) > 0);
+        if (currentQuestion.id === "system_defective") {
+          setErr("Please answer whether the system is defective. If Yes, at least one picture and a defect description are required.");
+        } else {
+          setErr("Please complete the resolution question and all required details before continuing.");
+        }
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
       setHighlightMissing(false);
       setHighlightMissingPhotos(false);
+
+      if (currentQuestion.id === "system_defective" && String(currentAnswer.answer || "").toUpperCase() === "YES") {
+        setQuestionIndex(1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       setStep(2);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -1193,6 +1197,20 @@ export default function CallOut() {
   function back() {
     setErr("");
     setInfo("");
+    setHighlightMissing(false);
+    setHighlightMissingPhotos(false);
+
+    if (step === 2) {
+      setQuestionIndex(systemDefectiveAnswer === "YES" ? 1 : 0);
+      setStep(1);
+      return;
+    }
+
+    if (step === 1 && questionIndex > 0) {
+      setQuestionIndex(questionIndex - 1);
+      return;
+    }
+
     setStep((s) => Math.max(0, s - 1));
   }
 
@@ -1303,22 +1321,17 @@ export default function CallOut() {
   // ✅ Draft record build/load helpers
   function buildDraftValue(signatureOverride = signatureDataUrl || "") {
     const cleanAnswers = {};
-    Object.keys(answers || {}).forEach((k) => {
-      const a = answers?.[k] || {};
-      const normalizedDefects = normalizeDefects(a).map((defect, defectIndex) => ({
-        finding: defect.finding || "",
-        photoDataUrl: defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl || "" : ""),
-        photoFile: null,
-        photoField: defect.photoField || ""
-      }));
-      cleanAnswers[k] = {
-        answer: a.answer || "",
-        defectsFound: a.defectsFound || defectStateFromAnswer(a.answer),
-        defects: normalizedDefects,
-        comment: defectsAsComment(normalizedDefects) || a.comment || "",
-        extra: a.extra || {},
-        photoDataUrl: normalizedDefects[0]?.photoDataUrl || a.photoDataUrl || "",
-        photoFile: null
+    questionRows.forEach((q) => {
+      const a = { ...emptyCallOutAnswer(q.id), ...(answers?.[q.id] || {}) };
+      cleanAnswers[q.id] = {
+        answer: String(a.answer || "").trim().toUpperCase(),
+        comment: String(a.comment || ""),
+        requirements: normalizeRequirements(a),
+        photos: normalizeCallOutPhotos(a).map((photo) => ({
+          dataUrl: photo.dataUrl || "",
+          file: null,
+          name: photo.name || ""
+        }))
       };
     });
 
@@ -1332,11 +1345,9 @@ export default function CallOut() {
       answers: cleanAnswers,
       signatureDataUrl: signatureOverride || "",
       signatureTouched: false,
-      questionRowsSnapshot: (questionRows || []).map((q) => ({
+      questionRowsSnapshot: questionRows.map((q) => ({
         id: q.id,
-        std: q.std,
-        question: q.question,
-        extra: q.extra || ""
+        question: q.question
       }))
     };
   }
@@ -1350,7 +1361,11 @@ export default function CallOut() {
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
-    setAnswers(v.answers || {});
+    setAnswers({
+      system_defective: { ...emptyCallOutAnswer("system_defective"), ...(v.answers?.system_defective || {}) },
+      defect_resolved: { ...emptyCallOutAnswer("defect_resolved"), ...(v.answers?.defect_resolved || {}) }
+    });
+    setQuestionIndex(0);
     setSignatureDataUrl(v.signatureDataUrl || "");
     setSignatureTouched(false);
 
@@ -1454,56 +1469,22 @@ export default function CallOut() {
     }
   }
 
-  function buildQuestionRowsForDraftValue(v) {
-    const snap = Array.isArray(v?.questionRowsSnapshot) ? v.questionRowsSnapshot : [];
-    if (snap.length) {
-      return snap
-        .map((q, idx) => ({
-          id: q?.id || makeQid(q?.std || "General", q?.question || `Question ${idx + 1}`, idx),
-          std: q?.std || "General",
-          question: String(q?.question || "").trim(),
-          extra: q?.extra || ""
-        }))
-        .filter((q) => q.question);
-    }
-
-    const draftStandards = defaultStandardsForChecklist(checklist);
-    if (!checklist || !draftStandards.length) return [];
-
-    const draftMerged = mergeQuestions(checklist, "monthly", draftStandards);
-    const rows = [];
-    Object.keys(draftMerged || {}).forEach((std) => {
-      const list = draftMerged[std] || [];
-      list.forEach((q, idx) => {
-        const qText = String(q?.question || "").trim();
-        if (!qText) return;
-        rows.push({
-          id: makeQid(std, qText, idx),
-          std,
-          question: qText,
-          extra: q?.extra ?? ""
-        });
-      });
-    });
-    return rows;
+  function buildQuestionRowsForDraftValue() {
+    return questionRows;
   }
 
   function validateDraftValueForGeneration(v, draftQuestionRows) {
     if (!v?.area) return "Draft is missing Area.";
-    if (!draftQuestionRows.length) {
-      return "Draft questions are unavailable. Open the draft and save it again, then try Generate.";
-    }
 
     const draftAnswers = v?.answers || {};
-    const incomplete = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {}, q.std)).length;
+    const systemAnswer = String(draftAnswers?.system_defective?.answer || "").trim().toUpperCase();
+    const applicable = systemAnswer === "YES" ? draftQuestionRows : [draftQuestionRows[0]];
+    const incomplete = applicable.filter((q) => !callOutResponseComplete(q.id, draftAnswers?.[q.id] || {})).length;
+
     if (incomplete > 0) {
-      return `Draft is incomplete. Checklist items still need a response or required photo/comment/defect detail: ${incomplete}`;
+      return `Draft is incomplete. Questionnaire items still need required answers, pictures or comments: ${incomplete}`;
     }
 
-    const missingPhotos = draftQuestionRows.reduce((count, q) => (
-      count + countMissingRequiredPhotos(draftAnswers?.[q.id] || {}, q.std)
-    ), 0);
-    if (missingPhotos > 0) return `Draft is incomplete. Missing required photos: ${missingPhotos}`;
     return "";
   }
 
@@ -1531,7 +1512,7 @@ export default function CallOut() {
     }
 
     if (unansweredCount > 0) {
-      setErr(`Please complete every checklist item before submitting. Incomplete: ${unansweredCount}`);
+      setErr(`Please complete every Call Out question before submitting. Incomplete: ${unansweredCount}`);
       setHighlightMissing(true);
       setStep(1);
       return;
@@ -1557,7 +1538,7 @@ export default function CallOut() {
       }
 
       setDraftProgress(35);
-      setDraftProgressText("Collecting checklist responses and evidence…");
+      setDraftProgressText("Collecting Call Out responses and evidence…");
 
       const value = buildDraftValue(capturedSignature);
       const name = buildDraftNameFromValue(value, Date.now());
@@ -1630,7 +1611,11 @@ export default function CallOut() {
     setCallOutStartTime("");
     setAreaSearch("");
     setAreaOpen(false);
-    setAnswers({});
+    setQuestionIndex(0);
+    setAnswers({
+      system_defective: emptyCallOutAnswer("system_defective"),
+      defect_resolved: emptyCallOutAnswer("defect_resolved")
+    });
     setHighlightMissing(false);
     setHighlightMissingPhotos(false);
 

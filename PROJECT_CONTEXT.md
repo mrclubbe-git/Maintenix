@@ -752,3 +752,17 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Repair outcome sections are mutually exclusive using template booleans: `<<#repairResolved>>...<</repairResolved>>` for Repair Evidence and `<<#repairOutstanding>>...<</repairOutstanding>>` for Repair Requirements. The generator must set exactly one of these true when Question 2 is answered; if Question 2 is not applicable, both should be false.
 - The Questionnaire Summary uses `<<resolutionSummary>>` so the generator can provide outcome-specific supporting detail.
 - Both resolved and outstanding visual variants were rendered and checked successfully.
+
+
+## Call Out report generator integration — 2026-10-11
+
+- Backend `Server_API/calloutWorker.js` is now mapped to the current Call Out Draft V2 report template fields and conditional sections.
+- Main backend commit: `64b356a4d85da05a4082deda460c587bd4712ad9`.
+- The worker validates and maps: Area, technician, start date/time, Submit completion date/time, system-defective outcome, defect pictures with per-picture comments, repair outcome, repair description, repair pictures with per-picture comments, unresolved repair requirements, and signature.
+- Template conditionals are mutually exclusive: `repairResolved` drives Repair Evidence; `repairOutstanding` drives Repair Requirements; both are false when no defect was reported.
+- The worker writes the signature image into the report photo folder for template embedding, generates the DOCX into `data/uploads/reports`, and updates Call Out status/report metadata.
+- No `routes/callout.js`, package.json, or package-lock replacement is required for this generator update.
+- Frontend Generate mapping is staged on main in commit `852cc23c93a7623e1a7421bc87466c426d5bf3bb`, but has NOT been synced to `deploy` yet. Do not describe Generate as live until the server worker is installed and the Pages deploy is verified successful.
+- Backend deployment ZIP created for the user: `/mnt/data/Maintenix_CallOut_Backend_Generator_Update_2026-10-11.zip`. It contains only `Server_API/calloutWorker.js`, placement/restart instructions, and SHA256.
+- Required server destination: `/home/charl/projects/maintenix-dev-api/Server_API/calloutWorker.js`.
+- Required template path remains: `/home/charl/projects/maintenix-dev-api/Server_API/data/templates/call_out_template.docx`.

@@ -140,7 +140,8 @@ function normalizeCallOutPhotos(record) {
     .map((photo) => ({
       dataUrl: String(photo?.dataUrl || ""),
       file: photo?.file || null,
-      name: String(photo?.name || "")
+      name: String(photo?.name || ""),
+      comment: String(photo?.comment || "")
     }))
     .filter((photo) => photo.dataUrl || photo.file);
 }
@@ -157,12 +158,18 @@ function callOutResponseComplete(questionId, record) {
   if (questionId === "system_defective") {
     if (answer === "NO") return true;
     if (answer !== "YES") return false;
-    return !!String(record?.comment || "").trim() && normalizeCallOutPhotos(record).length > 0;
+    const photos = normalizeCallOutPhotos(record);
+    return !!String(record?.comment || "").trim()
+      && photos.length > 0
+      && photos.every((photo) => photo.comment.trim());
   }
 
   if (questionId === "defect_resolved") {
     if (answer === "YES") {
-      return !!String(record?.comment || "").trim() && normalizeCallOutPhotos(record).length > 0;
+      const photos = normalizeCallOutPhotos(record);
+      return !!String(record?.comment || "").trim()
+        && photos.length > 0
+        && photos.every((photo) => photo.comment.trim());
     }
     if (answer === "NO") {
       const requirements = normalizeRequirements(record);
@@ -994,7 +1001,12 @@ export default function CallOut() {
           ...prev,
           [qid]: {
             ...current,
-            photos: [...photos, { dataUrl, file: prepared, name: prepared?.name || file?.name || "photo.jpg" }]
+            photos: [...photos, {
+              dataUrl,
+              file: prepared,
+              name: prepared?.name || file?.name || "photo.jpg",
+              comment: ""
+            }]
           }
         };
       });
@@ -1007,6 +1019,16 @@ export default function CallOut() {
     setAnswers((prev) => {
       const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
       const photos = normalizeCallOutPhotos(current).filter((_, index) => index !== photoIndex);
+      return { ...prev, [qid]: { ...current, photos } };
+    });
+  }
+
+  function updateCallOutPhotoComment(qid, photoIndex, value) {
+    setAnswers((prev) => {
+      const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
+      const photos = normalizeCallOutPhotos(current);
+      if (!photos[photoIndex]) return prev;
+      photos[photoIndex] = { ...photos[photoIndex], comment: value };
       return { ...prev, [qid]: { ...current, photos } };
     });
   }
@@ -1330,7 +1352,8 @@ export default function CallOut() {
         photos: normalizeCallOutPhotos(a).map((photo) => ({
           dataUrl: photo.dataUrl || "",
           file: null,
-          name: photo.name || ""
+          name: photo.name || "",
+          comment: photo.comment || ""
         }))
       };
     });
@@ -2037,8 +2060,8 @@ export default function CallOut() {
                     <div className="fw-bold mb-2">{isFirstQuestion ? "Defect evidence" : "Repair evidence"}</div>
                     <div className="text-muted small mb-3">
                       {isFirstQuestion
-                        ? "Take at least one picture and describe the defect."
-                        : "Take at least one picture and describe what was done to repair the defect."}
+                        ? "Take at least one picture, add a comment to every picture, and describe the defect."
+                        : "Take at least one picture, add a comment to every picture, and describe what was done to repair the defect."}
                     </div>
 
                     <Form.Group className="mb-3">
@@ -2086,6 +2109,18 @@ export default function CallOut() {
                                   Remove
                                 </CallOutButton>
                               </div>
+                              <Form.Group className="mt-2">
+                                <Form.Label className="small fw-bold mb-1">
+                                  Picture comment <span className="text-danger">Required</span>
+                                </Form.Label>
+                                <Form.Control
+                                  as="textarea"
+                                  rows={2}
+                                  placeholder="Describe what this picture shows"
+                                  value={photo.comment || ""}
+                                  onChange={(e) => updateCallOutPhotoComment(q.id, photoIndex, e.target.value)}
+                                />
+                              </Form.Group>
                             </div>
                           </Col>
                         ))}
@@ -2138,7 +2173,7 @@ export default function CallOut() {
                     {!answer
                       ? "Select Yes or No."
                       : answer === "YES"
-                        ? `At least one picture and a ${isFirstQuestion ? "defect" : "repair"} description are required.`
+                        ? `At least one picture, a comment for every picture, and a ${isFirstQuestion ? "defect" : "repair"} description are required.`
                         : "Enter every repair requirement before continuing."}
                   </div>
                 ) : null}
@@ -2174,7 +2209,12 @@ export default function CallOut() {
                 {systemDefectiveAnswer === "YES" ? (
                   <div className="mt-2">
                     <div className="small"><strong>Defect:</strong> {String(answers?.system_defective?.comment || "").trim() || "Missing"}</div>
-                    <div className="small"><strong>Pictures:</strong> {normalizeCallOutPhotos(answers?.system_defective || {}).length}</div>
+                    <div className="small fw-bold mt-2">Pictures:</div>
+                    {normalizeCallOutPhotos(answers?.system_defective || {}).map((photo, index) => (
+                      <div key={`review-defect-photo-${index}`} className="small ms-2">
+                        Picture {index + 1}: {photo.comment || "Missing comment"}
+                      </div>
+                    ))}
                   </div>
                 ) : null}
               </Card.Body>
@@ -2193,7 +2233,12 @@ export default function CallOut() {
                   {String(answers?.defect_resolved?.answer || "").toUpperCase() === "YES" ? (
                     <div className="mt-2">
                       <div className="small"><strong>Repair completed:</strong> {String(answers?.defect_resolved?.comment || "").trim() || "Missing"}</div>
-                      <div className="small"><strong>Pictures:</strong> {normalizeCallOutPhotos(answers?.defect_resolved || {}).length}</div>
+                      <div className="small fw-bold mt-2">Pictures:</div>
+                      {normalizeCallOutPhotos(answers?.defect_resolved || {}).map((photo, index) => (
+                        <div key={`review-repair-photo-${index}`} className="small ms-2">
+                          Picture {index + 1}: {photo.comment || "Missing comment"}
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="mt-2">

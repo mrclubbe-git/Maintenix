@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, Row, Col, Button, Form, Alert, ProgressBar, Badge, Spinner } from "@themesberg/react-bootstrap";
+import { addGlobalArea, fetchGlobalAreas, hasExactAreaMatch } from "../lib/globalAreas";
 
 function ServicingButton({ variant = "primary", disabled = false, style, children, ...props }) {
   return (
@@ -510,6 +511,7 @@ export default function Servicing() {
 
   // Loaded lists
   const [areaOptions, setAreaOptions] = useState([]);
+  const [addingArea, setAddingArea] = useState(false);
   const [serviceOptions, setServiceOptions] = useState([]);
 
   // Checklist
@@ -598,6 +600,38 @@ export default function Servicing() {
 
     return filtered;
   }, [areaOptions, areaSearch, area]);
+
+  const canAddArea = useMemo(() => {
+    const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
+    return !!candidate && !hasExactAreaMatch(areaOptions, candidate);
+  }, [areaOptions, areaSearch]);
+
+  async function createGlobalAreaFromSearch() {
+    const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
+    if (!candidate || addingArea) return;
+
+    setErr("");
+    setInfo("");
+    setAddingArea(true);
+
+    try {
+      const result = await addGlobalArea(authToken, candidate);
+      const updatedAreas = result.areas.length
+        ? result.areas
+        : Array.from(new Set([...(areaOptions || []), result.area]));
+
+      setAreaOptions(updatedAreas);
+      setArea(result.area);
+      setAreaSearch("");
+      setAreaOpen(false);
+      await cacheSet("areas", updatedAreas);
+      setInfo(result.created ? `Area added: ${result.area}` : `Area selected: ${result.area}`);
+    } catch (e) {
+      setErr(String(e?.message || "Failed to add area."));
+    } finally {
+      setAddingArea(false);
+    }
+  }
 
   const availableStandards = useMemo(() => getAvailableStandards(checklist), [checklist]);
 
@@ -816,13 +850,12 @@ export default function Servicing() {
     setLoadingChecklist(true);
 
     try {
-      const [areasRes, servicesRes, checklistRes] = await Promise.all([
-        fetchJson("/api/servicing/areas"),
+      const [areas, servicesRes, checklistRes] = await Promise.all([
+        fetchGlobalAreas(authToken),
         fetchJson("/api/servicing/services"),
         fetchJson(`/api/servicing/checklist?type=${encodeURIComponent(systemType)}`)
       ]);
 
-      const areas = Array.isArray(areasRes?.areas) ? areasRes.areas : [];
       const services = Array.isArray(servicesRes?.services) ? servicesRes.services : [];
       const loadedChecklist = getChecklistPayload(checklistRes);
 
@@ -2304,6 +2337,11 @@ export default function Servicing() {
                           return;
                         }
                         if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (canAddArea) {
+                            createGlobalAreaFromSearch();
+                            return;
+                          }
                           const first = (filteredAreaOptions || [])[0];
                           if (first) {
                             setArea(first);
@@ -2369,6 +2407,26 @@ export default function Servicing() {
                             No areas match “{String(areaSearch || "").trim()}”.
                           </div>
                         )}
+
+                        {canAddArea ? (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onMouseDown={(ev) => ev.preventDefault()}
+                            onClick={createGlobalAreaFromSearch}
+                            style={{
+                              padding: "10px 12px",
+                              cursor: addingArea ? "wait" : "pointer",
+                              borderTop: "1px solid rgba(0,0,0,0.08)",
+                              background: "#f8f9fa"
+                            }}
+                          >
+                            <div className="fw-bold" style={{ fontSize: 14 }}>
+                              {addingArea ? "Adding…" : `+ Add “${String(areaSearch || "").replace(/\s+/g, " ").trim()}”`}
+                            </div>
+                            <div className="text-muted small">Adds this area to the shared Servicing / Call Out area list.</div>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>

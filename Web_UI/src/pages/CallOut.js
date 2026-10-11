@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, Row, Col, Button, Form, Alert, ProgressBar, Badge, Spinner } from "@themesberg/react-bootstrap";
+import { addGlobalArea, fetchGlobalAreas, hasExactAreaMatch } from "../lib/globalAreas";
 
 function CallOutButton({ variant = "primary", disabled = false, style, children, ...props }) {
   return (
@@ -503,14 +504,14 @@ export default function CallOut() {
   const areaBoxRef = useRef(null); // ✅ outside click detection
   const areaInputRef = useRef(null); // ✅ focus/select behavior
   const areaCloseTimerRef = useRef(null); // ✅ blur delay to allow click
-  const [serviceType, setServiceType] = useState("");
+  const [serviceType, setServiceType] = useState("Call Out");
   const [systemType, setSystemType] = useState("substation");
   const [selectedStandardsState, setSelectedStandardsState] = useState([]);
   // Legacy draft booleans are still read by standardsFromDraftValue().
 
   // Loaded lists
   const [areaOptions, setAreaOptions] = useState([]);
-  const [serviceOptions, setServiceOptions] = useState([]);
+  const [addingArea, setAddingArea] = useState(false);
 
   // Checklist
   // Temporary baseline: Call Out intentionally uses the Servicing checklist source
@@ -600,6 +601,38 @@ export default function CallOut() {
 
     return filtered;
   }, [areaOptions, areaSearch, area]);
+
+  const canAddArea = useMemo(() => {
+    const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
+    return !!candidate && !hasExactAreaMatch(areaOptions, candidate);
+  }, [areaOptions, areaSearch]);
+
+  async function createGlobalAreaFromSearch() {
+    const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
+    if (!candidate || addingArea) return;
+
+    setErr("");
+    setInfo("");
+    setAddingArea(true);
+
+    try {
+      const result = await addGlobalArea(authToken, candidate);
+      const updatedAreas = result.areas.length
+        ? result.areas
+        : Array.from(new Set([...(areaOptions || []), result.area]));
+
+      setAreaOptions(updatedAreas);
+      setArea(result.area);
+      setAreaSearch("");
+      setAreaOpen(false);
+      await cacheSet("areas", updatedAreas);
+      setInfo(result.created ? `Area added: ${result.area}` : `Area selected: ${result.area}`);
+    } catch (e) {
+      setErr(String(e?.message || "Failed to add area."));
+    } finally {
+      setAddingArea(false);
+    }
+  }
 
   const availableStandards = useMemo(() => getAvailableStandards(checklist), [checklist]);
 
@@ -811,7 +844,6 @@ export default function CallOut() {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       setChecklist(null);
       setAreaOptions([]);
-      setServiceOptions([]);
       setErr("Internet connection is required. Offline mode is temporarily disabled.");
       return;
     }
@@ -820,25 +852,21 @@ export default function CallOut() {
     setLoadingChecklist(true);
 
     try {
-      const [areasRes, servicesRes, checklistRes] = await Promise.all([
-        fetchJson("/api/servicing/areas"),
-        fetchJson("/api/servicing/services"),
-        fetchJson(`/api/servicing/checklist?type=${encodeURIComponent(systemType)}`)
+      const [areas, checklistRes] = await Promise.all([
+        fetchGlobalAreas(authToken),
+        fetchJson("/api/servicing/checklist?type=substation")
       ]);
 
-      const areas = Array.isArray(areasRes?.areas) ? areasRes.areas : [];
-      const services = Array.isArray(servicesRes?.services) ? servicesRes.services : [];
       const loadedChecklist = getChecklistPayload(checklistRes);
 
       setAreaOptions(areas);
-      setServiceOptions(services);
+      setSystemType("substation");
+      setServiceType("Call Out");
       setChecklist(loadedChecklist);
 
-      // Keep a local mirror for current draft/job implementation, but do not
-      // use it as an offline fallback while offline mode is disabled.
+      // Keep a local mirror for the current draft implementation.
       await cacheSet("areas", areas);
-      await cacheSet("services", services);
-      await cacheSet(`checklist_${systemType}`, loadedChecklist);
+      await cacheSet("checklist_substation", loadedChecklist);
     } catch (e) {
       setChecklist(null);
       setErr(String(e?.message || "Failed to load Call Out baseline data. Internet connection is required."));
@@ -873,9 +901,8 @@ export default function CallOut() {
   function validatePreStart() {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return "Internet connection is required. Offline mode is temporarily disabled.";
     if (!area) return "Please select an Area.";
-    if (!serviceType) return "Please select a Service Type.";
-    if (!selectedStandards.length) return "Please select at least one standard.";
-    if (!checklist) return "Checklist is not loaded yet.";
+    if (!checklist) return "Call Out checklist is not loaded yet.";
+    if (!selectedStandards.length || !questionRows.length) return "Call Out checklist is not ready yet.";
     return "";
   }
 
@@ -1461,10 +1488,10 @@ export default function CallOut() {
   function loadDraftValueIntoForm(value) {
     const v = value || {};
     setArea(v.area || "");
-    setServiceType(v.serviceType || "");
-    setSystemType(v.systemType === "conveyor" ? "conveyor" : "substation");
+    setServiceType("Call Out");
+    setSystemType("substation");
     const draftStandards = standardsFromDraftValue(v);
-    setSelectedStandardsState(draftStandards);
+    setSelectedStandardsState(draftStandards.length ? draftStandards : defaultStandardsForChecklist(checklist));
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
@@ -1775,7 +1802,8 @@ export default function CallOut() {
     setArea("");
     setAreaSearch("");
     setAreaOpen(false);
-    setServiceType("");
+    setServiceType("Call Out");
+    setSystemType("substation");
     setSelectedStandardsState(defaultStandardsForChecklist(checklist));
     setAnswers({});
     setHighlightMissing(false);
@@ -1869,7 +1897,7 @@ export default function CallOut() {
           {info ? <Alert variant="info" className="mb-0">{info}</Alert> : null}
           {step === 0 ? (
             <Alert variant="secondary" className="mt-2 mb-0">
-              Call Out is currently using the Servicing workflow as its clean baseline. The Call Out-specific pre-start fields, questions and report mapping will be replaced next.
+              Call Out now uses its own Pre-Start with the shared global Area list. The copied checklist questions and report mapping will be replaced next.
             </Alert>
           ) : null}
         </Card.Body>
@@ -1989,46 +2017,24 @@ export default function CallOut() {
       {/* STEP 1: PRESTART */}
       {step === 0 ? (
         <Card border="light" className="shadow-sm">
-          <Card.Header className="d-flex justify-content-between align-items-center">
+          <Card.Header>
             <h5 className="mb-0">Pre-Start</h5>
-            <div className="text-muted small">
-              Frequency key: <span className="fw-bold">{frequencyKey}</span>
-            </div>
           </Card.Header>
           <Card.Body>
             <Row className="g-3">
               <Col md={12}>
                 <Form.Group>
-                  <Form.Label>System Type</Form.Label>
-                  <Form.Select
-                    value={systemType}
-                    onChange={(e) => {
-                      const next = e.target.value === "conveyor" ? "conveyor" : "substation";
-                      setSystemType(next);
-                      setChecklist(null);
-                      setAnswers({});
-                      setSelectedStandardsState([]);
-                      setStep(0);
-                    }}
-                    disabled={loadingChecklist}
-                  >
-                    <option value="substation">Substation</option>
-                    <option value="conveyor">Conveyor</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
                   <Form.Label>Area</Form.Label>
+                  <div className="text-muted small mb-2">
+                    Choose an existing area or add it to the shared area list if it is not available.
+                  </div>
 
-                  {/* ✅ UPDATED: Area dropdown with embedded search */}
                   <div ref={areaBoxRef} style={{ position: "relative" }}>
                     <Form.Control
                       ref={areaInputRef}
-                      placeholder="Choose Area…"
+                      placeholder="Choose or search Area…"
                       value={areaOpen ? areaSearch : (area || "")}
-                      disabled={loadingLists}
+                      disabled={loadingLists || addingArea}
                       onFocus={() => {
                         if (!areaOpen) setAreaSearch("");
                         setAreaOpen(true);
@@ -2050,6 +2056,11 @@ export default function CallOut() {
                           return;
                         }
                         if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (canAddArea) {
+                            createGlobalAreaFromSearch();
+                            return;
+                          }
                           const first = (filteredAreaOptions || [])[0];
                           if (first) {
                             setArea(first);
@@ -2080,7 +2091,7 @@ export default function CallOut() {
                           border: "1px solid #ced4da",
                           borderTop: "none",
                           borderRadius: "0 0 8px 8px",
-                          maxHeight: 260,
+                          maxHeight: 320,
                           overflowY: "auto",
                           boxShadow: "0 8px 18px rgba(0,0,0,0.08)"
                         }}
@@ -2091,10 +2102,7 @@ export default function CallOut() {
                               key={opt}
                               role="button"
                               tabIndex={0}
-                              onMouseDown={(ev) => {
-                                // prevent blur before click registers
-                                ev.preventDefault();
-                              }}
+                              onMouseDown={(ev) => ev.preventDefault()}
                               onClick={() => {
                                 setArea(opt);
                                 setAreaSearch("");
@@ -2115,59 +2123,42 @@ export default function CallOut() {
                             No areas match “{String(areaSearch || "").trim()}”.
                           </div>
                         )}
+
+                        {canAddArea ? (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onMouseDown={(ev) => ev.preventDefault()}
+                            onClick={createGlobalAreaFromSearch}
+                            style={{
+                              padding: "10px 12px",
+                              cursor: addingArea ? "wait" : "pointer",
+                              borderTop: "1px solid rgba(0,0,0,0.08)",
+                              background: "#f8f9fa"
+                            }}
+                          >
+                            <div className="fw-bold" style={{ fontSize: 14 }}>
+                              {addingArea ? "Adding…" : `+ Add “${String(areaSearch || "").replace(/\s+/g, " ").trim()}”`}
+                            </div>
+                            <div className="text-muted small">
+                              Adds this area to the same list used by Servicing and Call Out.
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
                 </Form.Group>
               </Col>
 
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Service Type</Form.Label>
-                  <Form.Select value={serviceType} onChange={(e) => setServiceType(e.target.value)} disabled={loadingLists}>
-                    <option value="">Choose Service…</option>
-                    {serviceOptions.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-
-              <Col md={12}>
-                <Form.Label>Standards</Form.Label>
-                <div className="d-flex flex-wrap" style={{ gap: 14 }}>
-                  {availableStandards.length ? (
-                    availableStandards.map((std) => (
-                      <Form.Check
-                        key={std}
-                        type="checkbox"
-                        label={std}
-                        checked={selectedStandards.includes(std)}
-                        onChange={(e) => {
-                          const checked = !!e.target.checked;
-                          setSelectedStandardsState((prev) => {
-                            const cur = new Set(prev || []);
-                            if (checked) cur.add(std);
-                            else cur.delete(std);
-                            return Array.from(cur);
-                          });
-                        }}
-                      />
-                    ))
-                  ) : (
-                    <span className="text-muted small">Standards load from the selected checklist.</span>
-                  )}
-                </div>
-              </Col>
-
               <Col md={12}>
                 {!checklist ? (
                   <Alert variant="warning" className="mb-0">
-                    Checklist not loaded yet. Confirm backend route: <span className="fw-bold">GET /api/servicing/checklist</span>
+                    Call Out baseline checklist is still loading.
                   </Alert>
                 ) : (
                   <Alert variant="success" className="mb-0">
-                    Checklist loaded for {systemType === "conveyor" ? "Conveyor" : "Substation"}.
+                    Area list and Call Out baseline are ready.
                   </Alert>
                 )}
               </Col>
@@ -2184,7 +2175,7 @@ export default function CallOut() {
               <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 12 }}>
                 <div>
                   <h5 className="mb-1">Checklist</h5>
-                  <div className="text-muted small">{systemType === "conveyor" ? "Conveyor" : "Substation"} • {area} • {serviceType}</div>
+                  <div className="text-muted small">{area}</div>
                 </div>
                 <div className="text-end">
                   <div className="fw-bold">{completedCount} of {questionRows.length} completed</div>
@@ -2195,7 +2186,7 @@ export default function CallOut() {
           </Card>
 
           {!questionRows.length ? (
-            <Alert variant="warning" className="mb-0">No checklist items found for the selected frequency/standards.</Alert>
+            <Alert variant="warning" className="mb-0">No Call Out baseline checklist items are available.</Alert>
           ) : (
             questionRows.map((q, idx) => {
               const a = answers?.[q.id] || { answer: "", defectsFound: "", defects: [], comment: "", photoDataUrl: "", photoFile: null };
@@ -2434,12 +2425,7 @@ export default function CallOut() {
             <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
 
             <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
-            <div className="mb-2"><strong>System Type:</strong> {systemType === "conveyor" ? "Conveyor" : "Substation"}</div>
-            <div className="mb-2"><strong>Area:</strong> {area}</div>
-            <div className="mb-2"><strong>Service Type:</strong> {serviceType}</div>
-            <div className="mb-3">
-              <strong>Standards:</strong> {selectedStandards.length ? selectedStandards.join(", ") : "-"}
-            </div>
+            <div className="mb-3"><strong>Area:</strong> {area}</div>
 
             <hr />
 

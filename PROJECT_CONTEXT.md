@@ -647,3 +647,13 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Call Out Pre-Start now exposes only **Area**.
 - System Type, Service Type, and Standards were removed from the Call Out Pre-Start UI and Review metadata.
 - Temporary hidden baseline values remain internally only while the copied Servicing checklist is still being used as the next-edit starting point.
+
+
+## API deployment compatibility — shared areas
+
+- The live development API can lag behind GitHub `main`; a frontend deployment does not deploy `Server_API`.
+- Shared Area reads now use the already-established `GET /api/servicing/areas` endpoint to avoid a 404 while the server catches up.
+- Shared Area writes use `POST /api/servicing/areas` first and fall back to `POST /api/areas` for compatibility.
+- `Server_API/routes/servicing.js` now implements `POST /areas`, writing to the same canonical `Server_API/data/templates/areas.txt` used by both Servicing and Call Out.
+- If both add-area endpoints return 404, the UI reports that the API server update/restart is required instead of showing a generic failure.
+- During the Call Out V2 baseline stage, Call Out draft operations use the isolated browser store only, so the UI does not repeatedly call an undeployed `/api/callout/drafts` route. Server draft sync will be re-enabled after the Call Out API/report mapping is finalized.

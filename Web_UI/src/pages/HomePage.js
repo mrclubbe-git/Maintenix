@@ -75,6 +75,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
     async function verify() {
       // no token => not logged in
       if (!authToken) {
+        localStorage.removeItem("authUser");
         if (!mounted) return;
         setAuthOk(false);
         setAuthChecked(true);
@@ -87,6 +88,16 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
           signal: controller.signal
         });
 
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("authUser");
+          window.dispatchEvent(new Event("authUserUpdated"));
+          if (!mounted) return;
+          setAuthOk(false);
+          setAuthChecked(true);
+          return;
+        }
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         // if backend returns ok, session is valid
@@ -96,7 +107,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
       } catch (e) {
         if (e?.name === "AbortError") return;
         if (!mounted) return;
-        // Offline access is intentionally disabled for now.
+        // API/network failures do not erase a potentially valid stored session.
         setAuthOk(false);
         setAuthChecked(true);
       }

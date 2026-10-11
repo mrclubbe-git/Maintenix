@@ -107,6 +107,22 @@ function defaultStandardsForChecklist(checklist) {
   return getAvailableStandards(checklist);
 }
 
+function localCallOutTimestamp(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value);
+  const pad = (n) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const offsetMinutes = -d.getTimezoneOffset();
+  const offsetSign = offsetMinutes >= 0 ? "+" : "-";
+  const offsetAbs = Math.abs(offsetMinutes);
+  const offset = `${offsetSign}${pad(Math.floor(offsetAbs / 60))}:${pad(offsetAbs % 60)}`;
+  return {
+    at: `${date}T${time}${offset}`,
+    date,
+    time
+  };
+}
+
 function makeQid(std, qText, idx) {
   const base = `${std}__${idx}__${String(qText || "").slice(0, 40)}`;
   return base.replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -480,6 +496,9 @@ export default function CallOut() {
 
   // Prestart
   const [area, setArea] = useState("");
+  const [callOutStartAt, setCallOutStartAt] = useState("");
+  const [callOutStartDate, setCallOutStartDate] = useState("");
+  const [callOutStartTime, setCallOutStartTime] = useState("");
   const [areaSearch, setAreaSearch] = useState("");
   const [areaOpen, setAreaOpen] = useState(false); // ✅ dropdown open state
   const areaBoxRef = useRef(null); // ✅ outside click detection
@@ -1230,6 +1249,12 @@ export default function CallOut() {
         setErr(msg);
         return;
       }
+      if (!callOutStartAt) {
+        const started = localCallOutTimestamp();
+        setCallOutStartAt(started.at);
+        setCallOutStartDate(started.date);
+        setCallOutStartTime(started.time);
+      }
       primeAnswers();
       setHighlightMissing(false);
       setStep(1);
@@ -1402,6 +1427,9 @@ export default function CallOut() {
     return {
       step,
       area,
+      callOutStartAt,
+      callOutStartDate,
+      callOutStartTime,
       areaSearch,
       answers: cleanAnswers,
       signatureDataUrl: signatureOverride || "",
@@ -1418,6 +1446,9 @@ export default function CallOut() {
   function loadDraftValueIntoForm(value) {
     const v = value || {};
     setArea(v.area || "");
+    setCallOutStartAt(v.callOutStartAt || "");
+    setCallOutStartDate(v.callOutStartDate || "");
+    setCallOutStartTime(v.callOutStartTime || "");
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
@@ -1696,6 +1727,9 @@ export default function CallOut() {
     setInfo(message);
     setStep(0);
     setArea("");
+    setCallOutStartAt("");
+    setCallOutStartDate("");
+    setCallOutStartTime("");
     setAreaSearch("");
     setAreaOpen(false);
     setAnswers({});
@@ -2302,7 +2336,9 @@ export default function CallOut() {
             <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
 
             <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
-            <div className="mb-3"><strong>Area:</strong> {area}</div>
+            <div className="mb-2"><strong>Area:</strong> {area}</div>
+            <div className="mb-2"><strong>Call Out Start Date:</strong> {callOutStartDate || "-"}</div>
+            <div className="mb-3"><strong>Call Out Start Time:</strong> {callOutStartTime ? callOutStartTime.slice(0, 5) : "-"}</div>
 
             <hr />
 

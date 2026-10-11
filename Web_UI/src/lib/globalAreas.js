@@ -16,36 +16,41 @@ function authHeaders(authToken, extra = {}) {
 }
 
 export async function fetchGlobalAreas(authToken) {
-  try {
-    const res = await fetch("/api/areas", {
-      headers: authHeaders(authToken)
-    });
-    const data = await readJsonResponse(res);
-    return Array.isArray(data?.areas) ? data.areas : [];
-  } catch (e) {
-    // Temporary deployment compatibility while the new shared areas route is
-    // being rolled out to the API server.
-    if (Number(e?.status || 0) !== 404) throw e;
-
-    const fallback = await fetch("/api/servicing/areas", {
-      headers: authHeaders(authToken)
-    });
-    const data = await readJsonResponse(fallback);
-    return Array.isArray(data?.areas) ? data.areas : [];
-  }
+  const res = await fetch("/api/servicing/areas", {
+    headers: authHeaders(authToken)
+  });
+  const data = await readJsonResponse(res);
+  return Array.isArray(data?.areas) ? data.areas : [];
 }
 
 export async function addGlobalArea(authToken, areaName) {
   const area = String(areaName || "").replace(/\s+/g, " ").trim();
   if (!area) throw new Error("Area name is required.");
 
-  const res = await fetch("/api/areas", {
-    method: "POST",
-    headers: authHeaders(authToken, { "Content-Type": "application/json" }),
-    body: JSON.stringify({ area })
-  });
+  async function postTo(path) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: authHeaders(authToken, { "Content-Type": "application/json" }),
+      body: JSON.stringify({ area })
+    });
+    return readJsonResponse(res);
+  }
 
-  const data = await readJsonResponse(res);
+  let data;
+  try {
+    data = await postTo("/api/servicing/areas");
+  } catch (e) {
+    if (Number(e?.status || 0) !== 404) throw e;
+    try {
+      data = await postTo("/api/areas");
+    } catch (fallbackError) {
+      if (Number(fallbackError?.status || 0) === 404) {
+        throw new Error("Area saving is not deployed on the API server yet. Update and restart the Server_API, then try again.");
+      }
+      throw fallbackError;
+    }
+  }
+
   return {
     area: String(data?.area || area),
     areas: Array.isArray(data?.areas) ? data.areas : [],

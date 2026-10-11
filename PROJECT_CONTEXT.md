@@ -667,3 +667,16 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Sign-in email/password controls are browser-autofill friendly: standard `name` and `autocomplete` attributes, uncontrolled DOM values backed by refs, and submit reads the actual DOM field values so password-manager/browser autofill is not lost when React state events are skipped.
 - The login success message now says it is redirecting to Overview, matching the actual route.
 - Deploy commit for these frontend fixes: `616bfa6c351ad319e95fde4608bdf6fa46635ef8`. GitHub Pages run: `38140934710` (must be verified successful before describing as live).
+
+
+## Call Out Pre-Start cleanup — 2026-10-11
+
+- Call Out Pre-Start is now Area-only. Removed copied Servicing Pre-Start state/data for Service Type, System Type and Standards from new Call Out drafts and reset/load flow.
+- The shared Area selector remains the only Call Out Pre-Start field and is required. Users can search the global list or add a missing Area directly.
+- `Web_UI/src/lib/globalAreas.js` now uses the canonical shared `/api/areas` GET/POST endpoints first, with `/api/servicing/areas` retained only as a 404 compatibility fallback. Servicing and Call Out both use this same helper/list.
+- The temporary copied Servicing questionnaire is still loaded internally only as a baseline for the next development stage; it is no longer treated as Pre-Start configuration.
+- Removed temporary Pre-Start/baseline readiness messaging from the Call Out Pre-Start card and cleaned the header wording.
+- Main Call Out cleanup commit: `503cc9793f57e723e4e6bb3524970ee8f97a36cf`.
+- Main shared Area API frontend commit: `4b5afae12ddd044395fec8d606221dee5ef8f5f0`.
+- Deploy commit: `a020ac1fad028531d625a64a679abfdb22bb44b9`.
+- GitHub Pages run: `38142377672` (verify completed success before describing this change as live).

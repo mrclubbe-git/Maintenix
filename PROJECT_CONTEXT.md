@@ -630,3 +630,20 @@ Pictures and the responder defect description remain optional, matching the pre-
 - New server draft endpoints are provided under `/api/callout/drafts` and stored separately under `Server_API/data/callout-drafts-v2`.
 - The existing Call Out report worker/generator remains unchanged. It will be reconnected after the new Call Out question schema is finalized.
 - Servicing is not modified by this Call Out baseline rebuild.
+
+
+## Shared global Area list
+
+- As of 2026-10-11, Servicing and Call Out use one shared Area list rather than separate/copy lists.
+- Canonical data remains `Server_API/data/templates/areas.txt` so existing area data is preserved in place.
+- Shared API: `GET /api/areas` returns the global list and `POST /api/areas` adds an area.
+- Duplicate prevention is case-insensitive and whitespace-normalized.
+- `Web_UI/src/lib/globalAreas.js` is the shared frontend client used by both pages.
+- Both Servicing and Call Out area pickers allow a logged-in user to add a typed area when there is no exact match in the list.
+- The frontend GET temporarily falls back to legacy `GET /api/servicing/areas` if the shared route has not yet reached the API server; adding areas requires the new shared API route.
+
+## Call Out Pre-Start
+
+- Call Out Pre-Start now exposes only **Area**.
+- System Type, Service Type, and Standards were removed from the Call Out Pre-Start UI and Review metadata.
+- Temporary hidden baseline values remain internally only while the copied Servicing checklist is still being used as the next-edit starting point.

@@ -767,14 +767,6 @@ export default function CallOut() {
   }
 
   async function getDraftRecord(key) {
-    if (authToken && navigator.onLine) {
-      try {
-        const serverRec = await getServerDraft(key);
-        if (serverRec) return serverRec;
-      } catch {
-        // fall back to local mirror
-      }
-    }
     if (!dbRef.current) return null;
     return await idbGet(dbRef.current, "calloutCache", key);
   }
@@ -804,21 +796,6 @@ export default function CallOut() {
       const onlyDrafts = (all || [])
         .filter((x) => x && typeof x.key === "string" && x.key.startsWith("callout_v2_draft_") && x.type === "calloutV2Draft")
         .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
-
-      if (authToken && navigator.onLine) {
-        try {
-          const serverDrafts = await listServerDrafts();
-          const byKey = new Map();
-          serverDrafts.forEach((d) => byKey.set(d.key, d));
-          onlyDrafts.forEach((d) => {
-            if (!byKey.has(d.key)) byKey.set(d.key, d);
-          });
-          setDrafts(Array.from(byKey.values()).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))));
-          return;
-        } catch {
-          // use local fallback below
-        }
-      }
 
       setDrafts(onlyDrafts);
     } catch {
@@ -1527,18 +1504,11 @@ export default function CallOut() {
       value
     };
 
-    let saved = rec;
-    if (authToken && navigator.onLine) {
-      try {
-        saved = await saveServerDraft(rec);
-      } catch (e) {
-        console.warn("Failed to save draft on server; keeping browser fallback.", e);
-      }
-    }
-
-    await idbPut(dbRef.current, "calloutCache", saved);
+    // Call Out V2 drafts remain browser-backed during the baseline stage.
+    // Server draft sync will be re-enabled after the API deployment is confirmed.
+    await idbPut(dbRef.current, "calloutCache", rec);
     await refreshDrafts();
-    return saved.key || key;
+    return rec.key || key;
   }
 
   async function loadDraft(draftKey) {
@@ -1576,18 +1546,11 @@ export default function CallOut() {
         setErr("Draft not found.");
         return;
       }
-      let updated = {
+      const updated = {
         ...rec,
         name,
         updatedAt: new Date().toISOString()
       };
-      if (authToken && navigator.onLine) {
-        try {
-          updated = await saveServerDraft(updated);
-        } catch (e) {
-          console.warn("Failed to rename draft on server; keeping browser fallback.", e);
-        }
-      }
       await idbPut(dbRef.current, "calloutCache", updated);
       await refreshDrafts();
       setInfo("Draft renamed.");
@@ -1605,13 +1568,6 @@ export default function CallOut() {
     if (!dbRef.current) return;
 
     try {
-      if (authToken && navigator.onLine) {
-        try {
-          await deleteServerDraft(draftKey);
-        } catch (e) {
-          console.warn("Failed to delete draft on server; removing browser copy.", e);
-        }
-      }
       await idbDelete(dbRef.current, "calloutCache", draftKey);
       await refreshDrafts();
       setInfo("Draft deleted.");
@@ -2008,7 +1964,7 @@ export default function CallOut() {
             ) : null}
 
             <div className="text-muted small mt-2">
-              Submit the completed baseline checklist from Review to create a Call Out draft. Generate will be enabled after the Call Out-specific questions and report mapping are defined.
+              Submit the completed baseline checklist from Review to create a Call Out draft. During this baseline stage drafts are stored in the browser; server draft sync and Generate will be enabled after the Call Out API/report mapping is finalized.
             </div>
           </Card.Body>
         </Card>

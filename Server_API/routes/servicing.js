@@ -452,6 +452,38 @@ router.get("/areas", requireAuth, (req, res) => {
   res.json({ ok: true, areas: safeLinesFromTxt(AREAS_TXT) });
 });
 
+router.post("/areas", requireAuth, (req, res) => {
+  try {
+    const area = String(req.body?.area || "")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160);
+
+    if (!area) {
+      return res.status(400).json({ ok: false, message: "Area name is required." });
+    }
+
+    const areas = safeLinesFromTxt(AREAS_TXT);
+    const wanted = area.toLowerCase();
+    const existing = areas.find((value) => String(value || "").trim().replace(/\s+/g, " ").toLowerCase() === wanted);
+
+    if (existing) {
+      return res.json({ ok: true, area: existing, areas, created: false });
+    }
+
+    const updated = [...areas, area];
+    ensureDir(path.dirname(AREAS_TXT));
+    const tmp = AREAS_TXT + ".tmp";
+    fs.writeFileSync(tmp, updated.length ? updated.join("\n") + "\n" : "", "utf8");
+    fs.renameSync(tmp, AREAS_TXT);
+
+    return res.status(201).json({ ok: true, area, areas: updated, created: true });
+  } catch (e) {
+    return res.status(500).json({ ok: false, message: String(e?.message || "Failed to add area.") });
+  }
+});
+
 /**
  * GET /api/servicing/services
  */

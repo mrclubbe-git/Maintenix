@@ -714,3 +714,17 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Main implementation head: `cf938563280622fa073c4c035bdf215585745ac7`.
 - Deploy commit: `9958ae4de9ef55d02e06d3b0e61249842076aec9`.
 - GitHub Pages run: `38145545382` completed successfully, including deployment.
+
+
+## Call Out picture comments — 2026-10-11
+
+- Every picture added to the Call Out questionnaire now has its own compulsory comment.
+- Applies to both defect evidence and repair evidence pictures.
+- Picture objects now store `dataUrl`, `name`, and `comment` (with browser-only `file` while active).
+- A Yes answer that requires picture evidence is not complete until at least one picture exists, the question-level description is complete, and every picture has a non-empty picture comment.
+- Each picture card shows its own required `Picture comment` textarea.
+- Review displays every picture and its associated comment text by picture number.
+- Draft serialization preserves each picture comment. Older drafts with pictures but no picture comments become incomplete until comments are added.
+- Main commit: `6fadffcf6be842c7134c3c0046d4e87ea6c8d0da`.
+- Deploy commit: `bc0c970d5db47cf6cfc9a7119cf1fd2ffc1ed7ce`.
+- GitHub Pages run: `38146279974` (verify completed success before describing as live).

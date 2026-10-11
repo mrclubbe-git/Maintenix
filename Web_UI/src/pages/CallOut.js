@@ -159,8 +159,7 @@ function callOutResponseComplete(questionId, record) {
     if (answer === "NO") return true;
     if (answer !== "YES") return false;
     const photos = normalizeCallOutPhotos(record);
-    return !!String(record?.comment || "").trim()
-      && photos.length > 0
+    return photos.length > 0
       && photos.every((photo) => photo.comment.trim());
   }
 
@@ -1190,7 +1189,7 @@ export default function CallOut() {
         setHighlightMissing(true);
         setHighlightMissingPhotos(callOutMissingPhotos(currentQuestion.id, currentAnswer) > 0);
         if (currentQuestion.id === "system_defective") {
-          setErr("Please answer whether the system is defective. If Yes, at least one picture and a defect description are required.");
+          setErr("Please answer whether the system is defective. If Yes, at least one picture and a comment for every picture are required.");
         } else {
           setErr("Please complete the resolution question and all required details before continuing.");
         }
@@ -2060,22 +2059,24 @@ export default function CallOut() {
                     <div className="fw-bold mb-2">{isFirstQuestion ? "Defect evidence" : "Repair evidence"}</div>
                     <div className="text-muted small mb-3">
                       {isFirstQuestion
-                        ? "Take at least one picture, add a comment to every picture, and describe the defect."
+                        ? "Take at least one picture and add a comment to every picture."
                         : "Take at least one picture, add a comment to every picture, and describe what was done to repair the defect."}
                     </div>
 
-                    <Form.Group className="mb-3">
-                      <Form.Label>
-                        {isFirstQuestion ? "Defect description" : "Repair description"} <span className="text-danger">Required</span>
-                      </Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={4}
-                        placeholder={isFirstQuestion ? "Describe the defect" : "Describe what was done to repair the defect"}
-                        value={a.comment || ""}
-                        onChange={(e) => updateCallOutAnswer(q.id, { comment: e.target.value })}
-                      />
-                    </Form.Group>
+                    {!isFirstQuestion ? (
+                      <Form.Group className="mb-3">
+                        <Form.Label>
+                          Repair description <span className="text-danger">Required</span>
+                        </Form.Label>
+                        <Form.Control
+                          as="textarea"
+                          rows={4}
+                          placeholder="Describe what was done to repair the defect"
+                          value={a.comment || ""}
+                          onChange={(e) => updateCallOutAnswer(q.id, { comment: e.target.value })}
+                        />
+                      </Form.Group>
+                    ) : null}
 
                     <div className="d-flex flex-wrap align-items-center mb-3" style={{ gap: 8 }}>
                       <CallOutButton type="button" variant="primary" onClick={() => openCallOutCamera(q.id)}>
@@ -2173,7 +2174,9 @@ export default function CallOut() {
                     {!answer
                       ? "Select Yes or No."
                       : answer === "YES"
-                        ? `At least one picture, a comment for every picture, and a ${isFirstQuestion ? "defect" : "repair"} description are required.`
+                        ? (isFirstQuestion
+                            ? "At least one picture and a comment for every picture are required."
+                            : "At least one picture, a comment for every picture, and a repair description are required.")
                         : "Enter every repair requirement before continuing."}
                   </div>
                 ) : null}
@@ -2208,7 +2211,6 @@ export default function CallOut() {
                 </div>
                 {systemDefectiveAnswer === "YES" ? (
                   <div className="mt-2">
-                    <div className="small"><strong>Defect:</strong> {String(answers?.system_defective?.comment || "").trim() || "Missing"}</div>
                     <div className="small fw-bold mt-2">Pictures:</div>
                     {normalizeCallOutPhotos(answers?.system_defective || {}).map((photo, index) => (
                       <div key={`review-defect-photo-${index}`} className="small ms-2">

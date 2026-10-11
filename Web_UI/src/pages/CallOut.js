@@ -123,6 +123,61 @@ function localCallOutTimestamp(value = new Date()) {
   };
 }
 
+const CALL_OUT_QUESTIONS = [
+  { id: "system_defective", question: "Is the system defective?" },
+  { id: "defect_resolved", question: "Could the defect be resolved?" }
+];
+
+function emptyCallOutAnswer(questionId) {
+  return questionId === "defect_resolved"
+    ? { answer: "", comment: "", photos: [], requirements: [""] }
+    : { answer: "", comment: "", photos: [], requirements: [] };
+}
+
+function normalizeCallOutPhotos(record) {
+  const photos = Array.isArray(record?.photos) ? record.photos : [];
+  return photos
+    .map((photo) => ({
+      dataUrl: String(photo?.dataUrl || ""),
+      file: photo?.file || null,
+      name: String(photo?.name || "")
+    }))
+    .filter((photo) => photo.dataUrl || photo.file);
+}
+
+function normalizeRequirements(record) {
+  return Array.isArray(record?.requirements)
+    ? record.requirements.map((value) => String(value || ""))
+    : [];
+}
+
+function callOutResponseComplete(questionId, record) {
+  const answer = String(record?.answer || "").trim().toUpperCase();
+
+  if (questionId === "system_defective") {
+    if (answer === "NO") return true;
+    if (answer !== "YES") return false;
+    return !!String(record?.comment || "").trim() && normalizeCallOutPhotos(record).length > 0;
+  }
+
+  if (questionId === "defect_resolved") {
+    if (answer === "YES") {
+      return !!String(record?.comment || "").trim() && normalizeCallOutPhotos(record).length > 0;
+    }
+    if (answer === "NO") {
+      const requirements = normalizeRequirements(record);
+      return requirements.length > 0 && requirements.every((value) => value.trim());
+    }
+  }
+
+  return false;
+}
+
+function callOutMissingPhotos(questionId, record) {
+  const answer = String(record?.answer || "").trim().toUpperCase();
+  return answer === "YES" && normalizeCallOutPhotos(record).length === 0 ? 1 : 0;
+}
+
 function makeQid(std, qText, idx) {
   const base = `${std}__${idx}__${String(qText || "").slice(0, 40)}`;
   return base.replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -484,12 +539,14 @@ export default function CallOut() {
   const [highlightMissing, setHighlightMissing] = useState(false);
   const [highlightMissingPhotos, setHighlightMissingPhotos] = useState(false);
 
-  // Shared defect camera input. Keeping it mounted lets button taps open the camera immediately.
-  const defectCameraInputRef = useRef(null);
-  const defectCameraTargetRef = useRef({ qid: "", defectIndex: 0 });
+  // Shared Call Out photo inputs.
+  const callOutCameraInputRef = useRef(null);
+  const callOutPictureInputRef = useRef(null);
+  const callOutPhotoTargetRef = useRef({ qid: "" });
 
   // Steps: 0=PreStart, 1=Questionnaire, 2=Review, 3=Draft creation progress
   const [step, setStep] = useState(0);
+  const [questionIndex, setQuestionIndex] = useState(0);
   const [draftSubmitting, setDraftSubmitting] = useState(false);
   const [draftProgress, setDraftProgress] = useState(0);
   const [draftProgressText, setDraftProgressText] = useState("");
@@ -509,12 +566,8 @@ export default function CallOut() {
   const [areaOptions, setAreaOptions] = useState([]);
   const [addingArea, setAddingArea] = useState(false);
 
-  // Checklist
-  // Temporary baseline: Call Out intentionally uses the Servicing checklist source
-  // until the Call Out-specific question set is defined.
-  const [checklist, setChecklist] = useState(null);
+  // Shared Area list
   const [loadingLists, setLoadingLists] = useState(false);
-  const [loadingChecklist, setLoadingChecklist] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -630,59 +683,31 @@ export default function CallOut() {
     }
   }
 
-  // Temporary only: the copied questionnaire still needs a fixed baseline until
-  // the Call Out-specific question set replaces it. These are not Pre-Start fields.
-  const baselineStandards = useMemo(() => defaultStandardsForChecklist(checklist), [checklist]);
+  const questionRows = CALL_OUT_QUESTIONS;
+  const [answers, setAnswers] = useState({
+    system_defective: emptyCallOutAnswer("system_defective"),
+    defect_resolved: emptyCallOutAnswer("defect_resolved")
+  });
 
-  const merged = useMemo(() => {
-    if (!checklist || !baselineStandards.length) return null;
-    return mergeQuestions(checklist, "monthly", baselineStandards);
-  }, [checklist, baselineStandards]);
+  const systemDefectiveAnswer = String(answers?.system_defective?.answer || "").trim().toUpperCase();
+  const applicableQuestionRows = systemDefectiveAnswer === "YES" ? questionRows : [questionRows[0]];
 
-  const questionRows = useMemo(() => {
-    if (!merged) return [];
-    const rows = [];
-    Object.keys(merged).forEach((std) => {
-      const list = merged[std] || [];
-      list.forEach((q, idx) => {
-        const qText = String(q?.question || "").trim();
-        if (!qText) return;
-        rows.push({
-          id: makeQid(std, qText, idx),
-          std,
-          question: qText,
-          extra: q?.extra ?? ""
-        });
-      });
-    });
-    return rows;
-  }, [merged]);
-
-  const [answers, setAnswers] = useState({});
-
-  const unansweredCount = useMemo(() => {
-    if (!questionRows.length) return 0;
-    return questionRows.filter((q) => !servicingResponseComplete(answers?.[q.id] || {}, q.std)).length;
-  }, [questionRows, answers]);
-
-  const completedCount = useMemo(
-    () => Math.max(0, questionRows.length - unansweredCount),
-    [questionRows.length, unansweredCount]
+  const unansweredCount = useMemo(
+    () => applicableQuestionRows.filter((q) => !callOutResponseComplete(q.id, answers?.[q.id] || {})).length,
+    [applicableQuestionRows, answers]
   );
 
-  const defectsFoundCount = useMemo(() => {
-    return questionRows.filter((q) => {
-      const a = answers?.[q.id] || {};
-      return !isGeneralStd(q.std) && (String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer)) === "yes";
-    }).length;
-  }, [questionRows, answers]);
+  const completedCount = useMemo(
+    () => Math.max(0, applicableQuestionRows.length - unansweredCount),
+    [applicableQuestionRows.length, unansweredCount]
+  );
 
-  const photoMissingCount = useMemo(() => {
-    if (!questionRows.length) return 0;
-    return questionRows.reduce((count, q) => (
-      count + countMissingRequiredPhotos(answers?.[q.id] || {}, q.std)
-    ), 0);
-  }, [questionRows, answers]);
+  const defectsFoundCount = systemDefectiveAnswer === "YES" ? 1 : 0;
+
+  const photoMissingCount = useMemo(
+    () => applicableQuestionRows.reduce((count, q) => count + callOutMissingPhotos(q.id, answers?.[q.id] || {}), 0),
+    [applicableQuestionRows, answers]
+  );
 
   const progress = useMemo(() => (step === 3 ? 100 : Math.round(((step + 1) / 3) * 100)), [step]);
 
@@ -792,7 +817,7 @@ export default function CallOut() {
     } catch {}
   }
 
-  async function loadListsAndChecklist() {
+  async function loadAreaList() {
     setErr("");
     setInfo("");
     if (!authToken) {
@@ -800,35 +825,20 @@ export default function CallOut() {
       return;
     }
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setChecklist(null);
       setAreaOptions([]);
       setErr("Internet connection is required. Offline mode is temporarily disabled.");
       return;
     }
 
     setLoadingLists(true);
-    setLoadingChecklist(true);
-
     try {
-      const [areas, checklistRes] = await Promise.all([
-        fetchGlobalAreas(authToken),
-        fetchJson("/api/servicing/checklist?type=substation")
-      ]);
-
-      const loadedChecklist = getChecklistPayload(checklistRes);
-
+      const areas = await fetchGlobalAreas(authToken);
       setAreaOptions(areas);
-      setChecklist(loadedChecklist);
-
-      // Keep a local mirror for the current draft implementation.
       await cacheSet("areas", areas);
-      await cacheSet("checklist_substation", loadedChecklist);
     } catch (e) {
-      setChecklist(null);
-      setErr(String(e?.message || "Failed to load Call Out baseline data. Internet connection is required."));
+      setErr(String(e?.message || "Failed to load the shared Area list."));
     } finally {
       setLoadingLists(false);
-      setLoadingChecklist(false);
     }
   }
 
@@ -838,7 +848,7 @@ export default function CallOut() {
       setErr("Internet connection is required. Offline mode is temporarily disabled.");
       return;
     }
-    loadListsAndChecklist();
+    loadAreaList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, canAccess]);
 
@@ -861,183 +871,104 @@ export default function CallOut() {
   }
 
   function primeAnswers() {
-    setAnswers((prev) => {
-      const next = { ...(prev || {}) };
-      questionRows.forEach((q) => {
-        if (!next[q.id]) {
-          next[q.id] = {
-            answer: "",
-            defectsFound: "",
-            defects: [],
-            comment: "",
-            extra: {},
-            photoDataUrl: "",
-            photoFile: null
-          };
-        }
-      });
-      return next;
-    });
+    setAnswers((prev) => ({
+      system_defective: { ...emptyCallOutAnswer("system_defective"), ...(prev?.system_defective || {}) },
+      defect_resolved: { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) }
+    }));
   }
 
-  function updateAnswer(qid, patch) {
+  function updateCallOutAnswer(qid, patch) {
     setAnswers((prev) => {
-      const current = prev?.[qid] || {
-        answer: "",
-        defectsFound: "",
-        defects: [],
-        comment: "",
-        extra: {},
-        photoDataUrl: "",
-        photoFile: null
-      };
+      const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
       return { ...prev, [qid]: { ...current, ...patch } };
     });
   }
 
-  function setDefectState(q, index, state) {
+  function selectCallOutAnswer(qid, answer) {
+    const normalized = String(answer || "").trim().toUpperCase();
+
     setAnswers((prev) => {
-      const current = prev?.[q.id] || {
-        answer: "",
-        defectsFound: "",
-        defects: [],
-        comment: "",
-        extra: {},
-        photoDataUrl: "",
-        photoFile: null
-      };
-      const existingDefects = normalizeDefects(current);
-      const defects = state === "yes"
-        ? (existingDefects.length ? existingDefects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
-        : [];
-      return {
-        ...prev,
-        [q.id]: {
-          ...current,
-          defectsFound: state,
-          answer: legacyAnswerForDefectState(q.std, state),
-          defects,
-          comment: state === "yes" ? defectsAsComment(defects) : "",
-          ...(state === "yes" ? {} : { photoDataUrl: "", photoFile: null })
+      const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
+      const next = { ...prev };
+
+      if (qid === "system_defective") {
+        next.system_defective = normalized === "YES"
+          ? { ...current, answer: "YES" }
+          : { ...emptyCallOutAnswer("system_defective"), answer: "NO" };
+
+        if (normalized === "NO") {
+          next.defect_resolved = emptyCallOutAnswer("defect_resolved");
         }
-      };
-    });
-
-    if (state === "no" || state === "na") {
-      window.setTimeout(() => {
-        const nextQuestion = questionRows[index + 1];
-        if (!nextQuestion) return;
-        const nextCard = document.getElementById(`servicing-check-${nextQuestion.id}`);
-        if (nextCard) nextCard.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 180);
-    }
-  }
-
-  function setGeneralResponse(q, answer) {
-    const normalizedAnswer = String(answer || "").trim().toUpperCase();
-    const state = defectStateFromAnswer(normalizedAnswer);
-
-    setAnswers((prev) => {
-      const current = prev?.[q.id] || {
-        answer: "",
-        defectsFound: "",
-        defects: [],
-        comment: "",
-        extra: {},
-        photoDataUrl: "",
-        photoFile: null
-      };
-      const existingDefects = normalizeDefects(current);
-      const evidence = existingDefects[0] || { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
-      const isYes = normalizedAnswer === "YES";
-
-      return {
-        ...prev,
-        [q.id]: {
-          ...current,
-          answer: normalizedAnswer,
-          defectsFound: state,
-          defects: isYes ? [{ ...evidence, finding: "" }] : [],
-          comment: isYes ? "" : String(current.comment || ""),
-          ...(isYes ? {} : { photoDataUrl: "", photoFile: null })
-        }
-      };
-    });
-
-    if (normalizedAnswer === "YES") {
-      openDefectCamera(q.id, 0);
-      return;
-    }
-
-    window.setTimeout(() => {
-      const input = document.getElementById(`servicing-general-comment-${q.id}`);
-      if (input && typeof input.focus === "function") input.focus();
-    }, 120);
-  }
-
-  function updateDefectFinding(qid, defectIndex, value) {
-    setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current);
-      if (!defects[defectIndex]) {
-        defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
+      } else {
+        next.defect_resolved = normalized === "YES"
+          ? { ...current, answer: "YES", requirements: [] }
+          : {
+              ...emptyCallOutAnswer("defect_resolved"),
+              answer: "NO",
+              requirements: normalizeRequirements(current).length ? normalizeRequirements(current) : [""]
+            };
       }
-      defects[defectIndex] = { ...defects[defectIndex], finding: value };
+
+      return next;
+    });
+
+    if (normalized === "YES") {
+      window.setTimeout(() => openCallOutCamera(qid), 0);
+    } else if (qid === "defect_resolved" && normalized === "NO") {
+      window.setTimeout(() => {
+        const input = document.getElementById("callout-requirement-0");
+        if (input && typeof input.focus === "function") input.focus();
+      }, 120);
+    }
+  }
+
+  function updateRequirement(index, value) {
+    setAnswers((prev) => {
+      const current = { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) };
+      const requirements = normalizeRequirements(current);
+      requirements[index] = value;
+      return { ...prev, defect_resolved: { ...current, requirements } };
+    });
+  }
+
+  function addRequirement() {
+    setAnswers((prev) => {
+      const current = { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) };
+      const requirements = normalizeRequirements(current);
+      return { ...prev, defect_resolved: { ...current, requirements: [...requirements, ""] } };
+    });
+  }
+
+  function removeRequirement(index) {
+    setAnswers((prev) => {
+      const current = { ...emptyCallOutAnswer("defect_resolved"), ...(prev?.defect_resolved || {}) };
+      const requirements = normalizeRequirements(current).filter((_, i) => i !== index);
       return {
         ...prev,
-        [qid]: {
+        defect_resolved: {
           ...current,
-          defects,
-          comment: defectsAsComment(defects)
+          requirements: requirements.length ? requirements : [""]
         }
       };
     });
   }
 
-  // ---- Photos (one photo per defect, captured before defect text) ----
   const isMobile = useMemo(() => isMobileDevice(), []);
 
-  function openDefectCamera(qid, defectIndex) {
-    defectCameraTargetRef.current = { qid, defectIndex };
-    const input = defectCameraInputRef.current;
+  function openCallOutCamera(qid) {
+    callOutPhotoTargetRef.current = { qid };
+    const input = callOutCameraInputRef.current;
     if (input && typeof input.click === "function") input.click();
   }
 
-  function addDefect(qid) {
-    const newIndex = normalizeDefects(answers?.[qid] || {}).length;
-    setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current);
-      const nextDefects = [...defects, { finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
-      return { ...prev, [qid]: { ...current, defects: nextDefects, comment: defectsAsComment(nextDefects) } };
-    });
-    // Same user gesture: immediately repeat the workflow by opening the camera.
-    openDefectCamera(qid, newIndex);
+  function openCallOutPicturePicker(qid) {
+    callOutPhotoTargetRef.current = { qid };
+    const input = callOutPictureInputRef.current;
+    if (input && typeof input.click === "function") input.click();
   }
 
-  function removeDefect(qid, defectIndex) {
-    setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current).filter((_, index) => index !== defectIndex);
-      const nextDefects = defects.length
-        ? defects
-        : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }];
-      const first = nextDefects[0] || {};
-      return {
-        ...prev,
-        [qid]: {
-          ...current,
-          defects: nextDefects,
-          comment: defectsAsComment(nextDefects),
-          photoDataUrl: first.photoDataUrl || "",
-          photoFile: first.photoFile || null
-        }
-      };
-    });
-  }
-
-  const onDefectPhotoSelected = async (qid, defectIndex, file) => {
-    if (!file) return;
+  const onCallOutPhotoSelected = async (qid, file) => {
+    if (!qid || !file) return;
     if (!String(file.type || "").startsWith("image/")) {
       setErr("Please select an image file.");
       return;
@@ -1057,59 +988,26 @@ export default function CallOut() {
     reader.onload = () => {
       const dataUrl = String(reader.result || "");
       setAnswers((prev) => {
-        const current = prev?.[qid] || {};
-        const defects = normalizeDefects(current);
-        if (!defects[defectIndex]) {
-          defects[defectIndex] = { finding: "", photoDataUrl: "", photoFile: null, photoField: "" };
-        }
-        defects[defectIndex] = {
-          ...defects[defectIndex],
-          photoDataUrl: dataUrl,
-          photoFile: prepared
-        };
-        const first = defects[0] || {};
+        const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
+        const photos = normalizeCallOutPhotos(current);
         return {
           ...prev,
           [qid]: {
             ...current,
-            defects,
-            comment: defectsAsComment(defects),
-            // Mirror defect 1 for compatibility with old drafts/backends.
-            photoDataUrl: first.photoDataUrl || "",
-            photoFile: first.photoFile || null
+            photos: [...photos, { dataUrl, file: prepared, name: prepared?.name || file?.name || "photo.jpg" }]
           }
         };
       });
-
-      window.setTimeout(() => {
-        const input = document.getElementById(`servicing-defect-${qid}-${defectIndex}`);
-        if (input && typeof input.focus === "function") input.focus();
-      }, 120);
     };
     reader.onerror = () => setErr("Failed to read selected photo.");
     reader.readAsDataURL(prepared);
   };
 
-  function clearDefectPhoto(qid, defectIndex) {
+  function removeCallOutPhoto(qid, photoIndex) {
     setAnswers((prev) => {
-      const current = prev?.[qid] || {};
-      const defects = normalizeDefects(current);
-      if (!defects[defectIndex]) return prev;
-      defects[defectIndex] = {
-        ...defects[defectIndex],
-        photoDataUrl: "",
-        photoFile: null
-      };
-      const first = defects[0] || {};
-      return {
-        ...prev,
-        [qid]: {
-          ...current,
-          defects,
-          photoDataUrl: first.photoDataUrl || "",
-          photoFile: first.photoFile || null
-        }
-      };
+      const current = { ...emptyCallOutAnswer(qid), ...(prev?.[qid] || {}) };
+      const photos = normalizeCallOutPhotos(current).filter((_, index) => index !== photoIndex);
+      return { ...prev, [qid]: { ...current, photos } };
     });
   }
 
@@ -1256,35 +1154,39 @@ export default function CallOut() {
         setCallOutStartTime(started.time);
       }
       primeAnswers();
+      setQuestionIndex(0);
       setHighlightMissing(false);
       setStep(1);
       return;
     }
 
     if (step === 1) {
-      if (unansweredCount > 0) {
-        setErr(`Please complete every checklist item and all required photo/comment/defect fields before continuing. Incomplete: ${unansweredCount}`);
+      const currentQuestion = questionRows[questionIndex] || questionRows[0];
+      const currentAnswer = answers?.[currentQuestion.id] || {};
+
+      if (!callOutResponseComplete(currentQuestion.id, currentAnswer)) {
         setHighlightMissing(true);
-        setHighlightMissingPhotos(false);
-
-        if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-
-      if (photoMissingCount > 0) {
-        setErr(`Please take required photos before continuing. Missing: ${photoMissingCount}`);
-        setHighlightMissing(false);
-        setHighlightMissingPhotos(true);
-
-        if (topRef.current) topRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        setHighlightMissingPhotos(callOutMissingPhotos(currentQuestion.id, currentAnswer) > 0);
+        if (currentQuestion.id === "system_defective") {
+          setErr("Please answer whether the system is defective. If Yes, at least one picture and a defect description are required.");
+        } else {
+          setErr("Please complete the resolution question and all required details before continuing.");
+        }
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
       setHighlightMissing(false);
       setHighlightMissingPhotos(false);
+
+      if (currentQuestion.id === "system_defective" && String(currentAnswer.answer || "").toUpperCase() === "YES") {
+        setQuestionIndex(1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       setStep(2);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -1295,6 +1197,20 @@ export default function CallOut() {
   function back() {
     setErr("");
     setInfo("");
+    setHighlightMissing(false);
+    setHighlightMissingPhotos(false);
+
+    if (step === 2) {
+      setQuestionIndex(systemDefectiveAnswer === "YES" ? 1 : 0);
+      setStep(1);
+      return;
+    }
+
+    if (step === 1 && questionIndex > 0) {
+      setQuestionIndex(questionIndex - 1);
+      return;
+    }
+
     setStep((s) => Math.max(0, s - 1));
   }
 
@@ -1405,22 +1321,17 @@ export default function CallOut() {
   // ✅ Draft record build/load helpers
   function buildDraftValue(signatureOverride = signatureDataUrl || "") {
     const cleanAnswers = {};
-    Object.keys(answers || {}).forEach((k) => {
-      const a = answers?.[k] || {};
-      const normalizedDefects = normalizeDefects(a).map((defect, defectIndex) => ({
-        finding: defect.finding || "",
-        photoDataUrl: defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl || "" : ""),
-        photoFile: null,
-        photoField: defect.photoField || ""
-      }));
-      cleanAnswers[k] = {
-        answer: a.answer || "",
-        defectsFound: a.defectsFound || defectStateFromAnswer(a.answer),
-        defects: normalizedDefects,
-        comment: defectsAsComment(normalizedDefects) || a.comment || "",
-        extra: a.extra || {},
-        photoDataUrl: normalizedDefects[0]?.photoDataUrl || a.photoDataUrl || "",
-        photoFile: null
+    questionRows.forEach((q) => {
+      const a = { ...emptyCallOutAnswer(q.id), ...(answers?.[q.id] || {}) };
+      cleanAnswers[q.id] = {
+        answer: String(a.answer || "").trim().toUpperCase(),
+        comment: String(a.comment || ""),
+        requirements: normalizeRequirements(a),
+        photos: normalizeCallOutPhotos(a).map((photo) => ({
+          dataUrl: photo.dataUrl || "",
+          file: null,
+          name: photo.name || ""
+        }))
       };
     });
 
@@ -1434,11 +1345,9 @@ export default function CallOut() {
       answers: cleanAnswers,
       signatureDataUrl: signatureOverride || "",
       signatureTouched: false,
-      questionRowsSnapshot: (questionRows || []).map((q) => ({
+      questionRowsSnapshot: questionRows.map((q) => ({
         id: q.id,
-        std: q.std,
-        question: q.question,
-        extra: q.extra || ""
+        question: q.question
       }))
     };
   }
@@ -1452,7 +1361,11 @@ export default function CallOut() {
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
-    setAnswers(v.answers || {});
+    setAnswers({
+      system_defective: { ...emptyCallOutAnswer("system_defective"), ...(v.answers?.system_defective || {}) },
+      defect_resolved: { ...emptyCallOutAnswer("defect_resolved"), ...(v.answers?.defect_resolved || {}) }
+    });
+    setQuestionIndex(0);
     setSignatureDataUrl(v.signatureDataUrl || "");
     setSignatureTouched(false);
 
@@ -1556,56 +1469,22 @@ export default function CallOut() {
     }
   }
 
-  function buildQuestionRowsForDraftValue(v) {
-    const snap = Array.isArray(v?.questionRowsSnapshot) ? v.questionRowsSnapshot : [];
-    if (snap.length) {
-      return snap
-        .map((q, idx) => ({
-          id: q?.id || makeQid(q?.std || "General", q?.question || `Question ${idx + 1}`, idx),
-          std: q?.std || "General",
-          question: String(q?.question || "").trim(),
-          extra: q?.extra || ""
-        }))
-        .filter((q) => q.question);
-    }
-
-    const draftStandards = defaultStandardsForChecklist(checklist);
-    if (!checklist || !draftStandards.length) return [];
-
-    const draftMerged = mergeQuestions(checklist, "monthly", draftStandards);
-    const rows = [];
-    Object.keys(draftMerged || {}).forEach((std) => {
-      const list = draftMerged[std] || [];
-      list.forEach((q, idx) => {
-        const qText = String(q?.question || "").trim();
-        if (!qText) return;
-        rows.push({
-          id: makeQid(std, qText, idx),
-          std,
-          question: qText,
-          extra: q?.extra ?? ""
-        });
-      });
-    });
-    return rows;
+  function buildQuestionRowsForDraftValue() {
+    return questionRows;
   }
 
   function validateDraftValueForGeneration(v, draftQuestionRows) {
     if (!v?.area) return "Draft is missing Area.";
-    if (!draftQuestionRows.length) {
-      return "Draft questions are unavailable. Open the draft and save it again, then try Generate.";
-    }
 
     const draftAnswers = v?.answers || {};
-    const incomplete = draftQuestionRows.filter((q) => !servicingResponseComplete(draftAnswers?.[q.id] || {}, q.std)).length;
+    const systemAnswer = String(draftAnswers?.system_defective?.answer || "").trim().toUpperCase();
+    const applicable = systemAnswer === "YES" ? draftQuestionRows : [draftQuestionRows[0]];
+    const incomplete = applicable.filter((q) => !callOutResponseComplete(q.id, draftAnswers?.[q.id] || {})).length;
+
     if (incomplete > 0) {
-      return `Draft is incomplete. Checklist items still need a response or required photo/comment/defect detail: ${incomplete}`;
+      return `Draft is incomplete. Questionnaire items still need required answers, pictures or comments: ${incomplete}`;
     }
 
-    const missingPhotos = draftQuestionRows.reduce((count, q) => (
-      count + countMissingRequiredPhotos(draftAnswers?.[q.id] || {}, q.std)
-    ), 0);
-    if (missingPhotos > 0) return `Draft is incomplete. Missing required photos: ${missingPhotos}`;
     return "";
   }
 
@@ -1633,7 +1512,7 @@ export default function CallOut() {
     }
 
     if (unansweredCount > 0) {
-      setErr(`Please complete every checklist item before submitting. Incomplete: ${unansweredCount}`);
+      setErr(`Please complete every Call Out question before submitting. Incomplete: ${unansweredCount}`);
       setHighlightMissing(true);
       setStep(1);
       return;
@@ -1659,7 +1538,7 @@ export default function CallOut() {
       }
 
       setDraftProgress(35);
-      setDraftProgressText("Collecting checklist responses and evidence…");
+      setDraftProgressText("Collecting Call Out responses and evidence…");
 
       const value = buildDraftValue(capturedSignature);
       const name = buildDraftNameFromValue(value, Date.now());
@@ -1732,7 +1611,11 @@ export default function CallOut() {
     setCallOutStartTime("");
     setAreaSearch("");
     setAreaOpen(false);
-    setAnswers({});
+    setQuestionIndex(0);
+    setAnswers({
+      system_defective: emptyCallOutAnswer("system_defective"),
+      defect_resolved: emptyCallOutAnswer("defect_resolved")
+    });
     setHighlightMissing(false);
     setHighlightMissingPhotos(false);
 
@@ -1749,22 +1632,34 @@ export default function CallOut() {
   return (
     <>
       <input
-        ref={defectCameraInputRef}
+        ref={callOutCameraInputRef}
         type="file"
         accept="image/*"
         {...(isMobile ? { capture: "environment" } : {})}
         style={{ display: "none" }}
         onChange={(e) => {
           const file = e.target.files && e.target.files[0];
-          const target = defectCameraTargetRef.current || {};
-          if (file && target.qid) onDefectPhotoSelected(target.qid, Number(target.defectIndex || 0), file);
+          const target = callOutPhotoTargetRef.current || {};
+          if (file && target.qid) onCallOutPhotoSelected(target.qid, file);
+          try { e.target.value = ""; } catch {}
+        }}
+      />
+      <input
+        ref={callOutPictureInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files && e.target.files[0];
+          const target = callOutPhotoTargetRef.current || {};
+          if (file && target.qid) onCallOutPhotoSelected(target.qid, file);
           try { e.target.value = ""; } catch {}
         }}
       />
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
         <div>
           <h4 className="mb-0">Call Out</h4>
-          <small className="text-muted">Pre-Start → Checklist → Review → Submit</small>
+          <small className="text-muted">Pre-Start → Questionnaire → Review → Submit</small>
           {!online ? (
             <div className="mt-1">
               <Badge bg="warning" text="dark">Offline</Badge>
@@ -1778,10 +1673,10 @@ export default function CallOut() {
 
           <CallOutButton
             variant="outline-secondary"
-            onClick={loadListsAndChecklist}
-            disabled={loadingLists || loadingChecklist || submitting || draftSubmitting}
+            onClick={loadAreaList}
+            disabled={loadingLists || submitting || draftSubmitting}
           >
-            {loadingLists || loadingChecklist ? (
+            {loadingLists ? (
               <>
                 <Spinner className="me-2" /> Loading…
               </>
@@ -1874,7 +1769,7 @@ export default function CallOut() {
               ))
             )}
             <div className="text-muted small mt-2">
-              Generation is intentionally inactive for the baseline clone until the Call Out question and report mapping is defined.
+              Generation remains inactive until the Call Out report mapping is finalized.
             </div>
           </Card.Body>
         </Card>
@@ -1930,7 +1825,7 @@ export default function CallOut() {
             ) : null}
 
             <div className="text-muted small mt-2">
-              Submit the completed baseline checklist from Review to create a Call Out draft. During this baseline stage drafts are stored in the browser; server draft sync and Generate will be enabled after the Call Out API/report mapping is finalized.
+              Submit the completed Call Out questionnaire from Review to create a draft. Drafts remain browser-backed until the Call Out report mapping is finalized.
             </div>
           </Card.Body>
         </Card>
@@ -2078,262 +1973,190 @@ export default function CallOut() {
         </Card>
       ) : null}
 
-      {/* STEP 2: CHECKLIST */}
-      {step === 1 ? (
-        <>
-          <Card border="light" className="shadow-sm mb-3">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 12 }}>
-                <div>
-                  <h5 className="mb-1">Checklist</h5>
-                  <div className="text-muted small">{area}</div>
-                </div>
-                <div className="text-end">
-                  <div className="fw-bold">{completedCount} of {questionRows.length} completed</div>
-                  <div className="text-muted small">Defects found: {defectsFoundCount} • Required photos missing: {photoMissingCount}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
+      {/* STEP 2: QUESTIONNAIRE */}
+      {step === 1 ? (() => {
+        const q = questionRows[questionIndex] || questionRows[0];
+        const a = { ...emptyCallOutAnswer(q.id), ...(answers?.[q.id] || {}) };
+        const answer = String(a.answer || "").trim().toUpperCase();
+        const photos = normalizeCallOutPhotos(a);
+        const requirements = normalizeRequirements(a);
+        const complete = callOutResponseComplete(q.id, a);
+        const isFirstQuestion = q.id === "system_defective";
 
-          {!questionRows.length ? (
-            <Alert variant="warning" className="mb-0">No Call Out baseline checklist items are available.</Alert>
-          ) : (
-            questionRows.map((q, idx) => {
-              const a = answers?.[q.id] || { answer: "", defectsFound: "", defects: [], comment: "", photoDataUrl: "", photoFile: null };
-              const defectState = String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer);
-              const defects = normalizeDefects(a);
-              const visibleDefects = defectState === "yes"
-                ? (defects.length ? defects : [{ finding: "", photoDataUrl: "", photoFile: null, photoField: "" }])
-                : [];
-              const isGeneralQuestion = isGeneralStd(q.std);
-              const generalAnswer = String(a.answer || "").trim().toUpperCase();
-              const generalEvidence = defects[0] || {};
-              const generalHasPhoto = generalPhotoPresent(a);
-              const generalPreview = generalEvidence.photoDataUrl || a.photoDataUrl || "";
-              const responseComplete = servicingResponseComplete(a, q.std);
-              const showMissing = (highlightMissing && !responseComplete) || (highlightMissingPhotos && countMissingRequiredPhotos(a, q.std) > 0);
-              const borderColor = showMissing
-                ? "#dc3545"
-                : isGeneralQuestion
-                  ? (responseComplete ? "#a3cfbb" : undefined)
-                  : defectState === "yes"
-                    ? "#f1aeb5"
-                    : defectState === "no"
-                      ? "#a3cfbb"
-                      : undefined;
+        return (
+          <>
+            <Card border="light" className="shadow-sm mb-3">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 12 }}>
+                  <div>
+                    <h5 className="mb-1">Questionnaire</h5>
+                    <div className="text-muted small">{area}</div>
+                  </div>
+                  <div className="text-end">
+                    <div className="fw-bold">Question {questionIndex + 1} of {systemDefectiveAnswer === "YES" ? 2 : 1}</div>
+                    <div className="text-muted small">{completedCount} completed</div>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
 
-              return (
-                <Card id={`servicing-check-${q.id}`} key={q.id} className="mb-3 shadow-sm" style={borderColor ? { borderColor, borderWidth: 1 } : undefined}>
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
-                      <div style={{ flex: "1 1 520px" }}>
-                        <div className="text-muted small mb-1">Check {idx + 1} of {questionRows.length} • {q.std}</div>
-                        <div className="fw-bold" style={{ fontSize: 16 }}>{q.question}</div>
-                        {q.extra ? <div className="text-muted small mt-1">Additional reading: {q.extra}</div> : null}
-                      </div>
-                      {responseComplete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
+            <Card className="mb-3 shadow-sm" style={(highlightMissing && !complete) ? { borderColor: "#dc3545", borderWidth: 1 } : undefined}>
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 10 }}>
+                  <div style={{ flex: "1 1 520px" }}>
+                    <div className="text-muted small mb-1">Question {questionIndex + 1}</div>
+                    <div className="fw-bold" style={{ fontSize: 18 }}>{q.question}</div>
+                  </div>
+                  {complete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
+                </div>
+
+                <div className="mt-3">
+                  <div className="fw-bold mb-2">Response</div>
+                  <div className="d-flex flex-wrap" style={{ gap: 12 }}>
+                    <ChecklistOptionPill
+                      active={answer === "YES"}
+                      tone={isFirstQuestion ? "danger" : "success"}
+                      icon="✓"
+                      onClick={() => selectCallOutAnswer(q.id, "YES")}
+                    >
+                      Yes
+                    </ChecklistOptionPill>
+                    <ChecklistOptionPill
+                      active={answer === "NO"}
+                      tone={isFirstQuestion ? "success" : "danger"}
+                      icon="✕"
+                      onClick={() => selectCallOutAnswer(q.id, "NO")}
+                    >
+                      No
+                    </ChecklistOptionPill>
+                  </div>
+                </div>
+
+                {answer === "YES" ? (
+                  <div className="mt-3 p-3" style={{ border: "1px solid #dee2e6", borderRadius: 10, background: "#f8f9fa" }}>
+                    <div className="fw-bold mb-2">{isFirstQuestion ? "Defect evidence" : "Repair evidence"}</div>
+                    <div className="text-muted small mb-3">
+                      {isFirstQuestion
+                        ? "Take at least one picture and describe the defect."
+                        : "Take at least one picture and describe what was done to repair the defect."}
                     </div>
 
-                    {isGeneralQuestion ? (
-                      <>
-                        <div className="mt-3">
-                          <div className="fw-bold mb-2">Response</div>
-                          <div className="d-flex flex-wrap" style={{ gap: 12 }}>
-                            <ChecklistOptionPill
-                              active={generalAnswer === "YES"}
-                              tone="success"
-                              icon="✓"
-                              onClick={() => setGeneralResponse(q, "YES")}
-                            >
-                              YES
-                            </ChecklistOptionPill>
-                            <ChecklistOptionPill
-                              active={generalAnswer === "NO"}
-                              tone="danger"
-                              icon="✕"
-                              onClick={() => setGeneralResponse(q, "NO")}
-                            >
-                              NO
-                            </ChecklistOptionPill>
-                            <ChecklistOptionPill
-                              active={generalAnswer === "N/A"}
-                              tone="secondary"
-                              icon="—"
-                              onClick={() => setGeneralResponse(q, "N/A")}
-                            >
-                              N/A
-                            </ChecklistOptionPill>
-                          </div>
-                        </div>
+                    <Form.Group className="mb-3">
+                      <Form.Label>
+                        {isFirstQuestion ? "Defect description" : "Repair description"} <span className="text-danger">Required</span>
+                      </Form.Label>
+                      <Form.Control
+                        as="textarea"
+                        rows={4}
+                        placeholder={isFirstQuestion ? "Describe the defect" : "Describe what was done to repair the defect"}
+                        value={a.comment || ""}
+                        onChange={(e) => updateCallOutAnswer(q.id, { comment: e.target.value })}
+                      />
+                    </Form.Group>
 
-                        {generalAnswer === "YES" ? (
-                          <div className="mt-3 p-3" style={{ border: "1px solid #a3cfbb", borderRadius: 10, background: "#f7fff9" }}>
-                            <div className="fw-bold mb-2">Picture Evidence <span className="text-danger">Required</span></div>
-                            {!generalHasPhoto ? (
-                              <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
-                                <div className="text-muted small mb-3">A picture is mandatory when YES is selected.</div>
-                                <CallOutButton type="button" variant="primary" onClick={() => openDefectCamera(q.id, 0)}>Open camera</CallOutButton>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
-                                  <Badge bg="success">Picture captured</Badge>
-                                  <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                                    <CallOutButton type="button" variant="outline-primary" onClick={() => openDefectCamera(q.id, 0)}>Retake photo</CallOutButton>
-                                    <CallOutButton type="button" variant="outline-secondary" onClick={() => clearDefectPhoto(q.id, 0)}>Clear</CallOutButton>
-                                  </div>
-                                </div>
-                                {generalPreview ? (
-                                  <div className="mb-2">
-                                    <img
-                                      src={generalPreview}
-                                      alt="General check evidence"
-                                      style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }}
-                                    />
-                                  </div>
-                                ) : null}
-                              </>
-                            )}
-                          </div>
-                        ) : null}
-
-                        {generalAnswer === "NO" || generalAnswer === "N/A" ? (
-                          <Form.Group className="mt-3">
-                            <Form.Label>Comment <span className="text-danger">Required</span></Form.Label>
-                            <Form.Control
-                              id={`servicing-general-comment-${q.id}`}
-                              as="textarea"
-                              rows={3}
-                              placeholder={generalAnswer === "NO" ? "Explain why the answer is NO" : "Explain why this item is not applicable"}
-                              value={a.comment || ""}
-                              onChange={(e) => updateAnswer(q.id, { comment: e.target.value })}
-                            />
-                            <Form.Text className="text-muted">A comment is mandatory when NO or N/A is selected.</Form.Text>
-                          </Form.Group>
-                        ) : null}
-
-                        {(highlightMissing || highlightMissingPhotos) && !responseComplete ? (
-                          <div className="text-danger small mt-2">
-                            {!generalAnswer
-                              ? "Choose YES, NO, or N/A."
-                              : generalAnswer === "YES"
-                                ? "A picture is required when YES is selected."
-                                : "A comment is required when NO or N/A is selected."}
-                          </div>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                    <div className="mt-3">
-                      <div className="fw-bold mb-2">Were any defects found for this check?</div>
-                      <div className="d-flex flex-wrap" style={{ gap: 12 }}>
-                        <ChecklistOptionPill
-                          active={defectState === "no"}
-                          tone="success"
-                          icon="✓"
-                          onClick={() => setDefectState(q, idx, "no")}
-                        >
-                          No defects
-                        </ChecklistOptionPill>
-                        <ChecklistOptionPill
-                          active={defectState === "yes"}
-                          tone="danger"
-                          icon="✕"
-                          onClick={() => { setDefectState(q, idx, "yes"); openDefectCamera(q.id, 0); }}
-                        >
-                          Defects found
-                        </ChecklistOptionPill>
-                        <ChecklistOptionPill
-                          active={defectState === "na"}
-                          tone="secondary"
-                          icon="—"
-                          onClick={() => setDefectState(q, idx, "na")}
-                        >
-                          N/A
-                        </ChecklistOptionPill>
-                      </div>
+                    <div className="d-flex flex-wrap align-items-center mb-3" style={{ gap: 8 }}>
+                      <CallOutButton type="button" variant="primary" onClick={() => openCallOutCamera(q.id)}>
+                        Open camera
+                      </CallOutButton>
+                      {isFirstQuestion ? (
+                        <CallOutButton type="button" variant="outline-primary" onClick={() => openCallOutPicturePicker(q.id)}>
+                          Add picture
+                        </CallOutButton>
+                      ) : null}
+                      <Badge bg={photos.length ? "success" : "secondary"}>
+                        {photos.length} picture{photos.length === 1 ? "" : "s"}
+                      </Badge>
                     </div>
 
-                    {defectState === "yes" ? (
-                      <div className="mt-3 p-3" style={{ border: "1px solid #f1aeb5", borderRadius: 10, background: "#fff8f8" }}>
-                        <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
-                          <div>
-                            <div className="fw-bold">Defects</div>
-                            <div className="text-muted small">For each defect: take the photo first, then enter the defect description.</div>
-                          </div>
-                          <Badge bg="danger">{visibleDefects.length} defect{visibleDefects.length === 1 ? "" : "s"}</Badge>
-                        </div>
-
-                        {visibleDefects.map((defect, defectIndex) => {
-                          const hasPhoto = defectHasPhoto(defect, a, defectIndex);
-                          const preview = defect.photoDataUrl || (defectIndex === 0 ? a.photoDataUrl || "" : "");
-                          const defectComplete = hasPhoto && !!String(defect.finding || "").trim();
-                          return (
-                            <div key={`${q.id}-defect-${defectIndex}`} className="mb-3 p-3 bg-white" style={{ border: "1px solid #dee2e6", borderRadius: 8 }}>
-                              <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
-                                <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                                  <div className="fw-bold">Defect {defectIndex + 1}</div>
-                                  {defectComplete ? <Badge bg="success">Complete</Badge> : <Badge bg="secondary">Pending</Badge>}
-                                </div>
-                                {visibleDefects.length > 1 ? <CallOutButton type="button" variant="outline-danger" onClick={() => removeDefect(q.id, defectIndex)}>Remove defect</CallOutButton> : null}
+                    {photos.length ? (
+                      <Row>
+                        {photos.map((photo, photoIndex) => (
+                          <Col md={6} lg={4} key={`${q.id}-photo-${photoIndex}`} className="mb-3">
+                            <div className="p-2 bg-white" style={{ border: "1px solid #dee2e6", borderRadius: 8 }}>
+                              {photo.dataUrl ? (
+                                <img
+                                  src={photo.dataUrl}
+                                  alt={`${isFirstQuestion ? "Defect" : "Repair"} evidence ${photoIndex + 1}`}
+                                  style={{ width: "100%", maxHeight: 260, objectFit: "contain", borderRadius: 6 }}
+                                />
+                              ) : null}
+                              <div className="d-flex justify-content-between align-items-center mt-2" style={{ gap: 8 }}>
+                                <span className="small text-muted">Picture {photoIndex + 1}</span>
+                                <CallOutButton type="button" variant="outline-danger" onClick={() => removeCallOutPhoto(q.id, photoIndex)}>
+                                  Remove
+                                </CallOutButton>
                               </div>
-
-                              {!hasPhoto ? (
-                                <div className="p-3 text-center" style={{ border: "1px dashed #adb5bd", borderRadius: 8 }}>
-                                  <div className="fw-bold mb-1">1. Take the defect photo</div>
-                                  <div className="text-muted small mb-3">The defect description unlocks after a photo is captured.</div>
-                                  <CallOutButton type="button" variant="primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Open camera</CallOutButton>
-                                </div>
-                              ) : (
-                                <>
-                                  <div className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 8 }}>
-                                    <div className="fw-bold">1. Defect photo captured</div>
-                                    <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                                      <CallOutButton type="button" variant="outline-primary" onClick={() => openDefectCamera(q.id, defectIndex)}>Retake photo</CallOutButton>
-                                      <CallOutButton type="button" variant="outline-secondary" onClick={() => clearDefectPhoto(q.id, defectIndex)}>Clear</CallOutButton>
-                                    </div>
-                                  </div>
-                                  {preview ? <div className="mb-3"><img src={preview} alt={`Defect ${defectIndex + 1}`} style={{ maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 8, border: "1px solid #ced4da" }} /></div> : null}
-                                  <Form.Group>
-                                    <Form.Label>2. Defect <span className="text-danger">Required</span></Form.Label>
-                                    <Form.Control id={`servicing-defect-${q.id}-${defectIndex}`} as="textarea" rows={3} placeholder="Describe the defect found" value={defect.finding || ""} onChange={(e) => updateDefectFinding(q.id, defectIndex, e.target.value)} />
-                                    <Form.Text className="text-muted">This text is written to the call-out report comment column.</Form.Text>
-                                  </Form.Group>
-                                </>
-                              )}
                             </div>
-                          );
-                        })}
+                          </Col>
+                        ))}
+                      </Row>
+                    ) : null}
+                  </div>
+                ) : null}
 
-                        <CallOutButton type="button" variant="outline-secondary" disabled={visibleDefects.some((defect, defectIndex) => !defectHasPhoto(defect, a, defectIndex) || !String(defect.finding || "").trim())} onClick={() => addDefect(q.id)}>Add another defect</CallOutButton>
-                        <div className="text-muted small mt-2">Adding another defect opens the camera again, then unlocks the next defect description.</div>
+                {!isFirstQuestion && answer === "NO" ? (
+                  <div className="mt-3 p-3" style={{ border: "1px solid #f1aeb5", borderRadius: 10, background: "#fff8f8" }}>
+                    <div className="fw-bold mb-1">Repair requirements</div>
+                    <div className="text-muted small mb-3">Describe what is required to repair the defect. Add more requirements where needed.</div>
+
+                    {(requirements.length ? requirements : [""]).map((requirement, requirementIndex) => (
+                      <div key={`requirement-${requirementIndex}`} className="mb-3">
+                        <Form.Label>
+                          Requirement {requirementIndex + 1} <span className="text-danger">Required</span>
+                        </Form.Label>
+                        <div className="d-flex align-items-start" style={{ gap: 8 }}>
+                          <Form.Control
+                            id={`callout-requirement-${requirementIndex}`}
+                            as="textarea"
+                            rows={3}
+                            placeholder="Describe what is required to repair the defect"
+                            value={requirement}
+                            onChange={(e) => updateRequirement(requirementIndex, e.target.value)}
+                          />
+                          {requirements.length > 1 ? (
+                            <CallOutButton type="button" variant="outline-danger" onClick={() => removeRequirement(requirementIndex)}>
+                              Remove
+                            </CallOutButton>
+                          ) : null}
+                        </div>
                       </div>
-                    ) : null}
+                    ))}
 
-                    {highlightMissing && !responseComplete ? (
-                      <div className="text-danger small mt-2">{defectState === "yes" ? "Each defect needs a photo first and then a defect description." : "Choose No defects, Defects found, or N/A."}</div>
-                    ) : null}
+                    <CallOutButton
+                      type="button"
+                      variant="outline-secondary"
+                      onClick={addRequirement}
+                      disabled={(requirements.length ? requirements : [""]).some((value) => !String(value || "").trim())}
+                    >
+                      Add another requirement
+                    </CallOutButton>
+                  </div>
+                ) : null}
 
-                      </>
-                    )}
-                  </Card.Body>
-                </Card>
-              );
-            })
-          )}
-        </>
-      ) : null}
+                {highlightMissing && !complete ? (
+                  <div className="text-danger small mt-3">
+                    {!answer
+                      ? "Select Yes or No."
+                      : answer === "YES"
+                        ? `At least one picture and a ${isFirstQuestion ? "defect" : "repair"} description are required.`
+                        : "Enter every repair requirement before continuing."}
+                  </div>
+                ) : null}
+              </Card.Body>
+            </Card>
+          </>
+        );
+      })() : null}
 
       {/* STEP 3: REVIEW */}
       {step === 2 ? (
         <Card border="light" className="shadow-sm">
           <Card.Header className="d-flex justify-content-between align-items-center">
             <h5 className="mb-0">Review</h5>
-            <small className="text-muted">Incomplete: {unansweredCount} • Defects found: {defectsFoundCount}</small>
+            <small className="text-muted">Incomplete: {unansweredCount} • Defect reported: {defectsFoundCount ? "Yes" : "No"}</small>
           </Card.Header>
           <Card.Body>
-            <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
+            <Alert variant="info">Review the Call Out responses, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
 
             <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
             <div className="mb-2"><strong>Area:</strong> {area}</div>
@@ -2342,68 +2165,49 @@ export default function CallOut() {
 
             <hr />
 
-            {questionRows.map((q, idx) => {
-              const a = answers?.[q.id] || {};
-              const defectState = String(a.defectsFound || "").toLowerCase() || defectStateFromAnswer(a.answer);
-              const defects = normalizeDefects(a);
-              const isGeneralQuestion = isGeneralStd(q.std);
-              const generalAnswer = String(a.answer || "").trim().toUpperCase();
-              const label = isGeneralQuestion
-                ? (generalAnswer || "Pending")
-                : defectState === "yes"
-                  ? "Defects found"
-                  : defectState === "no"
-                    ? "No defects"
-                    : defectState === "na"
-                      ? "N/A"
-                      : "Pending";
-              const badgeVariant = isGeneralQuestion
-                ? (generalAnswer === "YES" ? "success" : generalAnswer ? "secondary" : "secondary")
-                : defectState === "yes"
-                  ? "danger"
-                  : defectState === "no"
-                    ? "success"
-                    : "secondary";
+            <Card className="mb-3">
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
+                  <div className="fw-bold">1. Is the system defective?</div>
+                  <Badge bg={systemDefectiveAnswer === "YES" ? "danger" : "success"}>{systemDefectiveAnswer || "Pending"}</Badge>
+                </div>
+                {systemDefectiveAnswer === "YES" ? (
+                  <div className="mt-2">
+                    <div className="small"><strong>Defect:</strong> {String(answers?.system_defective?.comment || "").trim() || "Missing"}</div>
+                    <div className="small"><strong>Pictures:</strong> {normalizeCallOutPhotos(answers?.system_defective || {}).length}</div>
+                  </div>
+                ) : null}
+              </Card.Body>
+            </Card>
 
-              return (
-                <Card key={q.id} className="mb-3">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
-                      <div>
-                        <div className="fw-bold">{idx + 1}. {q.question}</div>
-                        <div className="text-muted small">
-                          {isGeneralQuestion
-                            ? q.std
-                            : `${q.std} • Defect photos: ${defects.filter((defect, defectIndex) => defectHasPhoto(defect, a, defectIndex)).length}/${defects.length}`}
-                        </div>
-                      </div>
-                      <Badge bg={badgeVariant}>{label}</Badge>
+            {systemDefectiveAnswer === "YES" ? (
+              <Card className="mb-3">
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
+                    <div className="fw-bold">2. Could the defect be resolved?</div>
+                    <Badge bg={String(answers?.defect_resolved?.answer || "").toUpperCase() === "YES" ? "success" : "danger"}>
+                      {String(answers?.defect_resolved?.answer || "").toUpperCase() || "Pending"}
+                    </Badge>
+                  </div>
+
+                  {String(answers?.defect_resolved?.answer || "").toUpperCase() === "YES" ? (
+                    <div className="mt-2">
+                      <div className="small"><strong>Repair completed:</strong> {String(answers?.defect_resolved?.comment || "").trim() || "Missing"}</div>
+                      <div className="small"><strong>Pictures:</strong> {normalizeCallOutPhotos(answers?.defect_resolved || {}).length}</div>
                     </div>
-
-                    {isGeneralQuestion ? (
-                      <div className="mt-2 p-2" style={{ background: "#f8f9fa", borderRadius: 8 }}>
-                        {generalAnswer === "YES" ? (
-                          <div className="small"><strong>Picture:</strong> {generalPhotoPresent(a) ? "Captured" : "Missing"}</div>
-                        ) : generalAnswer === "NO" || generalAnswer === "N/A" ? (
-                          <div className="small"><strong>Comment:</strong> {String(a.comment || "").trim() || "Missing"}</div>
-                        ) : (
-                          <div className="text-muted small">No response selected.</div>
-                        )}
-                      </div>
-                    ) : defectState === "yes" ? (
-                      <div className="mt-2">
-                        {defects.length ? defects.map((defect, defectIndex) => (
-                          <div key={`${q.id}-review-${defectIndex}`} className="mb-2 p-2" style={{ background: "#f8f9fa", borderRadius: 8 }}>
-                            <div className="fw-bold">Defect {defectIndex + 1}: {defect.finding || "Defect description required"}</div>
-                            <div className="small"><strong>Photo:</strong> {defectHasPhoto(defect, a, defectIndex) ? "Captured" : "Missing"}</div>
-                          </div>
-                        )) : <div className="text-muted small">{a.comment || "No defect details recorded."}</div>}
-                      </div>
-                    ) : null}
-                  </Card.Body>
-                </Card>
-              );
-            })}
+                  ) : (
+                    <div className="mt-2">
+                      <div className="small fw-bold mb-1">Repair requirements:</div>
+                      <ol className="mb-0 ps-3">
+                        {normalizeRequirements(answers?.defect_resolved || {}).filter((value) => value.trim()).map((value, index) => (
+                          <li key={`review-requirement-${index}`} className="small">{value}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            ) : null}
 
             <hr />
 

@@ -1336,9 +1336,6 @@ export default function CallOut() {
     };
   }
 
-  // Call Out report generation will be re-enabled after the cloned checklist is
-  // replaced with the final Call Out questions and report payload mapping.
-
   // ✅ Draft record build/load helpers
   function buildDraftValue(signatureOverride = signatureDataUrl || "", completionOverride = null) {
     const cleanAnswers = {};
@@ -1515,11 +1512,196 @@ export default function CallOut() {
     return "";
   }
 
-  async function enqueueCallOutJobFromValue() {
+  function buildCallOutGenerationJob(value, draftName = "", draftKey = "") {
+    const v = value || {};
+    const draftQuestionRows = buildQuestionRowsForDraftValue(v);
+    const validationError = validateDraftValueForGeneration(v, draftQuestionRows);
+    if (validationError) throw new Error(validationError);
+
+    if (!v.callOutCompletedDate || !v.callOutCompletedTime) {
+      throw new Error("Draft is missing the completion date/time. Load the draft, complete Review, and press Submit again.");
+    }
+
+    const systemAnswer = String(v?.answers?.system_defective?.answer || "").trim().toUpperCase();
+    const resolutionAnswer = String(v?.answers?.defect_resolved?.answer || "").trim().toUpperCase();
+
+    const payloadPhotos = [];
+    const attachments = [];
+
+    const addPhotos = (photos, kind, questionId) => {
+      normalizeCallOutPhotos({ photos }).forEach((photo, index) => {
+        const blob = blobFromDataUrl(photo.dataUrl);
+        if (!blob) {
+          throw new Error(`Unable to prepare ${kind} picture ${index + 1} for upload.`);
+        }
+
+        const fileName = String(photo.name || `${kind}_${index + 1}.jpg`);
+        payloadPhotos.push({
+          kind,
+          questionId,
+          name: fileName,
+          comment: String(photo.comment || "").trim()
+        });
+        attachments.push({
+          field: "photo",
+          blob,
+          fileName
+        });
+      });
+    };
+
+    if (systemAnswer === "YES") {
+      addPhotos(v?.answers?.system_defective?.photos || [], "defect", "system_defective");
+    }
+
+    if (systemAnswer === "YES" && resolutionAnswer === "YES") {
+      addPhotos(v?.answers?.defect_resolved?.photos || [], "repair", "defect_resolved");
+    }
+
+    const reportId = makeReportId();
+    const safeDraftName = String(draftName || buildDraftNameFromValue(v, reportId))
+      .replace(/\.docx$/i, "")
+      .trim();
+
+    const payload = {
+      reportId,
+      schemaVersion: 1,
+      area: v.area || "",
+      technician: authUser?.name || authUser?.email || "",
+      callOutStartAt: v.callOutStartAt || "",
+      callOutStartDate: v.callOutStartDate || "",
+      callOutStartTime: v.callOutStartTime || "",
+      callOutCompletedAt: v.callOutCompletedAt || "",
+      callOutCompletedDate: v.callOutCompletedDate || "",
+      callOutCompletedTime: v.callOutCompletedTime || "",
+      systemDefective: systemAnswer,
+      defectResolved: systemAnswer === "YES" ? resolutionAnswer : "N/A",
+      repairDescription: String(v?.answers?.defect_resolved?.comment || "").trim(),
+      repairRequirements: normalizeRequirements(v?.answers?.defect_resolved || {})
+        .map((item) => item.trim())
+        .filter(Boolean),
+      photos: payloadPhotos,
+      signatureDataUrl: v.signatureDataUrl || "",
+      desiredFileName: `${safeDraftName || `CallOut_${reportId}`}.docx`,
+      correctionOfReport: correctionContext?.correctionOf || "",
+      correctionReason: correctionContext?.reason || ""
+    };
+
+    return {
+      id: makeJobId(),
+      type: "callout_v2_generate",
+      schemaVersion: 1,
+      reportId,
+      draftKey,
+      draftName: safeDraftName,
+      payload,
+      attachments,
+      status: "queued",
+      error: "",
+      createdAt: new Date().toISOString(),
+      lastUpdateAt: new Date().toISOString(),
+      summary: {
+        area: v.area || "",
+        serviceType: "Call Out"
+      }
+    };
+  }
+
+  async function runCallOutJob(job) {
+    if (!dbRef.current) throw new Error("Draft/job storage is not available.");
+    if (!navigator.onLine) throw new Error("Internet connection is required to generate the report.");
+
+    const running = {
+      ...job,
+      status: "submitting",
+      error: "",
+      lastUpdateAt: new Date().toISOString()
+    };
+    await idbPut(dbRef.current, "calloutJobs", running);
+    await refreshJobs();
+    emitJobsEvent();
+
+    try {
+      await submitJobToServer(running);
+
+      let processing = {
+        ...running,
+        status: "processing",
+        lastUpdateAt: new Date().toISOString()
+      };
+      await idbPut(dbRef.current, "calloutJobs", processing);
+      await refreshJobs();
+
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        const status = await pollServerStatus(processing.reportId);
+        const serverStatus = String(status?.status || "").toLowerCase();
+
+        if (serverStatus === "done") {
+          const done = stripPayloadOnSuccess({
+            ...processing,
+            status: "done",
+            result: status?.result || null
+          });
+          await idbPut(dbRef.current, "calloutJobs", done);
+          await refreshJobs();
+          emitJobsEvent();
+          return done;
+        }
+
+        if (serverStatus === "error") {
+          throw new Error(status?.error || "Call Out report generation failed.");
+        }
+      }
+
+      const waiting = {
+        ...processing,
+        status: "processing",
+        error: "",
+        lastUpdateAt: new Date().toISOString()
+      };
+      await idbPut(dbRef.current, "calloutJobs", waiting);
+      await refreshJobs();
+      return waiting;
+    } catch (e) {
+      const failed = {
+        ...running,
+        status: "error",
+        error: String(e?.message || "Call Out report generation failed."),
+        lastUpdateAt: new Date().toISOString()
+      };
+      await idbPut(dbRef.current, "calloutJobs", failed);
+      await refreshJobs();
+      emitJobsEvent();
+      throw e;
+    }
+  }
+
+  async function enqueueCallOutJobFromValue(value, draftName = "", draftKey = "") {
     setErr("");
-    setInfo(
-      "Report generation is temporarily disabled on the Call Out baseline clone until the Call Out question set and report mapping are defined."
-    );
+    setInfo("");
+
+    if (!dbRef.current) throw new Error("Draft/job storage is not available in this browser.");
+    if (!authToken) throw new Error("Not logged in.");
+    if (!navigator.onLine) throw new Error("Internet connection is required to generate the report.");
+
+    const job = buildCallOutGenerationJob(value, draftName, draftKey);
+    await idbPut(dbRef.current, "calloutJobs", job);
+    await refreshJobs();
+    emitJobsEvent();
+
+    setSubmitting(true);
+    try {
+      const result = await runCallOutJob(job);
+      if (result?.status === "done") {
+        setInfo(`Report generated: ${result.result?.fileName || result.reportId}`);
+      } else {
+        setInfo("Report generation was submitted and is still processing. Use Refresh Jobs to check status.");
+      }
+      return result;
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function submitReviewAndSaveDraft() {
@@ -1619,14 +1801,31 @@ export default function CallOut() {
   }
 
   async function retryJob(id) {
-    if (!dbRef.current) return;
+    if (!dbRef.current || submitting) return;
     const job = await idbGet(dbRef.current, "calloutJobs", id);
     if (!job) return;
-    const updated = { ...job, status: "queued", error: "", lastUpdateAt: new Date().toISOString() };
+
+    const updated = {
+      ...job,
+      status: "queued",
+      error: "",
+      lastUpdateAt: new Date().toISOString()
+    };
     await idbPut(dbRef.current, "calloutJobs", updated);
     await refreshJobs();
-    setInfo("Job re-queued.");
     emitJobsEvent();
+
+    setSubmitting(true);
+    try {
+      const result = await runCallOutJob(updated);
+      if (result?.status === "done") {
+        setInfo(`Report generated: ${result.result?.fileName || result.reportId}`);
+      }
+    } catch (e) {
+      setErr(String(e?.message || "Failed to retry Call Out report generation."));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function resetToStart(message = "") {
@@ -1797,7 +1996,7 @@ export default function CallOut() {
               ))
             )}
             <div className="text-muted small mt-2">
-              Generation remains inactive until the Call Out report mapping is finalized.
+              Generated reports are processed by the Call Out worker and remain available here for download.
             </div>
           </Card.Body>
         </Card>
@@ -1832,8 +2031,8 @@ export default function CallOut() {
                     <CallOutButton
                       variant="success"
                       onClick={() => generateFromDraft(d.key)}
-                      disabled={true}
-                      title="Generation will be enabled after the Call Out question/report mapping is defined."
+                      disabled={submitting || draftSubmitting}
+                      title="Generate the Call Out report from this saved draft."
                     >
                       Generate
                     </CallOutButton>

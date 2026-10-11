@@ -4,8 +4,7 @@ const path = require("path");
 const { writeJsonAtomicSync: atomicWriteJsonSync, updateJsonWithLockSync } = require("./lib/lockedJson");
 const { findOldestQueuedJobSync, claimJobSync } = require("./lib/jobQueue");
 
-// These deps are typically already present because Servicing uses docxtemplater.
-// If image module isn't present, we generate without embedded photos.
+// DOCX generation dependencies shared with Servicing.
 let PizZip = null;
 let Docxtemplater = null;
 let ImageModule = null;
@@ -17,7 +16,7 @@ try {
   Docxtemplater = require("docxtemplater");
 } catch {}
 try {
-  // One common module name; if your project uses a different image module, we’ll adjust later.
+  // Image module used by the Call Out report template.
   ImageModule = require("docxtemplater-image-module-free");
 } catch {}
 
@@ -182,49 +181,174 @@ function photosDirFor(reportId) {
   return path.join(CALLOUT_PHOTOS_DIR, safeBasename(reportId));
 }
 
-// Minimal date formatter for template friendliness
-function fmtDateTime(v) {
-  const s = String(v || "").trim();
-  if (!s) return "";
-  // input from datetime-local is usually "YYYY-MM-DDTHH:mm"
-  return s.replace("T", " ");
+const TRANSPARENT_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z0J0AAAAASUVORK5CYII=";
+
+function normalizeAnswer(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function normalizeDocxFileName(value) {
+  const clean = safeBasename(String(value || "").trim() || "callout_report.docx");
+  return /\.docx$/i.test(clean) ? clean : `${clean}.docx`;
+}
+
+function parseImageDataUrl(dataUrl) {
+  const value = String(dataUrl || "").trim();
+  const match = value.match(/^data:image\/(png|jpe?g);base64,([\s\S]+)$/i);
+  if (!match) return null;
+  try {
+    return {
+      ext: String(match[1] || "").toLowerCase() === "png" ? ".png" : ".jpg",
+      buffer: Buffer.from(match[2], "base64")
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSignatureImage(reportId, payload) {
+  const reportDir = photosDirFor(reportId);
+  fs.mkdirSync(reportDir, { recursive: true });
+
+  const parsed = parseImageDataUrl(payload?.signatureDataUrl || payload?.signature || "");
+  const ext = parsed?.ext || ".png";
+  const filename = `signature_${safeBasename(reportId)}${ext}`;
+  const filePath = path.join(reportDir, filename);
+  fs.writeFileSync(
+    filePath,
+    parsed?.buffer || Buffer.from(TRANSPARENT_PNG_B64, "base64")
+  );
+  return filename;
 }
 
 function buildTemplateData(payload, reportId) {
-  const photos = Array.isArray(payload.photos) ? payload.photos : [];
+  const systemDefective = normalizeAnswer(
+    payload?.systemDefective || payload?.answers?.system_defective?.answer
+  );
+  const rawResolved = normalizeAnswer(
+    payload?.defectResolved || payload?.answers?.defect_resolved?.answer
+  );
+
+  if (systemDefective !== "YES" && systemDefective !== "NO") {
+    throw new Error("Call Out payload is missing a valid system-defective answer.");
+  }
+
+  const defectResolved = systemDefective === "YES"
+    ? rawResolved
+    : "N/A";
+
+  if (systemDefective === "YES" && defectResolved !== "YES" && defectResolved !== "NO") {
+    throw new Error("Call Out payload is missing a valid defect-resolution answer.");
+  }
+
+  const repairResolved = systemDefective === "YES" && defectResolved === "YES";
+  const repairOutstanding = systemDefective === "YES" && defectResolved === "NO";
+
+  const photos = Array.isArray(payload?.photos) ? payload.photos : [];
+  const normalizedPhotos = photos.map((photo, index) => ({
+    index: index + 1,
+    kind: String(photo?.kind || photo?.section || "").trim().toLowerCase(),
+    questionId: String(photo?.questionId || "").trim(),
+    comment: String(photo?.comment || photo?.description || "").trim(),
+    filename: safeBasename(photo?.filename || ""),
+    name: String(photo?.name || "").trim()
+  }));
+
+  const defectPictures = normalizedPhotos
+    .filter((photo) => photo.kind === "defect" || photo.questionId === "system_defective")
+    .map((photo, index) => ({
+      no: index + 1,
+      photo: photo.filename,
+      comment: photo.comment
+    }));
+
+  const repairPictures = normalizedPhotos
+    .filter((photo) => photo.kind === "repair" || photo.questionId === "defect_resolved")
+    .map((photo, index) => ({
+      no: index + 1,
+      photo: photo.filename,
+      comment: photo.comment
+    }));
+
+  if (systemDefective === "YES") {
+    if (!defectPictures.length) {
+      throw new Error("Call Out report requires at least one defect picture.");
+    }
+    if (defectPictures.some((item) => !item.photo || !item.comment)) {
+      throw new Error("Every defect picture requires a saved image and picture comment.");
+    }
+  }
+
+  const repairDescription = String(
+    payload?.repairDescription || payload?.answers?.defect_resolved?.comment || ""
+  ).trim();
+
+  const repairRequirements = (
+    Array.isArray(payload?.repairRequirements)
+      ? payload.repairRequirements
+      : (Array.isArray(payload?.answers?.defect_resolved?.requirements)
+          ? payload.answers.defect_resolved.requirements
+          : [])
+  )
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .map((requirement, index) => ({ no: index + 1, requirement }));
+
+  if (repairResolved) {
+    if (!repairDescription) {
+      throw new Error("Resolved Call Out report requires a repair description.");
+    }
+    if (!repairPictures.length) {
+      throw new Error("Resolved Call Out report requires at least one repair picture.");
+    }
+    if (repairPictures.some((item) => !item.photo || !item.comment)) {
+      throw new Error("Every repair picture requires a saved image and picture comment.");
+    }
+  }
+
+  if (repairOutstanding && !repairRequirements.length) {
+    throw new Error("Unresolved Call Out report requires at least one repair requirement.");
+  }
+
+  const signature = writeSignatureImage(reportId, payload);
+
+  const completionDate = String(payload?.callOutCompletedDate || "").trim();
+  const completionTime = String(payload?.callOutCompletedTime || "").trim();
+  if (!completionDate || !completionTime) {
+    throw new Error("Call Out payload is missing the completion date/time captured on Submit.");
+  }
+
+  const resolutionSummary = systemDefective !== "YES"
+    ? "Not applicable - no defect reported."
+    : repairResolved
+      ? repairDescription
+      : repairRequirements.map((item) => item.requirement).join("; ");
+
   return {
     reportId,
-    technician: payload.technician || payload._server?.owner?.name || payload._server?.owner?.email || payload._server?.userKey || "",
-
-    area: payload.area || "",
-    systemType: payload.systemType || "",
-
-    timeCallLogged: fmtDateTime(payload.timeCallLogged),
-    callLoggedByName: payload.callLoggedByName || "",
-    callLoggedByRole: payload.callLoggedByRole || "",
-
-    clientDefectDesc: payload.clientDefectDesc || "",
-
-    timeArrival: fmtDateTime(payload.timeArrival),
-    responderDefectDesc: payload.responderDefectDesc || "",
-
-    couldRectify: payload.couldRectify || "",
-    actionTaken: payload.actionTaken || "",
-    materialsRequired: payload.materialsRequired || "",
-
-    timeDeparture: fmtDateTime(payload.timeDeparture),
-
-    jobcardCreated: payload.jobcardCreated || "",
-    jobcardNumber: payload.jobcardNumber || "",
-    noJobcardReason: payload.noJobcardReason || "",
-
-    // For template loops: <<#photos>>...<</photos>>
-    photos: photos.map((p, idx) => ({
-      index: idx + 1,
-      name: p.name || "",
-      description: p.description || "",
-      filename: p.filename || "" // set by submit route
-    }))
+    technician:
+      payload?.technician ||
+      payload?._server?.owner?.name ||
+      payload?._server?.owner?.email ||
+      payload?._server?.userKey ||
+      "",
+    area: payload?.area || "",
+    callOutStartDate: payload?.callOutStartDate || "",
+    callOutStartTime: payload?.callOutStartTime || "",
+    callOutCompletedDate: completionDate,
+    callOutCompletedTime: completionTime,
+    systemDefective,
+    defectResolved,
+    resolutionSummary,
+    defectPictures: systemDefective === "YES" ? defectPictures : [],
+    repairResolved,
+    repairOutstanding,
+    repairDescription: repairResolved ? repairDescription : "",
+    repairPictures: repairResolved ? repairPictures : [],
+    repairRequirements: repairOutstanding ? repairRequirements : [],
+    signature,
+    "%signature": signature
   };
 }
 
@@ -232,7 +356,6 @@ function loadBinary(p) {
   return fs.readFileSync(p, "binary");
 }
 
-// If image module exists, allow template to render images with <<%photo>>
 function createImageModule(reportId) {
   if (!ImageModule) return null;
 
@@ -240,19 +363,19 @@ function createImageModule(reportId) {
     centered: false,
     fileType: "docx",
     getImage: (tagValue) => {
-      // tagValue will be a filename (e.g. from data.photos[n].filename)
       const file = safeBasename(tagValue || "");
-      if (!file) return null;
+      if (!file) return Buffer.from(TRANSPARENT_PNG_B64, "base64");
       const imgPath = path.join(photosDirFor(reportId), file);
       try {
         return fs.readFileSync(imgPath);
       } catch {
-        return null;
+        return Buffer.from(TRANSPARENT_PNG_B64, "base64");
       }
     },
-    getSize: () => {
-      // Default size; you can tune later or make it depend on orientation
-      return [520, 320];
+    getSize: (img, tagValue) => {
+      const file = String(tagValue || "").toLowerCase();
+      if (file.includes("signature_")) return [240, 90];
+      return [210, 145];
     }
   });
 }
@@ -268,6 +391,7 @@ async function generateDocxFromTemplate(reportId, payload) {
   }
 
   await ensureDir(REPORTS_OUT_DIR);
+  await ensureDir(photosDirFor(reportId));
 
   const content = loadBinary(TEMPLATE_PATH);
   const zip = new PizZip(content);
@@ -275,26 +399,30 @@ async function generateDocxFromTemplate(reportId, payload) {
   const opts = {
     paragraphLoop: true,
     linebreaks: true,
-    delimiters: { start: "<<", end: ">>" }
+    delimiters: { start: "<<", end: ">>" },
+    nullGetter: () => ""
   };
 
   const imageModule = createImageModule(reportId);
-  if (imageModule) {
-    opts.modules = [imageModule];
-  }
+  if (imageModule) opts.modules = [imageModule];
 
   const doc = new Docxtemplater(zip, opts);
-
   const data = buildTemplateData(payload, reportId);
   doc.render(data);
 
-  const out = doc.getZip().generate({ type: "nodebuffer" });
+  const out = doc.getZip().generate({ type: "nodebuffer", compression: "DEFLATE" });
 
-  const outName = `callout_${safeBasename(reportId)}.docx`;
+  const preferredName = pickNonEmpty(payload?.serverFileName, payload?.desiredFileName);
+  const datePart = String(payload?.callOutCompletedDate || payload?.callOutStartDate || "")
+    .trim()
+    .replace(/[^0-9-]/g, "") || new Date().toISOString().slice(0, 10);
+  const reportDigits = (String(reportId || "").match(/\d+/g) || []).join("");
+  const last4 = reportDigits ? reportDigits.slice(-4).padStart(4, "0") : "0000";
+  const fallbackName = `${safeBasename(payload?.area || "Area")}_CallOut_${datePart}_${last4}.docx`;
+  const outName = normalizeDocxFileName(preferredName || fallbackName);
   const outPath = path.join(REPORTS_OUT_DIR, outName);
 
   await fsp.writeFile(outPath, out);
-
   return outName;
 }
 
@@ -363,8 +491,8 @@ async function processOneJob(jobEntry) {
       service: "Callout",
       systemType: payload?.systemType || "",
       technician: payload?.technician || resolvedOwner?.name || resolvedOwner?.email || "",
-      createdAt: payload?.createdAt || new Date().toISOString(),
-      createdDate: String(payload?.createdAt || new Date().toISOString()).slice(0, 10),
+      createdAt: payload?.callOutCompletedAt || payload?.createdAt || new Date().toISOString(),
+      createdDate: payload?.callOutCompletedDate || String(payload?.createdAt || new Date().toISOString()).slice(0, 10),
       owner: resolvedOwner,
       ownerEmail,
       by: ownerEmail || "",
@@ -433,8 +561,15 @@ async function mainLoop() {
   }, 2000);
 }
 
-mainLoop().catch((e) => {
-  // eslint-disable-next-line no-console
-  console.error("CallOut worker failed to start:", e);
-  process.exit(1);
-});
+if (require.main === module) {
+  mainLoop().catch((e) => {
+    // eslint-disable-next-line no-console
+    console.error("CallOut worker failed to start:", e);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  buildTemplateData,
+  generateDocxFromTemplate
+};

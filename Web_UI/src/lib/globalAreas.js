@@ -16,10 +16,21 @@ function authHeaders(authToken, extra = {}) {
 }
 
 export async function fetchGlobalAreas(authToken) {
-  const res = await fetch("/api/servicing/areas", {
-    headers: authHeaders(authToken)
-  });
-  const data = await readJsonResponse(res);
+  async function getFrom(path) {
+    const res = await fetch(path, {
+      headers: authHeaders(authToken)
+    });
+    return readJsonResponse(res);
+  }
+
+  let data;
+  try {
+    data = await getFrom("/api/areas");
+  } catch (e) {
+    if (Number(e?.status || 0) !== 404) throw e;
+    data = await getFrom("/api/servicing/areas");
+  }
+
   return Array.isArray(data?.areas) ? data.areas : [];
 }
 
@@ -38,11 +49,11 @@ export async function addGlobalArea(authToken, areaName) {
 
   let data;
   try {
-    data = await postTo("/api/servicing/areas");
+    data = await postTo("/api/areas");
   } catch (e) {
     if (Number(e?.status || 0) !== 404) throw e;
     try {
-      data = await postTo("/api/areas");
+      data = await postTo("/api/servicing/areas");
     } catch (fallbackError) {
       if (Number(fallbackError?.status || 0) === 404) {
         throw new Error("Area saving is not deployed on the API server yet. Update and restart the Server_API, then try again.");

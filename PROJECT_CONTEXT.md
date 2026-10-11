@@ -728,3 +728,14 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Main commit: `6fadffcf6be842c7134c3c0046d4e87ea6c8d0da`.
 - Deploy commit: `bc0c970d5db47cf6cfc9a7119cf1fd2ffc1ed7ce`.
 - GitHub Pages run: `38146279974` (verify completed success before describing as live).
+
+
+## Call Out defect description removal — 2026-10-11
+
+- Question 1 `Is the system defective?` no longer has or requires a separate overall Defect description field.
+- When Question 1 = Yes, completion now requires at least one picture and a compulsory comment on every picture.
+- Question 2 `Could the defect be resolved?` keeps its overall Repair description requirement when Yes is selected, in addition to compulsory comments on every repair picture.
+- Review for Question 1 now relies on the per-picture comments instead of a separate defect description.
+- Main commit: `3a6adee8680720b6181806dab85e2e686a938115`.
+- Deploy commit: `80c67b196be5929352e27afefec5c0f9bdf012ac`.
+- GitHub Pages run: `38146661534` (verify completed success before describing as live).

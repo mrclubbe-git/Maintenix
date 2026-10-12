@@ -916,3 +916,10 @@ Pictures and the responder defect description remain optional, matching the pre-
 - This confirms the intended DEV request flow is working:
   Cloudflare Transform Rule -> Cloudflare Tunnel -> `127.0.0.1:5056` -> existing CRA Node routes.
 - No Nginx or Node routing change is required for the CRA DEV URL prefix.
+
+## CRA frontend path/data validation — 2026-10-12
+
+- User confirmed the CRA development frontend correctly redirects to `https://mrclubbe-git.github.io/Maintenix/CRA/#/dashboard/overview`.
+- Existing CRA data appears available after the move to the organization-specific frontend path.
+- Combined with the previously validated CRA-prefixed API health check, the CRA organization-instance migration is functioning correctly at the routing and existing-data level.
+- Continue using `/Maintenix/CRA/` for CRA development frontend access.

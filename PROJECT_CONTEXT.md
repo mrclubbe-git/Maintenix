@@ -873,3 +873,20 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Last Seen survives API restarts via `Server_API/data/presence.json`; Online status remains transient and heartbeat-driven.
 - Pending approval controls have been removed from Overview. User approval will be handled on a dedicated Admin page in a future development stage.
 - Treat the current Overview implementation as the completed baseline unless the user explicitly revisits it.
+
+## CRA organization-instance frontend foundation — 2026-10-12
+
+- Maintenix is moving toward fully separate organization instances rather than multi-tenant shared application behavior.
+- CRA (Collaborative Risk Applications) is the first organization instance and remains the reference implementation.
+- Development frontend URL is now built for `https://mrclubbe-git.github.io/Maintenix/CRA/`.
+- The GitHub Pages workflow assembles CRA under `/CRA/` and leaves a root redirect from `/Maintenix/` to `/Maintenix/CRA/`, preserving the existing hash route when possible.
+- CRA frontend API base is now `https://dev-api.main-tenix.com/CRA`, controlled by repository variable `MAINTENIX_CRA_API_BASE_URL`.
+- CRA organization build settings use `REACT_APP_ORGANIZATION_CODE=CRA` and `REACT_APP_ORGANIZATION_NAME=Collaborative Risk Applications`.
+- Added `Web_UI/src/config/organization.js` as the frontend organization boundary.
+- Browser local/session storage is organization-scoped using the `maintenix:CRA:` prefix. Known legacy CRA values (auth token/user, settings visibility, notifications) migrate automatically once from the old unscoped keys.
+- IndexedDB access now goes through `organizationDbName(...)`. CRA deliberately retains its historical DB names to preserve existing queued jobs/cache; future organizations will receive distinct organization-suffixed DB names.
+- Existing CRA pages and functionality remain unchanged apart from organization scoping and deployment path/API routing.
+- Main frontend organization foundation begins at commit `bea038304cd35b5dc32c5a89a484cc8aaddabc17`; final CRA deployment commit on `deploy` is `ba452b6d562aa9293b8ec7114d5215a273859b0e`.
+- GitHub Actions run `38235783216` completed successfully for both build and deploy.
+- Backend is not yet changed for the CRA URL prefix. The next server step is to expose the existing DEV CRA API instance (127.0.0.1:5056) beneath `https://dev-api.main-tenix.com/CRA/api/` and CRA uploads beneath `https://dev-api.main-tenix.com/CRA/uploads/`, without touching production.
+- Future organizations should have independent frontend builds, API processes/services, users, data, uploads, templates, and business logic. No cross-organization authentication or data access is intended.

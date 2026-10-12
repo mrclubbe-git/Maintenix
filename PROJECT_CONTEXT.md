@@ -904,3 +904,15 @@ Pictures and the responder defect description remain optional, matching the pre-
 - No Node route changes are required for this CRA DEV URL-prefix migration.
 - Production remains separate and must not be modified.
 - Previous Nginx-based CRA backend migration instructions are obsolete and must not be followed.
+
+## CRA DEV routing validation — 2026-10-12
+
+- User validated the CRA development API path through Cloudflare.
+- `maintenix-dev-api.service` is active and the API listens privately on `127.0.0.1:5056`.
+- Public CRA-prefixed health check succeeded:
+  - `https://dev-api.main-tenix.com/CRA/api/health`
+  - HTTP 200
+  - response `{"ok":true}`
+- This confirms the intended DEV request flow is working:
+  Cloudflare Transform Rule -> Cloudflare Tunnel -> `127.0.0.1:5056` -> existing CRA Node routes.
+- No Nginx or Node routing change is required for the CRA DEV URL prefix.

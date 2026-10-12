@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../../config/organization";
 import React, { useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAngleLeft, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
@@ -7,7 +8,7 @@ import { Link } from "react-router-dom";
 import { Routes } from "../../routes";
 
 export default function ResetPassword() {
-  const authToken = localStorage.getItem("authToken") || "";
+  const authToken = orgLocalStorage.getItem("authToken") || "";
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -77,8 +78,8 @@ export default function ResetPassword() {
       setConfirmNewPassword("");
 
       // ✅ Force re-login after password change
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("authUser");
+      orgLocalStorage.removeItem("authToken");
+      orgLocalStorage.removeItem("authUser");
 
       setLoading(false);
 

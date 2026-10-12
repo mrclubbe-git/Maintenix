@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 export default function initializeFormalReporting(root) {
 if (!root) return () => {};
 
@@ -7,7 +8,7 @@ const doc = root.ownerDocument || root.host?.ownerDocument || document;
 const $ = (id) => root.querySelector(`#${CSS.escape(id)}`);
 
 async function api(url, options = {}) {
-  const token = localStorage.getItem('authToken') || '';
+  const token = orgLocalStorage.getItem('authToken') || '';
   const headers = { Authorization: `Bearer ${token}`, ...(options.headers || {}) };
   const response = await fetch(`/api/formal-reports${url}`, { cache: 'no-store', ...options, headers });
   const body = await response.json();
@@ -361,7 +362,7 @@ root.addEventListener('click', async (event) => {
   if (!link) return;
   event.preventDefault();
   try {
-    const token = localStorage.getItem('authToken') || '';
+    const token = orgLocalStorage.getItem('authToken') || '';
     const response = await fetch(link.getAttribute('href') || link.href, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
     if (!response.ok) throw new Error(`Download failed (HTTP ${response.status})`);
     const blob = await response.blob();

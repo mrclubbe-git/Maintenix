@@ -1,14 +1,14 @@
 /* eslint-disable no-console */
 const { spawnSync } = require("child_process");
 
-const apiBase = process.env.REACT_APP_API_BASE_URL || "https://dev-api.main-tenix.com";
+const apiBase = process.env.REACT_APP_API_BASE_URL || "https://dev-api.main-tenix.com/CRA";
 process.env.REACT_APP_API_BASE_URL = apiBase;
 
 if (!String(process.env.NODE_OPTIONS || "").includes("--openssl-legacy-provider")) {
   process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --openssl-legacy-provider`.trim();
 }
 
-console.log(`Building GitHub Pages UI with API base: ${apiBase}`);
+console.log(`Building CRA GitHub Pages UI with API base: ${apiBase}`);
 
 const command = process.platform === "win32" ? "react-scripts.cmd" : "react-scripts";
 const result = spawnSync(command, ["build"], {

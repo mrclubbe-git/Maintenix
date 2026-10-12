@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Row,
@@ -107,8 +108,8 @@ function downloadCsvFile(filename, headers, rows) {
 }
 
 export default function StockControl() {
-  const authToken = localStorage.getItem("authToken") || "";
-  const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
+  const authToken = orgLocalStorage.getItem("authToken") || "";
+  const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
   const roleKey = safeRole(authUser?.role);
 
   const isAdmin = roleKey === "ADMIN";

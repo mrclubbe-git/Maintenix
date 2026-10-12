@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useState, useEffect } from "react";
 import { Route, Switch, Redirect } from "react-router-dom";
 import { Routes } from "../routes";
@@ -59,7 +60,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
   const [authOk, setAuthOk] = useState(false);
 
   // read token each render (good enough for routing)
-  const authToken = localStorage.getItem("authToken") || "";
+  const authToken = orgLocalStorage.getItem("authToken") || "";
 
   useEffect(() => {
     const timer = setTimeout(() => setLoaded(true), 1000);
@@ -75,7 +76,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
     async function verify() {
       // no token => not logged in
       if (!authToken) {
-        localStorage.removeItem("authUser");
+        orgLocalStorage.removeItem("authUser");
         if (!mounted) return;
         setAuthOk(false);
         setAuthChecked(true);
@@ -89,8 +90,8 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
         });
 
         if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("authToken");
-          localStorage.removeItem("authUser");
+          orgLocalStorage.removeItem("authToken");
+          orgLocalStorage.removeItem("authUser");
           window.dispatchEvent(new Event("authUserUpdated"));
           if (!mounted) return;
           setAuthOk(false);
@@ -124,14 +125,14 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
   }, [authToken]);
 
   const localStorageIsSettingsVisible = () => {
-    return localStorage.getItem("settingsVisible") === "false" ? false : true;
+    return orgLocalStorage.getItem("settingsVisible") === "false" ? false : true;
   };
 
   const [showSettings, setShowSettings] = useState(localStorageIsSettingsVisible);
 
   const toggleSettings = () => {
     setShowSettings(!showSettings);
-    localStorage.setItem("settingsVisible", String(!showSettings));
+    orgLocalStorage.setItem("settingsVisible", String(!showSettings));
   };
 
   return (

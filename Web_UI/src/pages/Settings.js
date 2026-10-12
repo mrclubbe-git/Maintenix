@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Col, Row, Card, Form, Button, Image, Alert, Spinner, Table, InputGroup } from "@themesberg/react-bootstrap";
 import { Link } from "react-router-dom";
@@ -21,8 +22,8 @@ function safeRole(x) {
 }
 
 export default function Settings() {
-  const authToken = localStorage.getItem("authToken") || "";
-  const storedUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
+  const authToken = orgLocalStorage.getItem("authToken") || "";
+  const storedUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
 
   const storedUserId = storedUser?.id || ""; // optional, depends on your auth payload
 
@@ -81,7 +82,7 @@ export default function Settings() {
 
       // Keep localStorage authUser in sync
       const merged = { ...(storedUser || {}), ...u };
-      localStorage.setItem("authUser", JSON.stringify(merged));
+      orgLocalStorage.setItem("authUser", JSON.stringify(merged));
       window.dispatchEvent(new Event("authUserUpdated"));
 
       setLoadingProfile(false);
@@ -154,8 +155,8 @@ export default function Settings() {
       setProfile((p) => ({ ...(p && typeof p === "object" ? p : {}), photoUrl: newUrl }));
 
       // Update localStorage authUser
-      const current = safeJsonParse(localStorage.getItem("authUser") || "null", {});
-      localStorage.setItem("authUser", JSON.stringify({ ...(current || {}), photoUrl: newUrl }));
+      const current = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", {});
+      orgLocalStorage.setItem("authUser", JSON.stringify({ ...(current || {}), photoUrl: newUrl }));
       window.dispatchEvent(new Event("authUserUpdated"));
 
       setOkMsg("Profile photo updated.");
@@ -201,8 +202,8 @@ export default function Settings() {
       setProfile((p) => ({ ...(p && typeof p === "object" ? p : {}), name: u.name || name }));
 
       // Update localStorage authUser
-      const current = safeJsonParse(localStorage.getItem("authUser") || "null", {});
-      localStorage.setItem("authUser", JSON.stringify({ ...(current || {}), ...u }));
+      const current = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", {});
+      orgLocalStorage.setItem("authUser", JSON.stringify({ ...(current || {}), ...u }));
       window.dispatchEvent(new Event("authUserUpdated"));
 
       setOkMsg("Name updated.");

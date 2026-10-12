@@ -14,7 +14,7 @@
     "themesberg"
   ],
   "license": "MIT",
-  "homepage": "https://mrclubbe-git.github.io/Maintenix",
+  "homepage": "https://mrclubbe-git.github.io/Maintenix/CRA",
   "proxy": "http://localhost:5055",
   "version": "1.2.0",
   "dependencies": {

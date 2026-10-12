@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Col,
@@ -108,12 +109,12 @@ function safeJsonParse(str, fallback = null) {
 }
 
 function readNotifications() {
-  const raw = safeJsonParse(localStorage.getItem("appNotifications") || "[]", []);
+  const raw = safeJsonParse(orgLocalStorage.getItem("appNotifications") || "[]", []);
   return Array.isArray(raw) ? raw : [];
 }
 
 function writeNotifications(items) {
-  localStorage.setItem("appNotifications", JSON.stringify(Array.isArray(items) ? items : []));
+  orgLocalStorage.setItem("appNotifications", JSON.stringify(Array.isArray(items) ? items : []));
   window.dispatchEvent(new Event("notificationsUpdated"));
 }
 
@@ -161,8 +162,8 @@ function addUserSpecificRejectedNotification(reportRow, reportDisplayName) {
 }
 
 export default function Reports() {
-  const authToken = localStorage.getItem("authToken") || "";
-  const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
+  const authToken = orgLocalStorage.getItem("authToken") || "";
+  const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
 
   const roleKey = String(authUser?.role || "").toUpperCase().replace(/\s+/g, "");
   const canModerate = roleKey === "ADMIN" || roleKey === "L2" || roleKey === "LEVEL2" || roleKey === "LEVEL_2";

@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../../config/organization";
 import React, { useEffect, useState } from "react";
 import { Col, Row, Card, Table, Badge, ProgressBar, Alert } from "@themesberg/react-bootstrap";
 
@@ -190,7 +191,7 @@ export default function DashboardOverview() {
   // ---------------------------
   // Auth token
   // ---------------------------
-  const authToken = localStorage.getItem("authToken") || "";
+  const authToken = orgLocalStorage.getItem("authToken") || "";
 
   // ---------------------------
   // Presence (online / last seen)

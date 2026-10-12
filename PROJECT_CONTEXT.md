@@ -1004,3 +1004,25 @@ Pictures and the responder defect description remain optional, matching the pre-
   - `getSessionExpiresAt()` returns `createdAt + SESSION_TTL_MS`
   - successful login includes `expiresAt`
 - Backend source of record is now aligned with the live CRA DEV 8-hour session implementation.
+
+## CRA Settings refocus — 2026-10-12
+
+- User approved refocusing Settings as a personal user page and moving administrator functions to a separate Administration page later.
+- `Web_UI/src/pages/Settings.js` was updated on `main`.
+- Main commit: `f04e181ce18c3622b94ef8af8a2d2a4fa11edc15`.
+- Settings page heading is now `My Settings`.
+- Current Settings content is intentionally limited to:
+  - profile photo
+  - editable name
+  - read-only email
+  - read-only organization identity
+  - read-only role
+  - read-only account status
+  - Security card showing the configured absolute session duration
+  - Change password
+  - Sign out now
+- The session duration display derives from `AUTH_SESSION_TTL_MS` so it stays aligned with the CRA 8-hour frontend auth ceiling.
+- The previous Admin-only User Management widget was removed from Settings. Admin user-management functionality is intended to move to a dedicated Administration page in a subsequent change.
+- The browser-side profile image size check was corrected to 2 MB to match the Settings UI/backend expectation.
+- No backend changes are required for this Settings revision.
+- This frontend change is committed to `main` only and has NOT been pushed to the `deploy` branch yet.

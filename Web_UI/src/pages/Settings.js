@@ -376,7 +376,7 @@ export default function Settings() {
                 <div className="text-muted small">
                   Your session will expire in{" "}
                   <span className="fw-bold text-dark" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {sessionCountdown}
+                    {sessionCountdown} hours
                   </span>.
                 </div>
               </div>

@@ -809,3 +809,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Main frontend commit: `7c53123d90b2eae1dcf601a533b7b69b4aee67d8`.
 - Deploy frontend commit: `6159919d3615c77ffac88d411e042ec397c57fbd`.
 - This change is frontend-only; no `Server_API` files were modified.
+
+## Servicing and Call Out functional milestone complete — 2026-10-12
+
+- User confirmed the current functional development scope for both the Servicing page and Call Out page is complete.
+- Servicing report generation is operational with embedded photos/signatures and proportional image scaling.
+- Call Out report generation is operational with embedded photos/signatures and proportional image scaling.
+- Call Out Question 1 supports both YES and NO workflows; NO requires a compulsory comment and still proceeds to Question 2.
+- The current Servicing and Call Out implementations should now be treated as the completed baseline for future development unless a new change request explicitly revisits them.

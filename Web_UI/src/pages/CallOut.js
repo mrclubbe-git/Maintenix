@@ -156,7 +156,9 @@ function callOutResponseComplete(questionId, record) {
   const answer = String(record?.answer || "").trim().toUpperCase();
 
   if (questionId === "system_defective") {
-    if (answer === "NO") return true;
+    if (answer === "NO") {
+      return !!String(record?.comment || "").trim();
+    }
     if (answer !== "YES") return false;
     const photos = normalizeCallOutPhotos(record);
     return photos.length > 0
@@ -696,7 +698,8 @@ export default function CallOut() {
   });
 
   const systemDefectiveAnswer = String(answers?.system_defective?.answer || "").trim().toUpperCase();
-  const applicableQuestionRows = systemDefectiveAnswer === "YES" ? questionRows : [questionRows[0]];
+  // Question 2 is always part of the Call Out flow, regardless of the Question 1 answer.
+  const applicableQuestionRows = questionRows;
 
   const unansweredCount = useMemo(
     () => applicableQuestionRows.filter((q) => !callOutResponseComplete(q.id, answers?.[q.id] || {})).length,
@@ -920,6 +923,11 @@ export default function CallOut() {
 
     if (normalized === "YES") {
       window.setTimeout(() => openCallOutCamera(qid), 0);
+    } else if (qid === "system_defective" && normalized === "NO") {
+      window.setTimeout(() => {
+        const input = document.getElementById("callout-system-no-comment");
+        if (input && typeof input.focus === "function") input.focus();
+      }, 120);
     } else if (qid === "defect_resolved" && normalized === "NO") {
       window.setTimeout(() => {
         const input = document.getElementById("callout-requirement-0");
@@ -1189,7 +1197,7 @@ export default function CallOut() {
         setHighlightMissing(true);
         setHighlightMissingPhotos(callOutMissingPhotos(currentQuestion.id, currentAnswer) > 0);
         if (currentQuestion.id === "system_defective") {
-          setErr("Please answer whether the system is defective. If Yes, at least one picture and a comment for every picture are required.");
+          setErr("Please complete Question 1. If Yes, at least one picture and a comment for every picture are required. If No, a comment is required.");
         } else {
           setErr("Please complete the resolution question and all required details before continuing.");
         }
@@ -1200,7 +1208,7 @@ export default function CallOut() {
       setHighlightMissing(false);
       setHighlightMissingPhotos(false);
 
-      if (currentQuestion.id === "system_defective" && String(currentAnswer.answer || "").toUpperCase() === "YES") {
+      if (currentQuestion.id === "system_defective") {
         setQuestionIndex(1);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -1222,7 +1230,7 @@ export default function CallOut() {
     setHighlightMissingPhotos(false);
 
     if (step === 2) {
-      setQuestionIndex(systemDefectiveAnswer === "YES" ? 1 : 0);
+      setQuestionIndex(1);
       setStep(1);
       return;
     }
@@ -1501,8 +1509,7 @@ export default function CallOut() {
     if (!v?.area) return "Draft is missing Area.";
 
     const draftAnswers = v?.answers || {};
-    const systemAnswer = String(draftAnswers?.system_defective?.answer || "").trim().toUpperCase();
-    const applicable = systemAnswer === "YES" ? draftQuestionRows : [draftQuestionRows[0]];
+    const applicable = draftQuestionRows;
     const incomplete = applicable.filter((q) => !callOutResponseComplete(q.id, draftAnswers?.[q.id] || {})).length;
 
     if (incomplete > 0) {
@@ -2220,7 +2227,7 @@ export default function CallOut() {
                     <div className="text-muted small">{area}</div>
                   </div>
                   <div className="text-end">
-                    <div className="fw-bold">Question {questionIndex + 1} of {systemDefectiveAnswer === "YES" ? 2 : 1}</div>
+                    <div className="fw-bold">Question {questionIndex + 1} of 2</div>
                     <div className="text-muted small">{completedCount} completed</div>
                   </div>
                 </div>
@@ -2335,6 +2342,26 @@ export default function CallOut() {
                   </div>
                 ) : null}
 
+                {isFirstQuestion && answer === "NO" ? (
+                  <div className="mt-3 p-3" style={{ border: "1px solid #badbcc", borderRadius: 10, background: "#f6fff9" }}>
+                    <div className="fw-bold mb-1">Comment required</div>
+                    <div className="text-muted small mb-3">Add a comment before continuing to Question 2.</div>
+                    <Form.Group>
+                      <Form.Label>
+                        Comment <span className="text-danger">Required</span>
+                      </Form.Label>
+                      <Form.Control
+                        id="callout-system-no-comment"
+                        as="textarea"
+                        rows={4}
+                        placeholder="Add the required comment"
+                        value={a.comment || ""}
+                        onChange={(e) => updateCallOutAnswer(q.id, { comment: e.target.value })}
+                      />
+                    </Form.Group>
+                  </div>
+                ) : null}
+
                 {!isFirstQuestion && answer === "NO" ? (
                   <div className="mt-3 p-3" style={{ border: "1px solid #f1aeb5", borderRadius: 10, background: "#fff8f8" }}>
                     <div className="fw-bold mb-1">Repair requirements</div>
@@ -2382,7 +2409,9 @@ export default function CallOut() {
                         ? (isFirstQuestion
                             ? "At least one picture and a comment for every picture are required."
                             : "At least one picture, a comment for every picture, and a repair description are required.")
-                        : "Enter every repair requirement before continuing."}
+                        : isFirstQuestion
+                          ? "A comment is required before continuing to Question 2."
+                          : "Enter every repair requirement before continuing."}
                   </div>
                 ) : null}
               </Card.Body>
@@ -2423,12 +2452,15 @@ export default function CallOut() {
                       </div>
                     ))}
                   </div>
+                ) : systemDefectiveAnswer === "NO" ? (
+                  <div className="small mt-2">
+                    <strong>Comment:</strong> {String(answers?.system_defective?.comment || "").trim() || "Missing"}
+                  </div>
                 ) : null}
               </Card.Body>
             </Card>
 
-            {systemDefectiveAnswer === "YES" ? (
-              <Card className="mb-3">
+            <Card className="mb-3">
                 <Card.Body>
                   <div className="d-flex justify-content-between align-items-start flex-wrap" style={{ gap: 8 }}>
                     <div className="fw-bold">2. Could the defect be resolved?</div>
@@ -2459,7 +2491,6 @@ export default function CallOut() {
                   )}
                 </Card.Body>
               </Card>
-            ) : null}
 
             <hr />
 

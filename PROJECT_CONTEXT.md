@@ -1043,3 +1043,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Frontend main commit: `3e10d26228df0e3b2fa3d2ad2e538687c771d25e`.
 - No backend change is required.
 - This change is on `main` only and has NOT been deployed yet.
+
+## CRA session expiry countdown deployed — 2026-10-12
+
+- User explicitly requested deployment of the live session-expiry countdown on the CRA Settings page.
+- Deploy branch commit: `975c2071d839946aabac9c709f4b89fb9ea249ae`.
+- GitHub Actions run `38254608994` completed successfully for both build and deploy.
+- Live CRA Settings now shows a dynamic `Your session will expire in HH:MM` countdown sourced from the organization-scoped auth expiry timestamp.
+- No backend changes were required for this display enhancement.

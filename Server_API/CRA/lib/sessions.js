@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DATA_FILE = path.join(__dirname, "..", "data", "sessions.json");
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+const SESSION_TTL_MS = 1000 * 60 * 60 * 8; // 8 hours
 
 // token -> { userId, createdAt, lastSeenAt }
 const sessions = new Map();
@@ -72,6 +72,18 @@ function createSession(userId) {
   return token;
 }
 
+function getSessionExpiresAt(token) {
+  loadSessions();
+
+  const key = String(token || "").trim();
+  if (!key) return 0;
+
+  const session = sessions.get(key) || null;
+  if (!session || !isFresh(session)) return 0;
+
+  return Number(session.createdAt || 0) + SESSION_TTL_MS;
+}
+
 function getSession(token) {
   loadSessions();
   const key = String(token || "").trim();
@@ -116,4 +128,10 @@ function extractBearer(input) {
 }
 
 
-module.exports = { createSession, getSession, deleteSession, extractBearer };
+module.exports = {
+  createSession,
+  getSession,
+  getSessionExpiresAt,
+  deleteSession,
+  extractBearer
+};

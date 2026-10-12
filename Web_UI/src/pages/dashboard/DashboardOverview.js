@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Col, Row, Card, Table, Badge, Button, ProgressBar, Alert, ButtonGroup } from "@themesberg/react-bootstrap";
+import { Col, Row, Card, Table, Badge, ProgressBar, Alert } from "@themesberg/react-bootstrap";
 
 // ---------------------------
 // Helpers (no external libs)
@@ -29,14 +29,6 @@ function timeAgo(isoString) {
     if (v >= 1) return rtf ? rtf.format(-v, u.name) : `${v} ${u.name}${v === 1 ? "" : "s"} ago`;
   }
   return "Just now";
-}
-
-function safeJsonParse(str, fallback = null) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return fallback;
-  }
 }
 
 function getInitials(nameOrEmail) {
@@ -196,76 +188,9 @@ export default function DashboardOverview() {
   }, []);
 
   // ---------------------------
-  // Auth context from localStorage
+  // Auth token
   // ---------------------------
-  const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
   const authToken = localStorage.getItem("authToken") || "";
-  const isAdmin = String(authUser?.role || "").toUpperCase() === "ADMIN";
-
-  // Admin view toggle: Pending approvals vs Presence list
-  const [adminView, setAdminView] = useState("presence"); // "pending" | "presence"
-
-  // ---------------------------
-  // Admin: pending approvals
-  // ---------------------------
-  const [pendingUsers, setPendingUsers] = useState([]);
-  const [pendingErr, setPendingErr] = useState("");
-
-  async function loadPending() {
-    if (!isAdmin) return;
-    if (!authToken) {
-      setPendingErr("Admin token missing. Please log in again.");
-      setPendingUsers([]);
-      return;
-    }
-
-    try {
-      setPendingErr("");
-      const res = await fetch("/api/admin/users?status=PENDING", {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setPendingErr(data?.message || `Failed to load pending users (HTTP ${res.status}).`);
-        setPendingUsers([]);
-        return;
-      }
-
-      setPendingUsers(Array.isArray(data.users) ? data.users : []);
-    } catch {
-      setPendingErr("Failed to load pending users (API not reachable).");
-      setPendingUsers([]);
-    }
-  }
-
-  async function approveUser(id) {
-    if (!authToken) return;
-    await fetch(`/api/admin/users/${id}/approve`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${authToken}` }
-    }).catch(() => null);
-    loadPending();
-  }
-
-  async function denyUser(id) {
-    if (!authToken) return;
-    await fetch(`/api/admin/users/${id}/deny`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${authToken}` }
-    }).catch(() => null);
-    loadPending();
-  }
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    if (adminView !== "pending") return;
-
-    loadPending();
-    const id = setInterval(loadPending, 10000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, authToken, adminView]);
 
   // ---------------------------
   // Presence (online / last seen)
@@ -303,47 +228,20 @@ export default function DashboardOverview() {
   }
 
   useEffect(() => {
-    // Non-admin always uses presence. Admins only need the list while the
-    // presence widget is selected; the global heartbeat keeps running either way.
-    if (isAdmin && adminView !== "presence") return;
-
     loadPresence();
     const loadId = setInterval(loadPresence, 5000);
 
     return () => clearInterval(loadId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, adminView, authToken]);
-
-  const showPendingWidget = isAdmin && adminView === "pending";
-  const showPresenceWidget = !isAdmin || adminView === "presence";
+  }, [authToken]);
 
   return (
     <>
-      {/* Header (filter removed) */}
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4 gap-2">
         <div>
           <h4 className="mb-0">Overview</h4>
           <small className="text-muted">Server status and user activity</small>
         </div>
-
-        {isAdmin ? (
-          <ButtonGroup className="mobile-stack-btn-group">
-            <Button
-              size="sm"
-              variant={adminView === "pending" ? "primary" : "outline-primary"}
-              onClick={() => setAdminView("pending")}
-            >
-              Pending approvals
-            </Button>
-            <Button
-              size="sm"
-              variant={adminView === "presence" ? "primary" : "outline-primary"}
-              onClick={() => setAdminView("presence")}
-            >
-              Users online
-            </Button>
-          </ButtonGroup>
-        ) : null}
       </div>
 
       {serverErr ? (
@@ -388,28 +286,15 @@ export default function DashboardOverview() {
           </Card>
         </Col>
 
-        {/* Users widget (admin toggle OR normal user presence) */}
+        {/* Users online / last seen */}
         <Col xs={12} xl={8}>
           <Card border="light" className="shadow-sm h-100">
             <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-              <h5 className="mb-0">
-                {showPendingWidget ? "Registered Users (Pending Approval)" : "Users Online / Last Seen"}
-                {showPendingWidget && pendingUsers.length ? (
-                  <Badge bg="warning" className="ms-2">
-                    {pendingUsers.length}
-                  </Badge>
-                ) : null}
-              </h5>
-              <small className="text-muted">{showPendingWidget ? "Approve / Decline" : "Presence"}</small>
+              <h5 className="mb-0">Users Online / Last Seen</h5>
+              <small className="text-muted">Presence</small>
             </Card.Header>
 
-            {showPendingWidget && pendingErr ? (
-              <Alert variant="warning" className="m-3 mb-0">
-                {pendingErr}
-              </Alert>
-            ) : null}
-
-            {showPresenceWidget && presenceErr ? (
+            {presenceErr ? (
               <Alert variant="warning" className="m-3 mb-0">
                 {presenceErr}
               </Alert>
@@ -418,52 +303,15 @@ export default function DashboardOverview() {
             <Card.Body className="p-0">
               <Table responsive className="table-centered table-nowrap mb-0 rounded mobile-wrap-table">
                 <thead className="thead-light">
-                  {showPendingWidget ? (
-                    <tr>
-                      <th className="border-0">User</th>
-                      <th className="border-0">Status</th>
-                      <th className="border-0">Requested</th>
-                      <th className="border-0">Actions</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th className="border-0">User</th>
-                      <th className="border-0">Status</th>
-                      <th className="border-0">Last seen</th>
-                    </tr>
-                  )}
+                  <tr>
+                    <th className="border-0">User</th>
+                    <th className="border-0">Status</th>
+                    <th className="border-0">Last seen</th>
+                  </tr>
                 </thead>
 
                 <tbody>
-                  {showPendingWidget ? (
-                    pendingUsers.length ? (
-                      pendingUsers.map((u) => (
-                        <tr key={u.id}>
-                          <td>
-                            <UserCell user={u} />
-                          </td>
-                          <td>
-                            <Badge bg="warning">Pending</Badge>
-                          </td>
-                          <td>{timeAgo(u.createdAt)}</td>
-                          <td>
-                            <Button size="sm" variant="success" className="me-2" onClick={() => approveUser(u.id)}>
-                              Approve
-                            </Button>
-                            <Button size="sm" variant="danger" onClick={() => denyUser(u.id)}>
-                              Decline
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td className="p-3 text-muted" colSpan={4}>
-                          No pending users.
-                        </td>
-                      </tr>
-                    )
-                  ) : presenceUsers.length ? (
+                  {presenceUsers.length ? (
                     presenceUsers.map((u) => (
                       <tr key={u.id}>
                         <td>

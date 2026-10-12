@@ -944,3 +944,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - The API/worker code itself uses relative paths/`__dirname`, so no Node route or data-path code change is required when the whole backend directory is moved intact.
 - Cloudflare routing remains unchanged: CRA public requests are rewritten at the edge and tunneled to `127.0.0.1:5056`.
 - Production remains separate and must not be modified.
+
+## CRA backend directory migration completed — 2026-10-12
+
+- User reported the CRA backend filesystem/service-path migration completed.
+- CRA DEV backend target path is now `/home/charl/projects/maintenix-dev-api/Server_API/CRA/`.
+- This aligns the live DEV backend layout with the repository structure under `Server_API/CRA/`.
+- Existing CRA Cloudflare routing remains unchanged: public `/CRA/` requests are rewritten at the edge and tunneled to the CRA DEV API on `127.0.0.1:5056`.
+- Production remains separate and untouched.

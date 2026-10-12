@@ -269,8 +269,8 @@ export default function DashboardOverview() {
 
   // ---------------------------
   // Presence (online / last seen)
-  // NOTE: This page pings presence while Overview is open.
-  // We'll move ping logic to a global file next so it works on every page.
+  // Heartbeats are sent globally from Web_UI/src/index.js so presence remains
+  // accurate while the user is working anywhere in Maintenix.
   // ---------------------------
   const [presenceUsers, setPresenceUsers] = useState([]);
   const [presenceErr, setPresenceErr] = useState("");
@@ -302,28 +302,15 @@ export default function DashboardOverview() {
     }
   }
 
-  function pingPresence() {
-    if (!authToken) return;
-    fetch("/api/presence/ping", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${authToken}` }
-    }).catch(() => null);
-  }
-
   useEffect(() => {
-    // Non-admin always uses presence
+    // Non-admin always uses presence. Admins only need the list while the
+    // presence widget is selected; the global heartbeat keeps running either way.
     if (isAdmin && adminView !== "presence") return;
 
-    pingPresence();
     loadPresence();
-
-    const pingId = setInterval(pingPresence, 15000);
     const loadId = setInterval(loadPresence, 5000);
 
-    return () => {
-      clearInterval(pingId);
-      clearInterval(loadId);
-    };
+    return () => clearInterval(loadId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, adminView, authToken]);
 

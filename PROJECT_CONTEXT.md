@@ -817,3 +817,14 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Call Out report generation is operational with embedded photos/signatures and proportional image scaling.
 - Call Out Question 1 supports both YES and NO workflows; NO requires a compulsory comment and still proceeds to Question 2.
 - The current Servicing and Call Out implementations should now be treated as the completed baseline for future development unless a new change request explicitly revisits them.
+
+## Cross-browser per-user draft storage — 2026-10-12
+
+- Draft persistence is being standardized so a signed-in user can access their own drafts across browsers/sessions for Servicing, Call Out, and Section Reports.
+- Servicing already had server-backed per-user drafts under `Server_API/data/servicing-drafts/<userKey>/` with IndexedDB as a browser mirror/fallback. No Servicing code change was required in this step.
+- Call Out frontend now uses its existing authenticated server draft API as the primary online source while retaining IndexedDB as a local mirror/fallback. Save, list, load, rename, delete, and Generate-from-draft now work with server-backed drafts. Main commit: `36ec855c404e2aa13d5cd9f8fffa86f771048bcd`. Deploy commit: `725d69e262bb52b782acd095b676cd1cc246d71f`.
+- Call Out server draft endpoints remain under `/api/callout/drafts` and store per-user JSON under `Server_API/data/callout-drafts-v2/<userKey>/`.
+- Section Reports already used server drafts, but the draft folder was global. `Server_API/routes/formalReports.js` now scopes drafts by authenticated user under `Server_API/data/formal-reporting/drafts/<userKey>/`, prevents one user from listing/loading/renaming/deleting another user's draft, and migrates legacy root-level drafts when their existing `savedBy` matches the current user.
+- Section Reports backend commit: `97a1bd609cd8048dc835549e5a6b596e3fbe51b4`.
+- Section Reports is still ADMIN-only; per-user scoping therefore currently isolates drafts between Admin accounts.
+- The development server must receive the updated `Server_API/routes/formalReports.js` and restart `maintenix-dev-api.service` before Section Reports cross-browser draft isolation is active.

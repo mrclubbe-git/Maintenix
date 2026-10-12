@@ -856,3 +856,12 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Online status remains transient and is correctly rebuilt from fresh heartbeats after restart.
 - Presence tracking does not modify `users.json`.
 - This behavior is now the accepted baseline for Overview user activity tracking.
+
+## Overview approval controls removed — 2026-10-12
+
+- The Overview page no longer contains the Pending approvals / Users online toggle.
+- Pending-user approval UI, polling, and Approve/Decline actions were removed from `Web_UI/src/pages/dashboard/DashboardOverview.js`.
+- Overview now always shows the Users Online / Last Seen presence table next to Server Info.
+- User approval will be moved to a dedicated Admin page in a future change.
+- Main frontend commit: `58710c150a90221212cf0888ed90002201632ca3`.
+- This frontend change has not been pushed to the `deploy` branch yet.

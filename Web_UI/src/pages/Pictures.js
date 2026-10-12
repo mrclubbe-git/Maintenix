@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Card,
@@ -31,14 +32,14 @@ function canAdmin(role) {
 }
 function getStoredUser() {
   try {
-    const raw = localStorage.getItem("authUser");
+    const raw = orgLocalStorage.getItem("authUser");
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 function getToken() {
-  return localStorage.getItem("authToken") || "";
+  return orgLocalStorage.getItem("authToken") || "";
 }
 function getRangeLabel(r) {
   const v = String(r || "PAST_7_DAYS").toUpperCase();

@@ -848,3 +848,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - `Web_UI/src/pages/dashboard/DashboardOverview.js` no longer sends its own duplicate heartbeat; it only polls the presence list. Main frontend commit: `f6e0fd5d0e9bb8ffbd0cb11635897a88a24bf7ef`.
 - Deploy frontend commit: `476b28fc09300d3c90e5f171aa8f6ad4059881c4`.
 - Deploy the updated backend file to `/home/charl/projects/maintenix-dev-api/Server_API/routes/presence.js` and restart `maintenix-dev-api.service`.
+
+## Persistent presence validation complete — 2026-10-12
+
+- User confirmed the persistent Overview presence / Last Seen implementation passed testing.
+- `Server_API/data/presence.json` now provides durable `lastSeenAt` across API restarts.
+- Online status remains transient and is correctly rebuilt from fresh heartbeats after restart.
+- Presence tracking does not modify `users.json`.
+- This behavior is now the accepted baseline for Overview user activity tracking.

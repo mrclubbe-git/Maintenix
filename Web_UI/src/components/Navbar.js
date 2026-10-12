@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nav, Navbar, Dropdown, Container, Badge } from "@themesberg/react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -16,7 +17,7 @@ function safeJsonParse(str, fallback = null) {
 }
 
 function readAuthUser() {
-  return safeJsonParse(localStorage.getItem("authUser") || "null", null);
+  return safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
 }
 
 function readNotifications() {
@@ -44,7 +45,7 @@ function formatNotificationTime(iso) {
 }
 
 async function refreshAuthUserFromApi() {
-  const token = localStorage.getItem("authToken") || "";
+  const token = orgLocalStorage.getItem("authToken") || "";
   if (!token) return;
 
   try {
@@ -60,7 +61,7 @@ async function refreshAuthUserFromApi() {
 
     const current = readAuthUser() || {};
     const merged = { ...(current || {}), ...u };
-    localStorage.setItem("authUser", JSON.stringify(merged));
+    orgLocalStorage.setItem("authUser", JSON.stringify(merged));
     window.dispatchEvent(new Event("authUserUpdated"));
   } catch {
     // ignore (offline or API not reachable)
@@ -90,7 +91,7 @@ export default function NavbarTop() {
   const notifWrapperRef = useRef(null);
 
   const loadNotifications = useCallback(async () => {
-    const token = localStorage.getItem("authToken") || "";
+    const token = orgLocalStorage.getItem("authToken") || "";
     if (!token) {
       setNotifications([]);
       return;
@@ -165,7 +166,7 @@ export default function NavbarTop() {
   }, [visibleNotifications]);
 
   async function notificationPost(path) {
-    const token = localStorage.getItem("authToken") || "";
+    const token = orgLocalStorage.getItem("authToken") || "";
     if (!token) return;
     try {
       const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
@@ -198,7 +199,7 @@ export default function NavbarTop() {
 
   async function sendBroadcastNotification(e) {
     e.preventDefault();
-    const token = localStorage.getItem("authToken") || "";
+    const token = orgLocalStorage.getItem("authToken") || "";
     if (!token || broadcastSending) return;
     setBroadcastErr("");
     setBroadcastSending(true);
@@ -283,8 +284,8 @@ export default function NavbarTop() {
   }, [notifOpen]);
 
   function handleLogout() {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("authUser");
+    orgLocalStorage.removeItem("authToken");
+    orgLocalStorage.removeItem("authUser");
     window.dispatchEvent(new Event("authUserUpdated"));
     window.location.hash = Routes.Signin.path;
   }

@@ -796,3 +796,16 @@ Pictures and the responder defect description remain optional, matching the pre-
   - `/home/charl/projects/maintenix-dev-api/Server_API/calloutWorker.js`
   - `/home/charl/projects/maintenix-dev-api/Server_API/lib/servicingGenerator.js`
 - Restart `maintenix-dev-api.service` after installing either backend file so the long-running workers load the updated generator code.
+
+## Call Out Question 1 NO workflow — 2026-10-12
+
+- Call Out Question 1 ("Is the system defective?") now has a complete NO branch.
+- Selecting NO opens a compulsory comment field and focuses it automatically.
+- Question 1 is only complete for NO when that comment contains text.
+- Pressing Next after a valid Question 1 response now always advances to Question 2, regardless of whether Question 1 was YES or NO.
+- Question 2 is always included in progress counts, draft validation, Review, and Back navigation.
+- Review shows the compulsory Question 1 NO comment.
+- Question 1 YES behavior is unchanged: at least one picture is required and every picture requires a comment.
+- Main frontend commit: `7c53123d90b2eae1dcf601a533b7b69b4aee67d8`.
+- Deploy frontend commit: `6159919d3615c77ffac88d411e042ec397c57fbd`.
+- This change is frontend-only; no `Server_API` files were modified.

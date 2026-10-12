@@ -1059,3 +1059,12 @@ Pictures and the responder defect description remain optional, matching the pre-
 - The redundant right-aligned duplicate countdown and `HH:MM` helper label were removed.
 - Frontend main commit: `f6709fde7bf0706f85b8a8b9865344b6bf71cb0f`.
 - This visual cleanup is on `main` only and has NOT been deployed yet.
+
+## Frontend deployment approval behavior — 2026-10-12
+
+- User explicitly stated that approval of a frontend change automatically grants deployment approval going forward.
+- Therefore, when the user approves or asks to implement a frontend change, deploy the corresponding tested frontend change to the `deploy` branch without requiring a second deployment confirmation.
+- Continue to keep backend changes separate and route backend instructions through Annie unless the user requests otherwise.
+- The CRA session countdown visual cleanup was deployed under this approval.
+- Deploy branch commit: `e0442969e07a2b0e3d31803c64626cf58b6d2bd4`.
+- GitHub Actions run `38255289137` completed successfully for both build and deploy.

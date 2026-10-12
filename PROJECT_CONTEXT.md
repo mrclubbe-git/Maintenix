@@ -1068,3 +1068,12 @@ Pictures and the responder defect description remain optional, matching the pre-
 - The CRA session countdown visual cleanup was deployed under this approval.
 - Deploy branch commit: `e0442969e07a2b0e3d31803c64626cf58b6d2bd4`.
 - GitHub Actions run `38255289137` completed successfully for both build and deploy.
+
+## CRA session countdown unit label — 2026-10-12
+
+- User requested the word `hours` be displayed next to the Settings session countdown so the remaining-time value is self-explanatory.
+- `Web_UI/src/pages/Settings.js` now displays the session message as `Your session will expire in HH:MM hours.`
+- Main commit: `ea30de8a289449cb3f3b688f608a5096bd7a43e5`.
+- The approved frontend change was automatically deployed under the standing deployment approval.
+- Deploy branch commit: `587cab369cab2acc5c9f2401b04140b3606bc59c`.
+- GitHub Actions run `38255949487` completed successfully for both build and deploy.

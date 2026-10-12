@@ -1051,3 +1051,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - GitHub Actions run `38254608994` completed successfully for both build and deploy.
 - Live CRA Settings now shows a dynamic `Your session will expire in HH:MM` countdown sourced from the organization-scoped auth expiry timestamp.
 - No backend changes were required for this display enhancement.
+
+## CRA Settings session countdown visual cleanup — 2026-10-12
+
+- User confirmed the live session-expiry countdown works but noted the countdown was visually duplicated.
+- `Web_UI/src/pages/Settings.js` was simplified so the remaining session time appears only once in the sentence `Your session will expire in HH:MM`.
+- The redundant right-aligned duplicate countdown and `HH:MM` helper label were removed.
+- Frontend main commit: `f6709fde7bf0706f85b8a8b9865344b6bf71cb0f`.
+- This visual cleanup is on `main` only and has NOT been deployed yet.

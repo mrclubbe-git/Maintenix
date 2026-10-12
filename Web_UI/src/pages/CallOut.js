@@ -1,3 +1,4 @@
+import { orgLocalStorage, organizationDbName } from "../config/organization";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Card, Row, Col, Button, Form, Alert, ProgressBar, Badge, Spinner } from "@themesberg/react-bootstrap";
 import { addGlobalArea, fetchGlobalAreas, hasExactAreaMatch } from "../lib/globalAreas";
@@ -346,7 +347,7 @@ function resizeCanvasToCSS(canvas, ctx) {
 // ---- IndexedDB helpers (offline cache + queue) ----
 function openMaintenixDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("maintenix_callout_v2");
+    const req = indexedDB.open(organizationDbName("maintenix_callout_v2"));
     req.onupgradeneeded = () => {
       const db = req.result;
 
@@ -516,12 +517,12 @@ function nowMs() {
 function acquireRunnerLock(ttlMs = 8000) {
   try {
     const key = getRunnerLockKey();
-    const raw = localStorage.getItem(key) || "";
+    const raw = orgLocalStorage.getItem(key) || "";
     const cur = raw ? safeJsonParse(raw, null) : null;
     if (cur?.expiresAt && cur.expiresAt > nowMs()) return false;
 
     const next = { expiresAt: nowMs() + ttlMs };
-    localStorage.setItem(key, JSON.stringify(next));
+    orgLocalStorage.setItem(key, JSON.stringify(next));
     return true;
   } catch {
     return true; // if localStorage blocked, just run (best-effort)
@@ -529,13 +530,13 @@ function acquireRunnerLock(ttlMs = 8000) {
 }
 function releaseRunnerLock() {
   try {
-    localStorage.removeItem(getRunnerLockKey());
+    orgLocalStorage.removeItem(getRunnerLockKey());
   } catch {}
 }
 
 export default function CallOut() {
-  const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
-  const authToken = localStorage.getItem("authToken") || "";
+  const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
+  const authToken = orgLocalStorage.getItem("authToken") || "";
   const roleKey = safeRole(authUser?.role);
   const topRef = useRef(null);
   const correctionContext = useMemo(() => readCorrectionContextFromHash(), []);

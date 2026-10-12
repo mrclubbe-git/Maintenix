@@ -1,3 +1,4 @@
+import { orgLocalStorage, orgSessionStorage, migrateLegacyCraLocalStorage, organizationDbName } from "./config/organization";
 // =========================================================
 // * Volt React Dashboard
 // =========================================================
@@ -76,8 +77,8 @@ async function checkForUpdatedBundleOnLoad() {
     if (!nextMainJs || !currentMainJs || nextMainJs === currentMainJs) return;
 
     try {
-      if (sessionStorage.getItem(UPDATE_PROMPT_KEY) === nextMainJs) return;
-      sessionStorage.setItem(UPDATE_PROMPT_KEY, nextMainJs);
+      if (orgSessionStorage.getItem(UPDATE_PROMPT_KEY) === nextMainJs) return;
+      orgSessionStorage.setItem(UPDATE_PROMPT_KEY, nextMainJs);
     } catch {}
 
     const ok = window.confirm("A Maintenix update is available. Press OK to reload and apply the update.");
@@ -112,8 +113,8 @@ async function removeLegacyOfflineArtifacts() {
   if (hadController) {
     try {
       const cleanupKey = "maintenix_offline_worker_removed";
-      if (sessionStorage.getItem(cleanupKey) !== "1") {
-        sessionStorage.setItem(cleanupKey, "1");
+      if (orgSessionStorage.getItem(cleanupKey) !== "1") {
+        orgSessionStorage.setItem(cleanupKey, "1");
         window.location.reload();
       }
     } catch {}
@@ -129,6 +130,7 @@ function runVersionCheckOnceOnLoad() {
   window.addEventListener("load", checkForUpdatedBundleOnLoad, { once: true });
 }
 
+migrateLegacyCraLocalStorage();
 removeLegacyOfflineArtifacts();
 runVersionCheckOnceOnLoad();
 
@@ -158,7 +160,7 @@ function PresenceHeartbeat() {
 
     const readLock = () => {
       try {
-        const raw = localStorage.getItem(LOCK_KEY);
+        const raw = orgLocalStorage.getItem(LOCK_KEY);
         if (!raw) return null;
         const obj = JSON.parse(raw);
         if (!obj || typeof obj !== "object") return null;
@@ -170,7 +172,7 @@ function PresenceHeartbeat() {
 
     const writeLock = (obj) => {
       try {
-        localStorage.setItem(LOCK_KEY, JSON.stringify(obj));
+        orgLocalStorage.setItem(LOCK_KEY, JSON.stringify(obj));
       } catch {}
     };
 
@@ -215,7 +217,7 @@ function PresenceHeartbeat() {
       try {
         const cur = readLock();
         const id = instanceIdRef.current;
-        if (cur && cur.id === id) localStorage.removeItem(LOCK_KEY);
+        if (cur && cur.id === id) orgLocalStorage.removeItem(LOCK_KEY);
       } catch {}
     };
     window.addEventListener("beforeunload", releaseIfOwned);
@@ -234,7 +236,7 @@ function PresenceHeartbeat() {
     runningRef.current = true;
 
     try {
-      const token = localStorage.getItem("authToken") || "";
+      const token = orgLocalStorage.getItem("authToken") || "";
       if (!token) return;
 
       // If offline, do nothing
@@ -258,7 +260,7 @@ function PresenceHeartbeat() {
 
     const readLock = () => {
       try {
-        const raw = localStorage.getItem(LOCK_KEY);
+        const raw = orgLocalStorage.getItem(LOCK_KEY);
         if (!raw) return null;
         const obj = JSON.parse(raw);
         if (!obj || typeof obj !== "object") return null;
@@ -270,7 +272,7 @@ function PresenceHeartbeat() {
 
     const writeLock = (obj) => {
       try {
-        localStorage.setItem(LOCK_KEY, JSON.stringify(obj));
+        orgLocalStorage.setItem(LOCK_KEY, JSON.stringify(obj));
       } catch {}
     };
 
@@ -362,7 +364,7 @@ const JOB_SCHEMA_VERSION = 2;
 function openMaintenixDb() {
   return new Promise((resolve, reject) => {
     // IMPORTANT: bump DB version so we can add CallOut stores
-    const req = indexedDB.open("maintenix", 2);
+    const req = indexedDB.open(organizationDbName("maintenix"), 2);
     req.onupgradeneeded = () => {
       const db = req.result;
 
@@ -705,7 +707,7 @@ async function processOneJob(db) {
   // Only process when online
   if (!navigator.onLine) return false;
 
-  const token = localStorage.getItem("authToken") || "";
+  const token = orgLocalStorage.getItem("authToken") || "";
   if (!token) return false;
 
   // 1) Submit queued/retry jobs to server (fast), then mark server_pending
@@ -947,7 +949,7 @@ async function pollCalloutServerStatus(reportId, token) {
 async function processOneCalloutJob(db) {
   if (!navigator.onLine) return false;
 
-  const token = localStorage.getItem("authToken") || "";
+  const token = orgLocalStorage.getItem("authToken") || "";
   if (!token) return false;
 
   // 1) Submit queued/retry callout jobs
@@ -1143,7 +1145,7 @@ function ServicingJobRunner() {
 
     const readLock = () => {
       try {
-        const raw = localStorage.getItem(LOCK_KEY);
+        const raw = orgLocalStorage.getItem(LOCK_KEY);
         if (!raw) return null;
         const obj = JSON.parse(raw);
         if (!obj || typeof obj !== "object") return null;
@@ -1155,7 +1157,7 @@ function ServicingJobRunner() {
 
     const writeLock = (obj) => {
       try {
-        localStorage.setItem(LOCK_KEY, JSON.stringify(obj));
+        orgLocalStorage.setItem(LOCK_KEY, JSON.stringify(obj));
       } catch {}
     };
 
@@ -1204,7 +1206,7 @@ function ServicingJobRunner() {
       try {
         const cur = readLock();
         const id = instanceIdRef.current;
-        if (cur && cur.id === id) localStorage.removeItem(LOCK_KEY);
+        if (cur && cur.id === id) orgLocalStorage.removeItem(LOCK_KEY);
       } catch {}
     };
     window.addEventListener("beforeunload", releaseIfOwned);
@@ -1225,7 +1227,7 @@ function ServicingJobRunner() {
 
     const readLock = () => {
       try {
-        const raw = localStorage.getItem(LOCK_KEY);
+        const raw = orgLocalStorage.getItem(LOCK_KEY);
         if (!raw) return null;
         const obj = JSON.parse(raw);
         if (!obj || typeof obj !== "object") return null;
@@ -1237,7 +1239,7 @@ function ServicingJobRunner() {
 
     const writeLock = (obj) => {
       try {
-        localStorage.setItem(LOCK_KEY, JSON.stringify(obj));
+        orgLocalStorage.setItem(LOCK_KEY, JSON.stringify(obj));
       } catch {}
     };
 

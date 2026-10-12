@@ -973,3 +973,15 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Annie instruction artifact created as `Annie_CRA_8_hour_session_expiry.txt`.
 - CRA DEV backend restart is required after Annie's backend file changes.
 - Production must remain untouched.
+
+## CRA 8-hour authentication expiry — 2026-10-12
+
+- User selected an absolute 8-hour login/session lifetime for CRA (not an inactivity/sliding timeout).
+- Frontend now stores and enforces an organization-scoped auth expiry and clears CRA auth when the expiry is reached.
+- Frontend login consumes backend `expiresAt` when supplied; legacy sessions without that key receive an 8-hour client-side ceiling.
+- Logout/password-reset auth cleanup also removes the stored expiry.
+- Frontend deployment commit: `8381d51da905e13d4fd2634d5f5e3e13144e7425`.
+- GitHub Actions run `38251213987` completed successfully for both build and deploy.
+- User reported Annie completed the corresponding CRA DEV backend change.
+- Intended backend behavior: `SESSION_TTL_MS = 8 hours`, expiry remains based on original `createdAt`, and successful login returns an `expiresAt` millisecond timestamp.
+- Important version-control note: at the time of this record, GitHub `main` still shows the pre-change 30-day TTL in `Server_API/CRA/lib/sessions.js` and no `expiresAt` login response in `Server_API/CRA/routes/auth.js`. The live Annie change therefore needs to be reconciled back into GitHub before the backend source of record is considered synchronized.

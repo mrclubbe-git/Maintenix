@@ -836,3 +836,15 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Servicing and Call Out drafts can be resumed from another browser/session when the same user account is used.
 - Section Reports retains per-user server scoping introduced in `Server_API/routes/formalReports.js`.
 - This cross-browser draft behavior should be treated as the new baseline for future draft-related development.
+
+## Persistent Overview presence / last seen — 2026-10-12
+
+- User requested that Overview "Last seen" survive API restarts without writing heartbeat activity into critical user account/password storage.
+- `Server_API/routes/presence.js` now stores durable last-seen timestamps in the separate file `Server_API/data/presence.json`.
+- The API keeps current-process heartbeats in memory for Online status. After any API restart the in-memory map starts empty, so users are correctly shown Offline until a fresh heartbeat arrives; persisted `lastSeenAt` remains available immediately.
+- Durable presence writes are throttled to at most once every 60 seconds per user and use the existing locked/atomic JSON helpers. `users.json` is not modified by presence tracking.
+- Backend presence commit: `897a957a200dd04632e00f2eb49339c0fed575b7`.
+- A global presence heartbeat was already mounted in `Web_UI/src/index.js`, so logged-in users are tracked while using any Maintenix page, not only Overview.
+- `Web_UI/src/pages/dashboard/DashboardOverview.js` no longer sends its own duplicate heartbeat; it only polls the presence list. Main frontend commit: `f6e0fd5d0e9bb8ffbd0cb11635897a88a24bf7ef`.
+- Deploy frontend commit: `476b28fc09300d3c90e5f171aa8f6ad4059881c4`.
+- Deploy the updated backend file to `/home/charl/projects/maintenix-dev-api/Server_API/routes/presence.js` and restart `maintenix-dev-api.service`.

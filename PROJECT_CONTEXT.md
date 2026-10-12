@@ -931,3 +931,16 @@ Pictures and the responder defect description remain optional, matching the pre-
 - The current DEV backend instance itself is treated as the CRA instance. Organization separation is provided by the frontend path, Cloudflare edge rewrite, dedicated API process/port, and the backend instance's own users/data/templates.
 - A future organization should use a separate sibling backend instance/directory and service (for example a separate TEST instance on another port), not share CRA's `Server_API/data`.
 - Renaming the existing CRA backend directory/service to explicitly include CRA is optional cleanup and not required for functional isolation.
+
+## CRA backend repository path split — 2026-10-12
+
+- User chose to make the CRA backend organization boundary explicit in the repository and development server filesystem.
+- All tracked CRA backend files were moved from `Server_API/*` to `Server_API/CRA/*`.
+- Repository move commit: `afbb94960a1b5d7dc55a4bcd5797b65502ad1895`.
+- `Web_UI/package.json` local API helper now targets `../Server_API/CRA`; commit `817c44ac11337250fa33f0f4cbfe2d0eefa65239`.
+- Target DEV filesystem path is `/home/charl/projects/maintenix-dev-api/Server_API/CRA/`.
+- The entire existing live DEV `Server_API` directory, including runtime data/uploads/untracked state, should be moved intact into the new `CRA` directory rather than reconstructed from Git, so CRA data is preserved.
+- `maintenix-dev-api.service` may keep its current service name, but its WorkingDirectory must change to `/home/charl/projects/maintenix-dev-api/Server_API/CRA`.
+- The API/worker code itself uses relative paths/`__dirname`, so no Node route or data-path code change is required when the whole backend directory is moved intact.
+- Cloudflare routing remains unchanged: CRA public requests are rewritten at the edge and tunneled to `127.0.0.1:5056`.
+- Production remains separate and must not be modified.

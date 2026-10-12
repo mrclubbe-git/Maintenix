@@ -22,7 +22,18 @@ try {
   ImageModule = null;
 }
 try {
-  sizeOf = require("image-size");
+  const imageSizeModule = require("image-size");
+  // image-size v2 exposes its callable through `imageSize` rather than the
+  // CommonJS module itself. Support both shapes so real dimensions are used
+  // and photos are scaled proportionally inside their report cells.
+  sizeOf =
+    typeof imageSizeModule === "function"
+      ? imageSizeModule
+      : typeof imageSizeModule.imageSize === "function"
+        ? imageSizeModule.imageSize
+        : typeof imageSizeModule.default === "function"
+          ? imageSizeModule.default
+          : null;
 } catch {
   sizeOf = null;
 }

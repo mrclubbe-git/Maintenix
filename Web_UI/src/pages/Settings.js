@@ -1,4 +1,4 @@
-import { clearOrgAuth, ensureOrgAuthExpiresAt, ORGANIZATION, orgLocalStorage } from "../config/organization";
+import { clearOrgAuth, ensureOrgAuthExpiresAt, getNotificationPreferences, ORGANIZATION, orgLocalStorage, setNotificationPreferences as persistNotificationPreferences } from "../config/organization";
 import React, { useEffect, useRef, useState } from "react";
 import { Col, Row, Card, Form, Button, Image, Alert, Spinner } from "@themesberg/react-bootstrap";
 import { Link } from "react-router-dom";
@@ -17,11 +17,15 @@ function safeJsonParse(str, fallback = null) {
 export default function Settings() {
   const authToken = orgLocalStorage.getItem("authToken") || "";
   const storedUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
-
+  const storedUserId = String(storedUser?.id || "");
 
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [savingPhoto, setSavingPhoto] = useState(false);
+  const [savingNotificationPreferences, setSavingNotificationPreferences] = useState(false);
+  const [notificationPreferences, setNotificationPreferencesState] = useState(() =>
+    getNotificationPreferences(storedUserId)
+  );
 
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
@@ -87,6 +91,78 @@ export default function Settings() {
     loadProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const localPreferences = getNotificationPreferences(storedUserId);
+    setNotificationPreferencesState(localPreferences);
+
+    async function loadRemotePreferences() {
+      if (!authToken) return;
+
+      try {
+        const res = await fetch("/api/profile/preferences", {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+
+        // Until the server-side preference endpoint is installed, keep using
+        // the organization-scoped per-user browser preference without error.
+        if (res.status === 404) return;
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !mounted) return;
+
+        const remote = data?.preferences?.notifications;
+        if (!remote || typeof remote !== "object") return;
+
+        const next = persistNotificationPreferences(storedUserId, remote);
+        if (mounted) setNotificationPreferencesState(next);
+      } catch {
+        // Browser-cached preferences remain available when the API is offline.
+      }
+    }
+
+    loadRemotePreferences();
+
+    return () => {
+      mounted = false;
+    };
+  }, [authToken, storedUserId]);
+
+  async function updateNotificationPreferences(patch) {
+    const next = persistNotificationPreferences(storedUserId, patch);
+    setNotificationPreferencesState(next);
+
+    if (!authToken) return;
+
+    setSavingNotificationPreferences(true);
+    try {
+      const res = await fetch("/api/profile/preferences", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ notifications: next })
+      });
+
+      if (res.status === 404) return;
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+
+      const remote = data?.preferences?.notifications;
+      if (remote && typeof remote === "object") {
+        const confirmed = persistNotificationPreferences(storedUserId, remote);
+        setNotificationPreferencesState(confirmed);
+      }
+    } catch {
+      // Keep the locally saved preference if the API cannot be reached.
+    } finally {
+      setSavingNotificationPreferences(false);
+    }
+  }
 
   function openFilePicker() {
     setOkMsg("");
@@ -388,6 +464,48 @@ export default function Settings() {
                 <Button type="button" variant="outline-danger" onClick={handleSignOut}>
                   Sign out now
                 </Button>
+              </div>
+            </Card.Body>
+          </Card>
+
+          <Card border="light" className="shadow-sm mb-4">
+            <Card.Header>
+              <h5 className="mb-0">Notifications</h5>
+            </Card.Header>
+
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-start gap-3 mb-4">
+                <div>
+                  <div className="fw-bold">Notification alerts</div>
+                  <div className="text-muted small">
+                    Show unread notification alerts in the navigation bar. Notifications that require acknowledgement remain visible.
+                  </div>
+                </div>
+                <Form.Check
+                  type="switch"
+                  id="notification-alerts-enabled"
+                  checked={notificationPreferences.enabled}
+                  onChange={(e) => updateNotificationPreferences({ enabled: e.target.checked })}
+                  disabled={savingNotificationPreferences}
+                  aria-label="Enable notification alerts"
+                />
+              </div>
+
+              <div className="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                  <div className="fw-bold">Notification sound</div>
+                  <div className="text-muted small">
+                    Play a short sound when a new unread notification arrives.
+                  </div>
+                </div>
+                <Form.Check
+                  type="switch"
+                  id="notification-sound-enabled"
+                  checked={notificationPreferences.sound}
+                  onChange={(e) => updateNotificationPreferences({ sound: e.target.checked })}
+                  disabled={savingNotificationPreferences || !notificationPreferences.enabled}
+                  aria-label="Enable notification sound"
+                />
               </div>
             </Card.Body>
           </Card>

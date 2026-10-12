@@ -1,4 +1,4 @@
-import { clearOrgAuth, orgLocalStorage } from "../config/organization";
+import { clearOrgAuth, getNotificationPreferences, orgLocalStorage, setNotificationPreferences as persistNotificationPreferences } from "../config/organization";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nav, Navbar, Dropdown, Container, Badge } from "@themesberg/react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -44,6 +44,44 @@ function formatNotificationTime(iso) {
   }
 }
 
+function playNotificationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const context = new AudioContextClass();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = 880;
+    gain.gain.setValueAtTime(0.035, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.12);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+
+    const startTone = () => {
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.12);
+    };
+
+    oscillator.onended = () => {
+      try { context.close(); } catch {}
+    };
+
+    if (context.state === "suspended") {
+      context.resume().then(startTone).catch(() => {
+        try { context.close(); } catch {}
+      });
+    } else {
+      startTone();
+    }
+  } catch {
+    // Browsers may block audio until the user has interacted with the page.
+  }
+}
+
 async function refreshAuthUserFromApi() {
   const token = orgLocalStorage.getItem("authToken") || "";
   if (!token) return;
@@ -72,6 +110,10 @@ export default function NavbarTop() {
   const [authUser, setAuthUser] = useState(readAuthUser);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [notifications, setNotifications] = useState(readNotifications);
+  const [notificationPreferences, setNotificationPreferencesState] = useState(() => {
+    const user = readAuthUser();
+    return getNotificationPreferences(user?.id);
+  });
   const [notifOpen, setNotifOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState("");
@@ -89,6 +131,37 @@ export default function NavbarTop() {
   });
 
   const notifWrapperRef = useRef(null);
+  const knownNotificationIdsRef = useRef(new Set());
+  const notificationSnapshotReadyRef = useRef(false);
+
+  const syncNotificationPreferencesFromApi = useCallback(async () => {
+    const user = readAuthUser();
+    const userId = String(user?.id || "");
+    const local = getNotificationPreferences(userId);
+    setNotificationPreferencesState(local);
+
+    const token = orgLocalStorage.getItem("authToken") || "";
+    if (!token) return;
+
+    try {
+      const res = await fetch("/api/profile/preferences", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.status === 404) return;
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+
+      const remote = data?.preferences?.notifications;
+      if (!remote || typeof remote !== "object") return;
+
+      const next = persistNotificationPreferences(userId, remote);
+      setNotificationPreferencesState(next);
+    } catch {
+      // Keep the local per-user preference if the API is unavailable.
+    }
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     const token = orgLocalStorage.getItem("authToken") || "";
@@ -104,6 +177,28 @@ export default function NavbarTop() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
       const remote = Array.isArray(data.notifications) ? data.notifications : [];
+
+      const user = readAuthUser();
+      const preferences = getNotificationPreferences(user?.id);
+      const knownIds = knownNotificationIdsRef.current;
+      const hasNewUnread = remote.some((n) => {
+        const id = String(n?.id || "");
+        return id && !n?.read && !knownIds.has(id);
+      });
+
+      if (
+        notificationSnapshotReadyRef.current &&
+        preferences.enabled &&
+        preferences.sound &&
+        hasNewUnread
+      ) {
+        playNotificationSound();
+      }
+
+      knownNotificationIdsRef.current = new Set(
+        remote.map((n) => String(n?.id || "")).filter(Boolean)
+      );
+      notificationSnapshotReadyRef.current = true;
       setNotifications(remote);
     } catch {
       setNotifications([]);
@@ -114,18 +209,31 @@ export default function NavbarTop() {
     const syncAuth = () => {
       const user = readAuthUser();
       setAuthUser(user);
+      setNotificationPreferencesState(getNotificationPreferences(user?.id));
       setNotifications([]);
+      knownNotificationIdsRef.current = new Set();
+      notificationSnapshotReadyRef.current = false;
+      syncNotificationPreferencesFromApi();
+    };
+
+    const syncNotificationPreferences = () => {
+      const user = readAuthUser();
+      setNotificationPreferencesState(getNotificationPreferences(user?.id));
     };
 
     window.addEventListener("authUserUpdated", syncAuth);
     window.addEventListener("notificationsUpdated", loadNotifications);
+    window.addEventListener("notificationPreferencesUpdated", syncNotificationPreferences);
 
     const onStorage = (e) => {
-      if (e.key === "authUser" || e.key === "authToken") syncAuth();
+      const key = String(e.key || "");
+      if (key.endsWith(":authUser") || key.endsWith(":authToken")) syncAuth();
+      if (key.includes(":notificationPreferences:")) syncNotificationPreferences();
     };
     window.addEventListener("storage", onStorage);
 
     refreshAuthUserFromApi();
+    syncNotificationPreferencesFromApi();
     loadNotifications();
     const timer = window.setInterval(() => {
       loadNotifications();
@@ -134,10 +242,11 @@ export default function NavbarTop() {
     return () => {
       window.removeEventListener("authUserUpdated", syncAuth);
       window.removeEventListener("notificationsUpdated", loadNotifications);
+      window.removeEventListener("notificationPreferencesUpdated", syncNotificationPreferences);
       window.removeEventListener("storage", onStorage);
       window.clearInterval(timer);
     };
-  }, [loadNotifications]);
+  }, [loadNotifications, syncNotificationPreferencesFromApi]);
 
   const displayName = authUser?.name || authUser?.email || "User";
   const role = String(authUser?.role || "").toUpperCase() || "USER";
@@ -160,6 +269,14 @@ export default function NavbarTop() {
   const unreadCount = useMemo(() => {
     return visibleNotifications.filter((n) => !n.read).length;
   }, [visibleNotifications]);
+
+  const requiredAcknowledgementCount = useMemo(() => {
+    return visibleNotifications.filter((n) => n.requiresAck && !n.acknowledged).length;
+  }, [visibleNotifications]);
+
+  const notificationBadgeCount = notificationPreferences.enabled
+    ? unreadCount
+    : requiredAcknowledgementCount;
 
   const hasClearableNotifications = useMemo(() => {
     return visibleNotifications.some((n) => !(n.requiresAck && !n.acknowledged));
@@ -312,7 +429,7 @@ export default function NavbarTop() {
                   style={{ minWidth: 36 }}
                 >
                   <FontAwesomeIcon icon={faBell} size="lg" />
-                  {unreadCount > 0 ? (
+                  {notificationBadgeCount > 0 ? (
                     <Badge
                       bg="danger"
                       pill
@@ -324,7 +441,7 @@ export default function NavbarTop() {
                         minWidth: 18
                       }}
                     >
-                      {unreadCount > 99 ? "99+" : unreadCount}
+                      {notificationBadgeCount > 99 ? "99+" : notificationBadgeCount}
                     </Badge>
                   ) : null}
                 </Dropdown.Toggle>

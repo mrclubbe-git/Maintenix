@@ -12,6 +12,57 @@ const STORAGE_PREFIX = `maintenix:${ORGANIZATION.code}:`;
 
 export const AUTH_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
+export const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
+  enabled: true,
+  sound: false
+});
+
+function notificationPreferencesStorageKey(userId) {
+  const id = String(userId || "anonymous").trim() || "anonymous";
+  return `notificationPreferences:${id}`;
+}
+
+export function getNotificationPreferences(userId) {
+  const fallback = { ...DEFAULT_NOTIFICATION_PREFERENCES };
+
+  try {
+    const raw = orgLocalStorage.getItem(notificationPreferencesStorageKey(userId));
+    if (!raw) return fallback;
+
+    const parsed = JSON.parse(raw);
+    return {
+      enabled: parsed?.enabled !== false,
+      sound: parsed?.sound === true
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+export function setNotificationPreferences(userId, patch = {}) {
+  const current = getNotificationPreferences(userId);
+  const next = {
+    enabled: patch.enabled === undefined ? current.enabled : patch.enabled !== false,
+    sound: patch.sound === undefined ? current.sound : patch.sound === true
+  };
+
+  // Sound is only meaningful when notification alerts are enabled.
+  if (!next.enabled) next.sound = false;
+
+  orgLocalStorage.setItem(
+    notificationPreferencesStorageKey(userId),
+    JSON.stringify(next)
+  );
+
+  try {
+    window.dispatchEvent(new CustomEvent("notificationPreferencesUpdated", {
+      detail: { userId: String(userId || ""), preferences: next }
+    }));
+  } catch {}
+
+  return next;
+}
+
 export const orgLocalStorage = {
   getItem(key) {
     return window.localStorage.getItem(STORAGE_PREFIX + String(key));

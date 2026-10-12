@@ -952,3 +952,24 @@ Pictures and the responder defect description remain optional, matching the pre-
 - This aligns the live DEV backend layout with the repository structure under `Server_API/CRA/`.
 - Existing CRA Cloudflare routing remains unchanged: public `/CRA/` requests are rewritten at the edge and tunneled to the CRA DEV API on `127.0.0.1:5056`.
 - Production remains separate and untouched.
+
+## CRA 8-hour authentication expiry — 2026-10-12
+
+- User selected an absolute 8-hour login lifetime for CRA.
+- This is a maximum session age from login, not an inactivity/sliding timeout.
+- Frontend implementation is committed on `main` but has NOT been deployed to `deploy` yet.
+- Frontend organization config now defines an 8-hour auth TTL and stores `authExpiresAt` alongside the CRA token/user.
+- Sign-in stores the backend-provided `expiresAt` when available, otherwise falls back to 8 hours from login.
+- Protected routes enforce the expiry with a timer and clear CRA auth when the deadline is reached.
+- Explicit logout/password-reset flows clear `authExpiresAt` as well as token/user.
+- Relevant frontend commits:
+  - `55d560c985cc6c1162360bff84fe2d315e486d2d` — auth expiry helpers
+  - `07711ad44445ea888fb9669daf3f83557174a39e` — sign-in expiry handling
+  - `a335e4f7f8cfa80d78bba71721fdffec82953f27` — protected-route expiry timer
+  - `91baaa057abddbbd9f486ddb144f5ad0d42600fa`, `afaa4917655df34142820c3bcc8433d50dbe6857`, `26f4766bc3ccf2f54cfac50c83aa5bb072c87cdf` — logout/reset cleanup
+- Backend remains authoritative and must be changed by Annie:
+  - `Server_API/CRA/lib/sessions.js`: reduce fixed TTL from 30 days to 8 hours while keeping expiry based on `createdAt`.
+  - `Server_API/CRA/routes/auth.js`: return the exact session `expiresAt` in successful login responses.
+- Annie instruction artifact created as `Annie_CRA_8_hour_session_expiry.txt`.
+- CRA DEV backend restart is required after Annie's backend file changes.
+- Production must remain untouched.

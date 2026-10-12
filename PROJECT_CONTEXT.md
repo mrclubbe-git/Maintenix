@@ -1077,3 +1077,32 @@ Pictures and the responder defect description remain optional, matching the pre-
 - The approved frontend change was automatically deployed under the standing deployment approval.
 - Deploy branch commit: `587cab369cab2acc5c9f2401b04140b3606bc59c`.
 - GitHub Actions run `38255949487` completed successfully for both build and deploy.
+
+## CRA user notification preferences — first implementation — 2026-10-12
+
+- User approved starting work on user notification settings.
+- Frontend notification preference helpers were added in `Web_UI/src/config/organization.js`.
+- Preferences are organization-scoped and locally keyed per CRA user.
+- Initial defaults:
+  - notification alerts enabled
+  - notification sound disabled
+- `Web_UI/src/pages/Settings.js` now has a Notifications card with:
+  - Notification alerts switch
+  - Notification sound switch
+- Turning notification alerts off automatically turns notification sound off.
+- `Web_UI/src/components/Navbar.js` now applies the preference:
+  - normal unread badge when alerts are enabled
+  - when alerts are disabled, required-acknowledgement notifications still remain visibly badged so mandatory notices cannot be hidden
+  - optional short Web Audio notification tone can play when a new unread notification arrives and sound is enabled
+  - first notification load does not play a sound for existing notifications
+- Browser audio may be blocked until the user has interacted with the page; this is handled silently.
+- Frontend is already compatible with future server-backed preferences through authenticated `GET/PATCH /api/profile/preferences`. Until that endpoint is installed, HTTP 404 is silently treated as local-only fallback.
+- Main frontend commits:
+  - `d3a2aa1b39fe84e019e80a254318b568a46237f4` notification preference helpers
+  - `9d3e86c744520a4ed1aaac3c73f9c8434a21608c` Settings notification controls
+  - `95c820a93e07ad02ba3d5b5fe3d8d533c4fc7802` Navbar preference behavior and notification sound
+- Deploy branch commit: `621e26dda5ef11689a6dad37edb0a2da4cdcc0ea`.
+- GitHub Actions run `38256865941` completed successfully for build and deploy.
+- Server-backed cross-browser persistence is the next backend step and should use a separate `data/user-preferences.json`, not `users.json`.
+- Annie instruction artifact created: `Annie_CRA_notification_preferences_backend.txt`.
+- Do not sync backend source to GitHub until Annie returns the tested backend files.

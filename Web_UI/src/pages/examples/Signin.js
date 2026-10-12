@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../../config/organization";
 import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
@@ -8,8 +9,8 @@ import { Routes } from "../../routes";
 import BgImage from "../../assets/img/illustrations/signin.svg";
 
 function clearStoredAuth() {
-  localStorage.removeItem("authToken");
-  localStorage.removeItem("authUser");
+  orgLocalStorage.removeItem("authToken");
+  orgLocalStorage.removeItem("authUser");
   window.dispatchEvent(new Event("authUserUpdated"));
 }
 
@@ -23,7 +24,7 @@ export default function Signin() {
   const passwordRef = useRef(null);
 
   useEffect(() => {
-    const existingToken = localStorage.getItem("authToken") || "";
+    const existingToken = orgLocalStorage.getItem("authToken") || "";
     if (!existingToken) return undefined;
 
     let mounted = true;
@@ -38,7 +39,7 @@ export default function Signin() {
         const data = await res.json().catch(() => ({}));
 
         if (res.ok && data?.user) {
-          localStorage.setItem("authUser", JSON.stringify(data.user));
+          orgLocalStorage.setItem("authUser", JSON.stringify(data.user));
           window.dispatchEvent(new Event("authUserUpdated"));
           if (mounted) window.location.hash = Routes.DashboardOverview.path;
           return;
@@ -93,8 +94,8 @@ export default function Signin() {
         return;
       }
 
-      localStorage.setItem("authToken", data.token);
-      localStorage.setItem("authUser", JSON.stringify(data.user));
+      orgLocalStorage.setItem("authToken", data.token);
+      orgLocalStorage.setItem("authUser", JSON.stringify(data.user));
       window.dispatchEvent(new Event("authUserUpdated"));
 
       setSuccessMsg(`Logged in as ${data.user.email} (${data.user.role}).`);

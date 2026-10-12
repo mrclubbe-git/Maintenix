@@ -784,3 +784,15 @@ Pictures and the responder defect description remain optional, matching the pre-
 - `Server_API/calloutWorker.js` now upgrades the legacy plain image tags to image-module tags in the template ZIP at generation time, so the existing `call_out_template.docx` does not need to be replaced solely for this issue.
 - The worker now rejects missing/invalid technician signatures instead of silently writing a transparent placeholder, requires the DOCX image module, and fails explicitly when a referenced report image is missing on disk.
 - Backend must be updated/restarted with this worker commit before retesting Call Out report generation.
+
+## Report image aspect-ratio fix — 2026-10-12
+
+- Confirmed root cause of image-less generated reports on the development backend: the `maintenix-dev` systemd service user could not load `docxtemplater-image-module-free` because its `xmldom` dependency was not resolvable/readable from the mixed-ownership `node_modules` tree. Rebuilding dependencies with `npm ci` as `maintenix-dev` restored module loading.
+- Call Out and Servicing report generators were then updated to resolve the callable exported by `image-size` v2 through `imageSize` (while retaining compatibility with callable/default export shapes).
+- The existing `getSize` logic now receives each image's real width/height and scales it proportionally inside the existing report-cell bounds, preserving aspect ratio without cropping or distortion.
+- Call Out generator commit: `d7c5fb4fdfdf81ad08ed382f2a2c39c76f78dea0` (`Server_API/calloutWorker.js`).
+- Servicing generator commit: `3aff5924afe2f5a344a603714468ece5c04eaa52` (`Server_API/lib/servicingGenerator.js`).
+- Server destinations remain:
+  - `/home/charl/projects/maintenix-dev-api/Server_API/calloutWorker.js`
+  - `/home/charl/projects/maintenix-dev-api/Server_API/lib/servicingGenerator.js`
+- Restart `maintenix-dev-api.service` after installing either backend file so the long-running workers load the updated generator code.

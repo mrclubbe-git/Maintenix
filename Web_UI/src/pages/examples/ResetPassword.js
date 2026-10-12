@@ -1,4 +1,4 @@
-import { orgLocalStorage } from "../../config/organization";
+import { clearOrgAuth, orgLocalStorage } from "../../config/organization";
 import React, { useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAngleLeft, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
@@ -78,8 +78,7 @@ export default function ResetPassword() {
       setConfirmNewPassword("");
 
       // ✅ Force re-login after password change
-      orgLocalStorage.removeItem("authToken");
-      orgLocalStorage.removeItem("authUser");
+      clearOrgAuth();
 
       setLoading(false);
 

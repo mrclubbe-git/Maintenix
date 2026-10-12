@@ -1,4 +1,4 @@
-import { orgLocalStorage } from "../config/organization";
+import { clearOrgAuth, orgLocalStorage } from "../config/organization";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nav, Navbar, Dropdown, Container, Badge } from "@themesberg/react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -284,9 +284,7 @@ export default function NavbarTop() {
   }, [notifOpen]);
 
   function handleLogout() {
-    orgLocalStorage.removeItem("authToken");
-    orgLocalStorage.removeItem("authUser");
-    window.dispatchEvent(new Event("authUserUpdated"));
+    clearOrgAuth();
     window.location.hash = Routes.Signin.path;
   }
 

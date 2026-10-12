@@ -1,4 +1,4 @@
-import { orgLocalStorage } from "../../config/organization";
+import { clearOrgAuth, isOrgAuthExpired, orgLocalStorage, setOrgAuth } from "../../config/organization";
 import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
@@ -9,9 +9,7 @@ import { Routes } from "../../routes";
 import BgImage from "../../assets/img/illustrations/signin.svg";
 
 function clearStoredAuth() {
-  orgLocalStorage.removeItem("authToken");
-  orgLocalStorage.removeItem("authUser");
-  window.dispatchEvent(new Event("authUserUpdated"));
+  clearOrgAuth();
 }
 
 export default function Signin() {
@@ -26,6 +24,11 @@ export default function Signin() {
   useEffect(() => {
     const existingToken = orgLocalStorage.getItem("authToken") || "";
     if (!existingToken) return undefined;
+
+    if (isOrgAuthExpired()) {
+      clearStoredAuth();
+      return undefined;
+    }
 
     let mounted = true;
     const controller = new AbortController();
@@ -94,9 +97,7 @@ export default function Signin() {
         return;
       }
 
-      orgLocalStorage.setItem("authToken", data.token);
-      orgLocalStorage.setItem("authUser", JSON.stringify(data.user));
-      window.dispatchEvent(new Event("authUserUpdated"));
+      setOrgAuth(data.token, data.user, data.expiresAt);
 
       setSuccessMsg(`Logged in as ${data.user.email} (${data.user.role}).`);
       setLoading(false);

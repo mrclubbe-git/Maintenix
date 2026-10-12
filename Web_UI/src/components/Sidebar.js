@@ -1,4 +1,4 @@
-import { orgLocalStorage } from "../config/organization";
+import { clearOrgAuth, orgLocalStorage } from "../config/organization";
 import React, { useMemo, useState } from "react";
 import SimpleBar from "simplebar-react";
 import { useLocation, Link } from "react-router-dom";

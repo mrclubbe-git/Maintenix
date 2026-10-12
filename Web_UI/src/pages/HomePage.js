@@ -1,4 +1,4 @@
-import { orgLocalStorage } from "../config/organization";
+import { clearOrgAuth, ensureOrgAuthExpiresAt, isOrgAuthExpired, orgLocalStorage } from "../config/organization";
 import React, { useState, useEffect } from "react";
 import { Route, Switch, Redirect } from "react-router-dom";
 import { Routes } from "../routes";
@@ -77,11 +77,24 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
       // no token => not logged in
       if (!authToken) {
         orgLocalStorage.removeItem("authUser");
+        orgLocalStorage.removeItem("authExpiresAt");
         if (!mounted) return;
         setAuthOk(false);
         setAuthChecked(true);
         return;
       }
+
+      if (isOrgAuthExpired()) {
+        clearOrgAuth();
+        if (!mounted) return;
+        setAuthOk(false);
+        setAuthChecked(true);
+        return;
+      }
+
+      // Legacy CRA sessions may predate the client-side expiry key.
+      // Give them a client-side ceiling while the backend remains authoritative.
+      ensureOrgAuthExpiresAt();
 
       try {
         const res = await fetch("/api/profile/me", {
@@ -90,9 +103,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
         });
 
         if (res.status === 401 || res.status === 403) {
-          orgLocalStorage.removeItem("authToken");
-          orgLocalStorage.removeItem("authUser");
-          window.dispatchEvent(new Event("authUserUpdated"));
+          clearOrgAuth();
           if (!mounted) return;
           setAuthOk(false);
           setAuthChecked(true);
@@ -122,6 +133,29 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
       mounted = false;
       controller.abort();
     };
+  }, [authToken]);
+
+  // Enforce the absolute 8-hour login lifetime even if the user leaves one page open.
+  useEffect(() => {
+    if (!authToken) return undefined;
+
+    const expiresAt = ensureOrgAuthExpiresAt();
+    const remaining = expiresAt - Date.now();
+
+    if (remaining <= 0) {
+      clearOrgAuth();
+      setAuthOk(false);
+      setAuthChecked(true);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      clearOrgAuth();
+      setAuthOk(false);
+      setAuthChecked(true);
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
   }, [authToken]);
 
   const localStorageIsSettingsVisible = () => {

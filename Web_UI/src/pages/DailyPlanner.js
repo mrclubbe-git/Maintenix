@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarDay, faCheckCircle, faPlus, faSave, faTrashAlt, faUserCheck } from "@fortawesome/free-solid-svg-icons";
@@ -36,7 +37,7 @@ function hashQueryDate() {
 }
 
 function authHeaders(json = true) {
-  const token = localStorage.getItem("authToken") || "";
+  const token = orgLocalStorage.getItem("authToken") || "";
   return {
     ...(json ? { "Content-Type": "application/json" } : {}),
     Authorization: `Bearer ${token}`

@@ -1033,3 +1033,13 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Deploy branch commit: `f4a284f40e0878c16ecf5d50d65d4f7ddd43675b`.
 - GitHub Actions run `38253962326` completed successfully for both build and deploy.
 - Live CRA Settings now contains personal Profile and Security functionality only; Admin User Management remains removed pending a dedicated Administration page.
+
+## CRA Settings session expiry countdown — 2026-10-12
+
+- User requested the static session-duration display be replaced with a live session-expiry countdown.
+- `Web_UI/src/pages/Settings.js` now reads the organization-scoped auth expiry via `ensureOrgAuthExpiresAt()` and updates the remaining time once per second.
+- The Security card now displays: `Your session will expire in HH:MM` with a tabular-numeric countdown.
+- Countdown format uses hours and minutes only; expiry enforcement remains handled by the existing CRA auth/session logic.
+- Frontend main commit: `3e10d26228df0e3b2fa3d2ad2e538687c771d25e`.
+- No backend change is required.
+- This change is on `main` only and has NOT been deployed yet.

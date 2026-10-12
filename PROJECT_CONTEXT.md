@@ -828,3 +828,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Section Reports backend commit: `97a1bd609cd8048dc835549e5a6b596e3fbe51b4`.
 - Section Reports is still ADMIN-only; per-user scoping therefore currently isolates drafts between Admin accounts.
 - The development server must receive the updated `Server_API/routes/formalReports.js` and restart `maintenix-dev-api.service` before Section Reports cross-browser draft isolation is active.
+
+## Cross-browser draft validation complete — 2026-10-12
+
+- User confirmed cross-browser draft access is working.
+- The per-user server-backed draft model is now validated for the current development workflow.
+- Servicing and Call Out drafts can be resumed from another browser/session when the same user account is used.
+- Section Reports retains per-user server scoping introduced in `Server_API/routes/formalReports.js`.
+- This cross-browser draft behavior should be treated as the new baseline for future draft-related development.

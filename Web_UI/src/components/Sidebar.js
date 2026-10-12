@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useMemo, useState } from "react";
 import SimpleBar from "simplebar-react";
 import { useLocation, Link } from "react-router-dom";
@@ -27,7 +28,7 @@ export default function Sidebar(props = {}) {
 
   const onCollapse = () => setShow(!show);
 
-  const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
+  const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
   const displayName = authUser?.name || authUser?.email || "User";
 
   // ✅ Use uploaded profile pic if present
@@ -37,8 +38,8 @@ export default function Sidebar(props = {}) {
   }, [authUser]);
 
   function handleLogout() {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("authUser");
+    orgLocalStorage.removeItem("authToken");
+    orgLocalStorage.removeItem("authUser");
 
     // ✅ update Navbar instantly (same tab)
     window.dispatchEvent(new Event("authUserUpdated"));

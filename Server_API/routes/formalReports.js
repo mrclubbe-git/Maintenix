@@ -90,6 +90,56 @@ function safeFileName(value) {
   return fileName && fileName === String(value || "") && !fileName.includes("..") ? fileName : null;
 }
 
+function userKeyFromReq(req) {
+  const raw = String(req.user?.id || req.user?.email || "unknown").trim();
+  return raw.replace(/[^\w.\-]+/g, "_").slice(0, 120) || "unknown";
+}
+
+function userDraftDir(req) {
+  return path.join(DRAFTS_DIR, userKeyFromReq(req));
+}
+
+function userDraftPath(req, id) {
+  return path.join(userDraftDir(req), `${id}.json`);
+}
+
+function migrateLegacyDraftsForUser(req) {
+  ensureDirs();
+  const destinationDir = userDraftDir(req);
+  fs.mkdirSync(destinationDir, { recursive: true });
+
+  const userId = String(req.user?.id || "").trim();
+  if (!userId || !fs.existsSync(DRAFTS_DIR)) return;
+
+  for (const entry of fs.readdirSync(DRAFTS_DIR, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".json")) continue;
+
+    const legacyPath = path.join(DRAFTS_DIR, entry.name);
+    let draft = null;
+    try {
+      draft = readJson(legacyPath);
+    } catch {
+      continue;
+    }
+
+    if (String(draft?.savedBy || "").trim() !== userId) continue;
+
+    const id = safeId(draft?.id || entry.name.replace(/\.json$/i, ""));
+    if (!id) continue;
+
+    const scopedPath = userDraftPath(req, id);
+    if (!fs.existsSync(scopedPath)) {
+      writeJsonAtomic(scopedPath, draft);
+    }
+
+    try {
+      fs.unlinkSync(legacyPath);
+    } catch {
+      // The scoped copy is already durable; leave a legacy copy if cleanup fails.
+    }
+  }
+}
+
 function generationId() {
   return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "z").toLowerCase();
 }
@@ -177,23 +227,41 @@ router.get("/health", async (req, res) => {
 router.get("/sections", (req, res) => res.json({ ok: true, sections: sectionInventory() }));
 
 router.post("/drafts", (req, res) => {
-  ensureDirs();
+  migrateLegacyDraftsForUser(req);
+
   const error = validateDraft(req.body);
   if (error) return res.status(400).json({ ok: false, error });
+
   const id = safeId(req.body.id);
   if (!id) return res.status(400).json({ ok: false, error: "Invalid draft ID" });
-  const destination = path.join(DRAFTS_DIR, `${id}.json`);
+
+  const destination = userDraftPath(req, id);
   const existing = fs.existsSync(destination) ? readJson(destination) : {};
   const defaultName = `${req.body.section} · ${req.body.month} · Week ${req.body.week}`;
-  const saved = { ...req.body, id, name: existing.name || defaultName, savedAt: new Date().toISOString(), savedBy: req.user.id, version: 1 };
+  const saved = {
+    ...req.body,
+    id,
+    name: existing.name || defaultName,
+    savedAt: new Date().toISOString(),
+    savedBy: req.user.id,
+    owner: {
+      id: req.user.id || "",
+      email: req.user.email || "",
+      name: req.user.name || ""
+    },
+    version: 2
+  };
+
   writeJsonAtomic(destination, saved);
   res.json({ ok: true, draft: saved });
 });
 
 router.get("/drafts", (req, res) => {
-  ensureDirs();
-  const drafts = listFiles(DRAFTS_DIR, ".json")
-    .map((file) => readJson(path.join(DRAFTS_DIR, file.name)))
+  migrateLegacyDraftsForUser(req);
+
+  const drafts = listFiles(userDraftDir(req), ".json")
+    .map((file) => readJson(path.join(userDraftDir(req), file.name)))
+    .filter((draft) => String(draft?.savedBy || "") === String(req.user.id || ""))
     .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")))
     .map((draft) => ({
       id: draft.id,
@@ -204,34 +272,71 @@ router.get("/drafts", (req, res) => {
       compiledName: draft.compiledName,
       savedAt: draft.savedAt
     }));
+
   res.json({ ok: true, drafts });
 });
 
 router.get("/drafts/:id", (req, res) => {
+  migrateLegacyDraftsForUser(req);
+
   const id = safeId(req.params.id);
   if (!id) return res.status(400).json({ ok: false, error: "Invalid draft ID" });
-  const source = path.join(DRAFTS_DIR, `${id}.json`);
+
+  const source = userDraftPath(req, id);
   if (!fs.existsSync(source)) return res.status(404).json({ ok: false, error: "Draft not found" });
-  res.json({ ok: true, draft: readJson(source) });
+
+  const draft = readJson(source);
+  if (String(draft?.savedBy || "") !== String(req.user.id || "")) {
+    return res.status(404).json({ ok: false, error: "Draft not found" });
+  }
+
+  res.json({ ok: true, draft });
 });
 
 router.patch("/drafts/:id", (req, res) => {
+  migrateLegacyDraftsForUser(req);
+
   const id = safeId(req.params.id);
   if (!id) return res.status(400).json({ ok: false, error: "Invalid draft ID" });
-  const source = path.join(DRAFTS_DIR, `${id}.json`);
+
+  const source = userDraftPath(req, id);
   if (!fs.existsSync(source)) return res.status(404).json({ ok: false, error: "Draft not found" });
+
+  const existing = readJson(source);
+  if (String(existing?.savedBy || "") !== String(req.user.id || "")) {
+    return res.status(404).json({ ok: false, error: "Draft not found" });
+  }
+
   const name = String(req.body?.name || "").replace(/\s+/g, " ").trim();
-  if (!name || name.length > 120) return res.status(400).json({ ok: false, error: "Draft name must be 1–120 characters" });
-  const draft = { ...readJson(source), name, savedAt: new Date().toISOString(), savedBy: req.user.id };
+  if (!name || name.length > 120) {
+    return res.status(400).json({ ok: false, error: "Draft name must be 1–120 characters" });
+  }
+
+  const draft = {
+    ...existing,
+    name,
+    savedAt: new Date().toISOString(),
+    savedBy: req.user.id
+  };
+
   writeJsonAtomic(source, draft);
   res.json({ ok: true, draft });
 });
 
 router.delete("/drafts/:id", (req, res) => {
+  migrateLegacyDraftsForUser(req);
+
   const id = safeId(req.params.id);
   if (!id) return res.status(400).json({ ok: false, error: "Invalid draft ID" });
-  const source = path.join(DRAFTS_DIR, `${id}.json`);
+
+  const source = userDraftPath(req, id);
   if (!fs.existsSync(source)) return res.status(404).json({ ok: false, error: "Draft not found" });
+
+  const draft = readJson(source);
+  if (String(draft?.savedBy || "") !== String(req.user.id || "")) {
+    return res.status(404).json({ ok: false, error: "Draft not found" });
+  }
+
   fs.unlinkSync(source);
   res.json({ ok: true });
 });

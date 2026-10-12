@@ -4,7 +4,13 @@ const crypto = require("crypto");
 
 const { getUsers, saveUsers, findByEmail } = require("../lib/userStore");
 const { hashPassword, verifyPassword } = require("../lib/passwords");
-const { createSession, getSession, deleteSession, extractBearer } = require("../lib/sessions");
+const {
+  createSession,
+  getSession,
+  getSessionExpiresAt,
+  deleteSession,
+  extractBearer
+} = require("../lib/sessions");
 
 const router = express.Router();
 
@@ -83,7 +89,13 @@ router.post("/login", (req, res) => {
     }
 
     const token = createSession(user.id);
-    return res.json({ ok: true, token, user: publicUser(user) });
+    const expiresAt = getSessionExpiresAt(token);
+    return res.json({
+      ok: true,
+      token,
+      expiresAt,
+      user: publicUser(user)
+    });
   } catch {
     return res.status(500).json({ ok: false, message: "Login failed." });
   }
@@ -110,4 +122,3 @@ router.post("/logout", (req, res) => {
 });
 
 module.exports = router;
-

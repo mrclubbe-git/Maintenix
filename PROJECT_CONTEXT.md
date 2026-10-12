@@ -1026,3 +1026,10 @@ Pictures and the responder defect description remain optional, matching the pre-
 - The browser-side profile image size check was corrected to 2 MB to match the Settings UI/backend expectation.
 - No backend changes are required for this Settings revision.
 - This frontend change is committed to `main` only and has NOT been pushed to the `deploy` branch yet.
+
+## CRA Settings deployed — 2026-10-12
+
+- User explicitly requested deployment of the refocused CRA Settings page.
+- Deploy branch commit: `f4a284f40e0878c16ecf5d50d65d4f7ddd43675b`.
+- GitHub Actions run `38253962326` completed successfully for both build and deploy.
+- Live CRA Settings now contains personal Profile and Security functionality only; Admin User Management remains removed pending a dedicated Administration page.

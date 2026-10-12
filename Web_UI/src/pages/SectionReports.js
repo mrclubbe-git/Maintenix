@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useEffect, useRef } from "react";
 import { Redirect } from "react-router-dom";
 import { Routes } from "../routes";
@@ -55,7 +56,7 @@ const pageMarkup = `
   </main>`;
 
 function currentRole() {
-  try { return String(JSON.parse(localStorage.getItem("authUser") || "null")?.role || "").toUpperCase().replace(/\s+/g, ""); }
+  try { return String(JSON.parse(orgLocalStorage.getItem("authUser") || "null")?.role || "").toUpperCase().replace(/\s+/g, ""); }
   catch { return ""; }
 }
 

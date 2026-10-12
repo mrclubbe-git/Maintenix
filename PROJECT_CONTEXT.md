@@ -890,3 +890,17 @@ Pictures and the responder defect description remain optional, matching the pre-
 - GitHub Actions run `38235783216` completed successfully for both build and deploy.
 - Backend is not yet changed for the CRA URL prefix. The next server step is to expose the existing DEV CRA API instance (127.0.0.1:5056) beneath `https://dev-api.main-tenix.com/CRA/api/` and CRA uploads beneath `https://dev-api.main-tenix.com/CRA/uploads/`, without touching production.
 - Future organizations should have independent frontend builds, API processes/services, users, data, uploads, templates, and business logic. No cross-organization authentication or data access is intended.
+
+## DEV CRA API routing correction — 2026-10-12
+
+- Development API traffic does NOT use Nginx.
+- `dev-api.main-tenix.com` is carried by Cloudflare Tunnel directly to the private development API at `127.0.0.1:5056`.
+- A Cloudflare Transform Rule runs before the request enters the tunnel and rewrites organization-prefixed CRA paths internally:
+  - `/CRA/api/...` -> `/api/...`
+  - `/CRA/uploads/...` -> `/uploads/...`
+- The browser retains the CRA-prefixed public URL while the existing Node API continues receiving its original routes unchanged.
+- Correct DEV request flow: Cloudflare edge rewrite -> existing Cloudflare Tunnel -> existing CRA dev API on `127.0.0.1:5056`.
+- No Nginx changes are required for the CRA DEV migration.
+- No Node route changes are required for this CRA DEV URL-prefix migration.
+- Production remains separate and must not be modified.
+- Previous Nginx-based CRA backend migration instructions are obsolete and must not be followed.

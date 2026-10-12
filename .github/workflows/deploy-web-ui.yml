@@ -43,8 +43,32 @@ jobs:
           # Keep warnings visible in the log without blocking this legacy UI build.
           CI: "false"
           # Repository variable overrides this development API fallback when needed.
-          REACT_APP_API_BASE_URL: ${{ vars.MAINTENIX_API_BASE_URL || 'https://dev-api.main-tenix.com' }}
+          REACT_APP_API_BASE_URL: ${{ vars.MAINTENIX_CRA_API_BASE_URL || 'https://dev-api.main-tenix.com/CRA' }}
+          REACT_APP_ORGANIZATION_CODE: CRA
+          REACT_APP_ORGANIZATION_NAME: Collaborative Risk Applications
         run: npm run build:github
+
+      - name: Assemble organization Pages artifact
+        working-directory: Web_UI
+        run: |
+          rm -rf pages
+          mkdir -p pages/CRA
+          cp -a build/. pages/CRA/
+          touch pages/.nojekyll
+          cat > pages/index.html <<'EOF'
+          <!doctype html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=CRA/">
+              <script>window.location.replace("CRA/" + window.location.hash);</script>
+              <title>Maintenix</title>
+            </head>
+            <body>
+              <a href="CRA/">Open Collaborative Risk Applications</a>
+            </body>
+          </html>
+          EOF
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -52,7 +76,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Web_UI/build
+          path: Web_UI/pages
 
   deploy:
     environment:

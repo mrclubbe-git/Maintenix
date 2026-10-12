@@ -923,3 +923,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Existing CRA data appears available after the move to the organization-specific frontend path.
 - Combined with the previously validated CRA-prefixed API health check, the CRA organization-instance migration is functioning correctly at the routing and existing-data level.
 - Continue using `/Maintenix/CRA/` for CRA development frontend access.
+
+## CRA organization migration fully validated — 2026-10-12
+
+- User confirmed all CRA functional checks pass after migration to `/Maintenix/CRA/`.
+- Current CRA DEV backend remains physically at `/home/charl/projects/maintenix-dev-api/Server_API`; there is no required `CRA/` subdirectory inside `Server_API`.
+- The current DEV backend instance itself is treated as the CRA instance. Organization separation is provided by the frontend path, Cloudflare edge rewrite, dedicated API process/port, and the backend instance's own users/data/templates.
+- A future organization should use a separate sibling backend instance/directory and service (for example a separate TEST instance on another port), not share CRA's `Server_API/data`.
+- Renaming the existing CRA backend directory/service to explicitly include CRA is optional cleanup and not required for functional isolation.

@@ -1,6 +1,6 @@
-import { orgLocalStorage } from "../config/organization";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Col, Row, Card, Form, Button, Image, Alert, Spinner, Table, InputGroup } from "@themesberg/react-bootstrap";
+import { AUTH_SESSION_TTL_MS, clearOrgAuth, ORGANIZATION, orgLocalStorage } from "../config/organization";
+import React, { useEffect, useRef, useState } from "react";
+import { Col, Row, Card, Form, Button, Image, Alert, Spinner } from "@themesberg/react-bootstrap";
 import { Link } from "react-router-dom";
 
 import { Routes } from "../routes";
@@ -14,18 +14,10 @@ function safeJsonParse(str, fallback = null) {
   }
 }
 
-function safeRole(x) {
-  return String(x || "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "");
-}
-
 export default function Settings() {
   const authToken = orgLocalStorage.getItem("authToken") || "";
   const storedUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
 
-  const storedUserId = storedUser?.id || ""; // optional, depends on your auth payload
 
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [savingName, setSavingName] = useState(false);
@@ -48,7 +40,6 @@ export default function Settings() {
       ? profile
       : { name: "", email: "", role: "", status: "", photoUrl: "" };
 
-  const isAdmin = useMemo(() => safeRole(safeProfile.role) === "ADMIN", [safeProfile.role]);
 
   const fileInputRef = useRef(null);
   const avatarSrc = safeProfile.photoUrl ? safeProfile.photoUrl : Profile3;
@@ -123,7 +114,7 @@ export default function Settings() {
 
     // NOTE: If you increased backend upload size, update this too.
     // For now, keep at 2MB as per your current UI copy.
-    if (file.size > 4 * 1024 * 1024) {
+    if (file.size > 2 * 1024 * 1024) {
       setErr("Image too large (max 2MB). Please choose a smaller image.");
       return;
     }
@@ -214,146 +205,20 @@ export default function Settings() {
     }
   }
 
-  // ------------------------------------------------------------
-  // Admin widget: user management
-  // ------------------------------------------------------------
-  const [adminUsers, setAdminUsers] = useState([]);
-  const [adminLoading, setAdminLoading] = useState(false);
-  const [adminErr, setAdminErr] = useState("");
-  const [adminOk, setAdminOk] = useState("");
-  const [adminQuery, setAdminQuery] = useState("");
-  const [adminBusyId, setAdminBusyId] = useState(""); // per-row busy lock
-
-  async function loadAdminUsers() {
-    if (!isAdmin) return;
-    if (!authToken) return;
-
-    setAdminLoading(true);
-    setAdminErr("");
-    setAdminOk("");
-    try {
-      const res = await fetch("/api/admin/users", {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setAdminErr(data?.message || `Failed to load users (HTTP ${res.status}).`);
-        setAdminUsers([]);
-        setAdminLoading(false);
-        return;
-      }
-
-      setAdminUsers(Array.isArray(data.users) ? data.users : []);
-      setAdminLoading(false);
-    } catch {
-      setAdminErr("Failed to load users (API not reachable).");
-      setAdminUsers([]);
-      setAdminLoading(false);
-    }
+  function handleSignOut() {
+    clearOrgAuth();
+    window.location.hash = Routes.Signin.path;
   }
 
-  async function setUserRole(userId, role) {
-    if (!authToken) return;
-    if (!isAdmin) return;
-
-    const nextRole = safeRole(role);
-    if (!["ADMIN", "L1", "L2", "L3"].includes(nextRole)) return;
-
-    setAdminBusyId(userId);
-    setAdminErr("");
-    setAdminOk("");
-    try {
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/role`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`
-        },
-        body: JSON.stringify({ role: nextRole })
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setAdminErr(data?.message || `Role update failed (HTTP ${res.status}).`);
-        setAdminBusyId("");
-        return;
-      }
-
-      setAdminOk("Role updated.");
-      // Update list in-place
-      setAdminUsers((prev) =>
-        prev.map((u) => (String(u.id) === String(userId) ? { ...u, role: data?.user?.role || nextRole } : u))
-      );
-      setAdminBusyId("");
-    } catch {
-      setAdminErr("Role update failed (API not reachable).");
-      setAdminBusyId("");
-    }
-  }
-
-  async function removeUser(userId) {
-    if (!authToken) return;
-    if (!isAdmin) return;
-
-    const u = adminUsers.find((x) => String(x.id) === String(userId));
-    const label = u?.email || u?.name || userId;
-
-    // confirm
-    // eslint-disable-next-line no-alert
-    const ok = window.confirm(`Remove user: ${label} ?\n\nThis will delete the user from users.json.`);
-    if (!ok) return;
-
-    setAdminBusyId(userId);
-    setAdminErr("");
-    setAdminOk("");
-    try {
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setAdminErr(data?.message || `Remove failed (HTTP ${res.status}).`);
-        setAdminBusyId("");
-        return;
-      }
-
-      setAdminOk("User removed.");
-      setAdminUsers((prev) => prev.filter((x) => String(x.id) !== String(userId)));
-      setAdminBusyId("");
-    } catch {
-      setAdminErr("Remove failed (API not reachable).");
-      setAdminBusyId("");
-    }
-  }
-
-  useEffect(() => {
-    // Load only when admin + token available
-    if (!isAdmin) return;
-    if (!authToken) return;
-    loadAdminUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, authToken]);
-
-  const filteredAdminUsers = useMemo(() => {
-    const q = String(adminQuery || "").trim().toLowerCase();
-    if (!q) return adminUsers;
-
-    return adminUsers.filter((u) => {
-      const email = String(u.email || "").toLowerCase();
-      const name = String(u.name || "").toLowerCase();
-      return email.includes(q) || name.includes(q);
-    });
-  }, [adminUsers, adminQuery]);
-
-  // ------------------------------------------------------------
+  const sessionHours = Math.round(AUTH_SESSION_TTL_MS / (60 * 60 * 1000));
 
   return (
     <>
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4">
-        <h4 className="mb-0">Settings</h4>
+        <div>
+          <h4 className="mb-1">My Settings</h4>
+          <div className="text-muted">Manage your CRA profile and account security.</div>
+        </div>
       </div>
 
       {err ? <Alert variant="danger">{err}</Alert> : null}
@@ -373,7 +238,8 @@ export default function Settings() {
 
               <h5 className="mb-1 text-break">{safeProfile.name || safeProfile.email || "User"}</h5>
 
-              <div className="text-muted small text-break">
+              <div className="text-muted small text-break">{safeProfile.email || ""}</div>
+              <div className="text-muted small text-break mt-1">
                 {safeProfile.role ? String(safeProfile.role).toUpperCase() : "USER"}
                 {safeProfile.status ? ` • ${safeProfile.status}` : ""}
               </div>
@@ -401,17 +267,12 @@ export default function Settings() {
               <div className="text-muted small mt-2">PNG / JPG / WEBP • Max 2MB</div>
             </Card.Body>
           </Card>
-
         </Col>
 
         <Col xs={12} xl={8}>
           <Card border="light" className="shadow-sm mb-4">
-            <Card.Header className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <Card.Header>
               <h5 className="mb-0">Profile</h5>
-
-              <Button as={Link} to={Routes.ResetPassword.path} variant="outline-primary" size="sm">
-                Reset password
-              </Button>
             </Card.Header>
 
             <Card.Body>
@@ -424,7 +285,7 @@ export default function Settings() {
                         type="text"
                         value={safeProfile.name}
                         onChange={(e) => {
-                          const value = e.target.value; // capture before event pooling clears it
+                          const value = e.target.value;
                           setProfile((p) => ({
                             ...(p && typeof p === "object" ? p : {}),
                             name: value
@@ -446,12 +307,19 @@ export default function Settings() {
                 <Row className="mb-3">
                   <Col md={6}>
                     <Form.Group>
+                      <Form.Label>Organization</Form.Label>
+                      <Form.Control value={`${ORGANIZATION.name} (${ORGANIZATION.code})`} disabled />
+                    </Form.Group>
+                  </Col>
+
+                  <Col md={3}>
+                    <Form.Group>
                       <Form.Label>Role</Form.Label>
                       <Form.Control value={String(safeProfile.role || "").toUpperCase()} disabled />
                     </Form.Group>
                   </Col>
 
-                  <Col md={6}>
+                  <Col md={3}>
                     <Form.Group>
                       <Form.Label>Status</Form.Label>
                       <Form.Control value={safeProfile.status || ""} disabled />
@@ -465,124 +333,39 @@ export default function Settings() {
                       <Spinner size="sm" className="me-2" /> Saving…
                     </>
                   ) : (
-                    "Save name"
+                    "Save changes"
                   )}
                 </Button>
               </Form>
             </Card.Body>
           </Card>
 
-          {/* ✅ Admin-only User Management widget */}
-          {isAdmin ? (
-            <Card border="light" className="shadow-sm mb-4">
-              <Card.Header className="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                <div className="min-w-0">
-                  <h5 className="mb-0">User Management</h5>
-                  <small className="text-muted">Admins can change roles and remove users</small>
+          <Card border="light" className="shadow-sm mb-4">
+            <Card.Header>
+              <h5 className="mb-0">Security</h5>
+            </Card.Header>
+
+            <Card.Body>
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                <div>
+                  <div className="fw-bold">Session duration</div>
+                  <div className="text-muted small">
+                    You will be signed out {sessionHours} hours after signing in and will need to authenticate again.
+                  </div>
                 </div>
+                <div className="fw-bold text-nowrap">{sessionHours} hours</div>
+              </div>
 
-                <div className="d-flex flex-wrap align-items-center justify-content-end gap-2" style={{ minWidth: 0 }}>
-                  <InputGroup size="sm" style={{ width: "min(260px, 100%)" }}>
-                    <Form.Control
-                      placeholder="Search name or email…"
-                      value={adminQuery}
-                      onChange={(e) => setAdminQuery(e.target.value)}
-                      disabled={adminLoading}
-                    />
-                  </InputGroup>
-
-                  <Button variant="outline-primary" size="sm" onClick={loadAdminUsers} disabled={adminLoading}>
-                    {adminLoading ? (
-                      <>
-                        <Spinner size="sm" className="me-2" /> Loading…
-                      </>
-                    ) : (
-                      "Refresh"
-                    )}
-                  </Button>
-                </div>
-              </Card.Header>
-
-              <Card.Body className="p-0">
-                {adminErr ? <Alert variant="warning" className="m-3 mb-0">{adminErr}</Alert> : null}
-                {adminOk ? <Alert variant="success" className="m-3 mb-0">{adminOk}</Alert> : null}
-
-                <Table responsive className="table-centered mb-0 rounded">
-                  <thead className="thead-light">
-                    <tr>
-                      <th className="border-0">Name</th>
-                      <th className="border-0">Email</th>
-                      <th className="border-0">Status</th>
-                      <th className="border-0">Role</th>
-                      <th className="border-0 text-end">Actions</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filteredAdminUsers.length === 0 ? (
-                      <tr>
-                        <td className="p-3 text-muted" colSpan={5}>
-                          No users found.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredAdminUsers.map((u) => {
-                        const busy = adminBusyId === u.id;
-                        const isSelf = storedUserId && String(u.id) === String(storedUserId);
-
-                        return (
-                          <tr key={u.id}>
-                            <td className="fw-bold text-break">{u.name || "-"}</td>
-                            <td className="text-break">{u.email || "-"}</td>
-                            <td>{String(u.status || "").toUpperCase()}</td>
-                            <td style={{ minWidth: 140 }}>
-                              <Form.Select
-                                size="sm"
-                                value={safeRole(u.role)}
-                                disabled={busy || isSelf}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setUserRole(u.id, value);
-                                }}
-                                title={isSelf ? "You cannot change your own role here." : "Change role"}
-                              >
-                                <option value="L1">L1</option>
-                                <option value="L2">L2</option>
-                                <option value="L3">L3</option>
-                                <option value="ADMIN">ADMIN</option>
-                              </Form.Select>
-                            </td>
-                            <td className="text-end">
-                              <Button
-                                size="sm"
-                                variant="outline-danger"
-                                disabled={busy || isSelf}
-                                onClick={() => removeUser(u.id)}
-                                title={isSelf ? "You cannot remove your own admin account." : "Remove user"}
-                              >
-                                {busy ? (
-                                  <>
-                                    <Spinner size="sm" className="me-2" /> Working…
-                                  </>
-                                ) : (
-                                  "Remove"
-                                )}
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </Table>
-
-                <div className="p-3 text-muted small">
-                  Tip: Newly approved users default to <span className="fw-bold">L1</span>, then you can promote to{" "}
-                  <span className="fw-bold">L2</span>.
-                </div>
-              </Card.Body>
-            </Card>
-          ) : null}
+              <div className="d-flex flex-wrap gap-2">
+                <Button as={Link} to={Routes.ResetPassword.path} variant="outline-primary">
+                  Change password
+                </Button>
+                <Button type="button" variant="outline-danger" onClick={handleSignOut}>
+                  Sign out now
+                </Button>
+              </div>
+            </Card.Body>
+          </Card>
         </Col>
       </Row>
     </>

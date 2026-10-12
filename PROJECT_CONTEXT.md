@@ -865,3 +865,11 @@ Pictures and the responder defect description remain optional, matching the pre-
 - User approval will be moved to a dedicated Admin page in a future change.
 - Main frontend commit: `58710c150a90221212cf0888ed90002201632ca3`.
 - This frontend change has not been pushed to the `deploy` branch yet.
+
+## Overview page baseline complete — 2026-10-12
+
+- User confirmed the current Overview page work is complete for this stage.
+- Overview now includes Server Info and persistent Users Online / Last Seen activity.
+- Last Seen survives API restarts via `Server_API/data/presence.json`; Online status remains transient and heartbeat-driven.
+- Pending approval controls have been removed from Overview. User approval will be handled on a dedicated Admin page in a future development stage.
+- Treat the current Overview implementation as the completed baseline unless the user explicitly revisits it.

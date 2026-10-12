@@ -985,3 +985,22 @@ Pictures and the responder defect description remain optional, matching the pre-
 - User reported Annie completed the corresponding CRA DEV backend change.
 - Intended backend behavior: `SESSION_TTL_MS = 8 hours`, expiry remains based on original `createdAt`, and successful login returns an `expiresAt` millisecond timestamp.
 - Important version-control note: at the time of this record, GitHub `main` still shows the pre-change 30-day TTL in `Server_API/CRA/lib/sessions.js` and no `expiresAt` login response in `Server_API/CRA/routes/auth.js`. The live Annie change therefore needs to be reconciled back into GitHub before the backend source of record is considered synchronized.
+
+## CRA 8-hour backend files synchronized to GitHub — 2026-10-12
+
+- User supplied the tested CRA backend files for the 8-hour authentication change as `Maintenix_CRA_8_hour_session_updates_2026-10-12.tar.gz`.
+- Archive contained exactly:
+  - `lib/sessions.js`
+  - `routes/auth.js`
+- Both uploaded files passed `node --check`.
+- Uploaded `sessions.js` SHA256: `736dae0495564a359c5ed5ebf50694be08d3c156ce6e489261eddce427f46845`.
+- Uploaded `auth.js` SHA256: `1bd3e57631da75a280d4033b43db9f1cb164387f440a4376bab397dd1e25183c`.
+- GitHub `main` was synchronized to the tested backend behavior:
+  - `Server_API/CRA/lib/sessions.js` commit `21cd38779f059dce25764a6151914769a1f163d8`
+  - `Server_API/CRA/routes/auth.js` commit `8380da76221edfe63c1e27d7fe8d9b2b7b874966`
+- Verified on GitHub main:
+  - `SESSION_TTL_MS = 1000 * 60 * 60 * 8`
+  - expiry remains based on `createdAt`
+  - `getSessionExpiresAt()` returns `createdAt + SESSION_TTL_MS`
+  - successful login includes `expiresAt`
+- Backend source of record is now aligned with the live CRA DEV 8-hour session implementation.

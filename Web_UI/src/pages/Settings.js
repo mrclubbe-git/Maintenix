@@ -1,4 +1,4 @@
-import { AUTH_SESSION_TTL_MS, clearOrgAuth, ORGANIZATION, orgLocalStorage } from "../config/organization";
+import { clearOrgAuth, ensureOrgAuthExpiresAt, ORGANIZATION, orgLocalStorage } from "../config/organization";
 import React, { useEffect, useRef, useState } from "react";
 import { Col, Row, Card, Form, Button, Image, Alert, Spinner } from "@themesberg/react-bootstrap";
 import { Link } from "react-router-dom";
@@ -210,7 +210,32 @@ export default function Settings() {
     window.location.hash = Routes.Signin.path;
   }
 
-  const sessionHours = Math.round(AUTH_SESSION_TTL_MS / (60 * 60 * 1000));
+  const [sessionRemainingMs, setSessionRemainingMs] = useState(() => {
+    const expiresAt = ensureOrgAuthExpiresAt();
+    return Math.max(0, expiresAt - Date.now());
+  });
+
+  useEffect(() => {
+    function updateSessionCountdown() {
+      const expiresAt = ensureOrgAuthExpiresAt();
+      setSessionRemainingMs(Math.max(0, expiresAt - Date.now()));
+    }
+
+    updateSessionCountdown();
+    const timer = window.setInterval(updateSessionCountdown, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  function formatSessionCountdown(ms) {
+    const totalMinutes = Math.ceil(Math.max(0, Number(ms) || 0) / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+
+  const sessionCountdown = formatSessionCountdown(sessionRemainingMs);
 
   return (
     <>
@@ -348,12 +373,17 @@ export default function Settings() {
             <Card.Body>
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
                 <div>
-                  <div className="fw-bold">Session duration</div>
+                  <div className="fw-bold">Session expiry</div>
                   <div className="text-muted small">
-                    You will be signed out {sessionHours} hours after signing in and will need to authenticate again.
+                    Your session will expire in <span className="fw-bold text-dark">{sessionCountdown}</span>.
                   </div>
                 </div>
-                <div className="fw-bold text-nowrap">{sessionHours} hours</div>
+                <div className="text-md-end">
+                  <div className="fw-bold text-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {sessionCountdown}
+                  </div>
+                  <div className="text-muted small">HH:MM</div>
+                </div>
               </div>
 
               <div className="d-flex flex-wrap gap-2">

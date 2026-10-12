@@ -371,18 +371,13 @@ export default function Settings() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
-                <div>
-                  <div className="fw-bold">Session expiry</div>
-                  <div className="text-muted small">
-                    Your session will expire in <span className="fw-bold text-dark">{sessionCountdown}</span>.
-                  </div>
-                </div>
-                <div className="text-md-end">
-                  <div className="fw-bold text-nowrap" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <div className="mb-4">
+                <div className="fw-bold">Session expiry</div>
+                <div className="text-muted small">
+                  Your session will expire in{" "}
+                  <span className="fw-bold text-dark" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {sessionCountdown}
-                  </div>
-                  <div className="text-muted small">HH:MM</div>
+                  </span>.
                 </div>
               </div>
 

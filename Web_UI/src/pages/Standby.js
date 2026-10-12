@@ -1,3 +1,4 @@
+import { orgLocalStorage } from "../config/organization";
 import React, { useEffect, useMemo, useState } from "react";
 import { Row, Col, Card, Form, Button, Table, Alert, Badge, ButtonGroup } from "@themesberg/react-bootstrap";
 
@@ -36,9 +37,9 @@ function toYmd(d) {
 }
 
 export default function Standby() {
-  const authUser = safeJsonParse(localStorage.getItem("authUser") || "null", null);
+  const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
   const role = authUser?.role || "";
-  const token = localStorage.getItem("authToken") || "";
+  const token = orgLocalStorage.getItem("authToken") || "";
   const editor = canEditStandby(role);
 
   const [allUsers, setAllUsers] = useState([]);
@@ -432,7 +433,7 @@ export default function Standby() {
               {editor ? (
                 <>
                   <Button variant="primary" className="w-100 mt-3" onClick={createSchedule} disabled={busy}>
-                    {busy ? "Working…" : "Create / Update Schedule"}
+                    {busy ? "WorkingÂ…" : "Create / Update Schedule"}
                   </Button>
                   <Button variant="outline-danger" className="w-100 mt-2" onClick={clearSchedule} disabled={busy || !config}>
                     Clear / Remove Schedule

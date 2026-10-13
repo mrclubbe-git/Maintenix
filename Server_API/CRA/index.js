@@ -18,6 +18,7 @@ const photosRoutes = require("./routes/photos");
 const calloutRoutes = require("./routes/callout");
 const standbyRoutes = require("./routes/standby");
 const notificationsRoutes = require("./routes/notifications");
+const pushRoutes = require("./routes/push");
 const dailyPlannerRoutes = require("./routes/dailyPlanner");
 const formalReportsRoutes = require("./routes/formalReports");
 
@@ -83,6 +84,7 @@ app.use("/api/photos", photosRoutes);
 app.use("/api/callout", calloutRoutes);
 app.use("/api/standby", standbyRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/push", pushRoutes);
 app.use("/api/daily-planner", dailyPlannerRoutes);
 app.use("/api/formal-reports", formalReportsRoutes);
 

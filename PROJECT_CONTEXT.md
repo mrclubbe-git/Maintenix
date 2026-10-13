@@ -1106,3 +1106,39 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Server-backed cross-browser persistence is the next backend step and should use a separate `data/user-preferences.json`, not `users.json`.
 - Annie instruction artifact created: `Annie_CRA_notification_preferences_backend.txt`.
 - Do not sync backend source to GitHub until Annie returns the tested backend files.
+
+## Repository/server separation and backend handoff workflow — 2026-10-13
+
+- The CRA development server and GitHub repository are intentionally separate platforms.
+- Never use git clone, git pull, git push, or repository synchronization commands on the development server.
+- GitHub `main` is the source of truth for backend source files going forward.
+- Backend workflow:
+  1. inspect/edit/create the backend file in GitHub first;
+  2. commit it to `main`;
+  3. provide the exact new/edited backend file(s) to Charl;
+  4. Charl/Annie manually places those files under `/home/charl/projects/maintenix-dev-api/Server_API/CRA/`;
+  5. restart only `maintenix-dev-api.service` when required and validate DEV.
+- Frontend approval continues to imply deployment approval; approved frontend changes are committed and deployed automatically.
+- Mutable server runtime data is not treated as GitHub source code and must not be overwritten merely to make byte-for-byte comparisons match. Examples include sessions, presence, notifications, drafts, queues/status, uploads, generated reports, and live user/account state.
+
+### 2026-10-13 CRA Server_API reconciliation findings
+
+The uploaded 2026-10-12 18:35 SAST CRA backend snapshot was compared with GitHub `main`.
+
+Server is functionally newer/preferred for these source/artifact files:
+- `Server_API/CRA/index.js`: server gates host-metric status behind `SERVER_STATUS_ENABLED=true` and defaults HOST to `127.0.0.1`, matching the current Cloudflare-tunnel DEV architecture.
+- `Server_API/CRA/routes/areas.js`: server has the newer canonical area helper implementation with safer atomic writes and exported `readAreas`/`addArea` helpers.
+- `Server_API/CRA/routes/servicing.js`: server delegates the compatibility area routes to the canonical shared areas implementation instead of duplicating area writes.
+- `Server_API/CRA/routes/callout.js`: server has later draft validation, no-store headers, atomic draft writes, stricter ID/value validation, and safer delete/load behavior.
+- `Server_API/CRA/package-lock.json`: server lock reflects the validated installed DEV dependency set and is newer than the repo lock.
+- `Server_API/CRA/data/templates/call_out_template.docx`: server template was updated during the validated Call Out work; repo copy is the older initial template.
+- `Server_API/CRA/data/templates/servicing_checklist_approved_v1.docx`: present and actively preferred on the server but missing from GitHub; it must be added to the repo.
+- `Server_API/CRA/.env.example`: safe DEV configuration example exists on server and should be added to GitHub; real `.env` remains server-only.
+
+Repo is newer/preferred for:
+- `Server_API/CRA/SERVER_REQUIREMENTS.txt`: server exactly matches an older 2026-09-09 repo revision; current repo document is newer and DEV-aligned.
+- `Server_API/CRA/formal-reporting/report_worker.py`: runtime code is functionally identical; server only contains a stale path comment, so repo remains authoritative.
+
+No functional reconciliation is needed for the three formal-report master DOCX templates: their Git blobs differ, but internal ZIP entry content/CRC and sizes match, so the document content is equivalent.
+
+Do not source-sync mutable runtime files such as `data/users.json`, `data/reports.meta.json`, `data/standby.json`, or runtime-modified `data/templates/areas.txt` simply because the live server differs. In particular, never overwrite live `users.json` during source reconciliation.

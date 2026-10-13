@@ -1,4 +1,5 @@
 import { orgLocalStorage, orgSessionStorage, migrateLegacyCraLocalStorage, organizationDbName } from "./config/organization";
+import { isMaintenixPushWorkerRegistration, isMaintenixPushWorkerScriptUrl } from "./lib/devicePush";
 // =========================================================
 // * Volt React Dashboard
 // =========================================================
@@ -54,7 +55,10 @@ async function hardRefreshMaintenixApp() {
   try {
     if ("serviceWorker" in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((registration) => registration.unregister()));
+      const legacyRegistrations = registrations.filter(
+        (registration) => !isMaintenixPushWorkerRegistration(registration)
+      );
+      await Promise.all(legacyRegistrations.map((registration) => registration.unregister()));
     }
   } catch {}
 
@@ -89,14 +93,22 @@ async function checkForUpdatedBundleOnLoad() {
 }
 
 async function removeLegacyOfflineArtifacts() {
-  const hadController = typeof navigator !== "undefined" &&
-    "serviceWorker" in navigator &&
-    !!navigator.serviceWorker.controller;
+  const controllerScriptUrl =
+    typeof navigator !== "undefined" &&
+    "serviceWorker" in navigator
+      ? navigator.serviceWorker.controller?.scriptURL || ""
+      : "";
+  const hadController = Boolean(
+    controllerScriptUrl && !isMaintenixPushWorkerScriptUrl(controllerScriptUrl)
+  );
 
   try {
     if ("serviceWorker" in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((registration) => registration.unregister()));
+      const legacyRegistrations = registrations.filter(
+        (registration) => !isMaintenixPushWorkerRegistration(registration)
+      );
+      await Promise.all(legacyRegistrations.map((registration) => registration.unregister()));
     }
   } catch {}
 

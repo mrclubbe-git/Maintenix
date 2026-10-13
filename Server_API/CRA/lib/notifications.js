@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { queueNotificationPush } = require("./pushNotifications");
 
 const DATA_FILE = path.join(__dirname, "..", "data", "notifications.json");
 
@@ -116,6 +117,7 @@ function createNotification(input) {
   // Keep a generous but bounded local JSON store.
   db.notifications = db.notifications.slice(0, 2000);
   writeDb(db);
+  queueNotificationPush(notification);
   return notification;
 }
 
@@ -211,6 +213,7 @@ function acknowledgeMatching(predicate, user, { createAckNotice = true } = {}) {
 
   if (ackNotices.length) db.notifications.unshift(...ackNotices);
   writeDb(db);
+  ackNotices.forEach((notice) => queueNotificationPush(notice));
   return out.map((n) => notificationForClient(n, user));
 }
 

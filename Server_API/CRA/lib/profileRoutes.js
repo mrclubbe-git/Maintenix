@@ -4,6 +4,7 @@ const express = require("express");
 
 const { extractBearer, getSession } = require("./sessions");
 const { getUsers, updateUserById } = require("./userStore");
+const { getUserPreferences, updateUserPreferences } = require("./userPreferences");
 
 const router = express.Router();
 
@@ -58,6 +59,64 @@ router.patch("/me", requireAuth, (req, res) => {
       photoUrl: updated.photoUrl || ""
     }
   });
+});
+
+// GET /api/profile/preferences
+router.get("/preferences", requireAuth, (req, res) => {
+  const preferences = getUserPreferences(req.user);
+  res.json({ ok: true, preferences });
+});
+
+// PATCH /api/profile/preferences
+router.patch("/preferences", requireAuth, (req, res) => {
+  const notifications = req.body?.notifications;
+
+  if (!notifications || typeof notifications !== "object" || Array.isArray(notifications)) {
+    return res.status(400).json({
+      ok: false,
+      message: "notifications preference object is required."
+    });
+  }
+
+  if (
+    notifications.enabled !== undefined &&
+    typeof notifications.enabled !== "boolean"
+  ) {
+    return res.status(400).json({
+      ok: false,
+      message: "notifications.enabled must be boolean."
+    });
+  }
+
+  if (
+    notifications.sound !== undefined &&
+    typeof notifications.sound !== "boolean"
+  ) {
+    return res.status(400).json({
+      ok: false,
+      message: "notifications.sound must be boolean."
+    });
+  }
+
+  if (
+    notifications.enabled === undefined &&
+    notifications.sound === undefined
+  ) {
+    return res.status(400).json({
+      ok: false,
+      message: "No supported notification preferences supplied."
+    });
+  }
+
+  const preferences = updateUserPreferences(req.user, { notifications });
+  if (!preferences) {
+    return res.status(400).json({
+      ok: false,
+      message: "Unable to identify user."
+    });
+  }
+
+  res.json({ ok: true, preferences });
 });
 
 // PUT /api/profile/photo  { dataUrl: "data:image/png;base64,..." }

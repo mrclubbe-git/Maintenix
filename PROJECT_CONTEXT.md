@@ -1181,3 +1181,28 @@ The final missing binary template has now been verified on GitHub main:
 - This exactly matches the validated DEV server binary that was expected.
 
 The one-time DEV server -> GitHub backend reconciliation is therefore complete. GitHub `main` is now the source of truth for future CRA backend changes. Future workflow: make backend changes in GitHub first, commit them, then provide only the changed backend files for placement on the DEV server.
+
+## CRA notification preferences backend — repo-first implementation — 2026-10-13
+
+- Development resumed with the Notifications settings backend after the repository/server reconciliation completed.
+- GitHub main is the source of truth. No git operations are performed on the DEV server.
+- Added `Server_API/CRA/lib/userPreferences.js`.
+  - Stores per-user preferences separately in `data/user-preferences.json`.
+  - Does not modify `data/users.json`.
+  - Defaults: notification alerts enabled, notification sound disabled.
+  - If alerts are disabled, sound is normalized to false.
+  - Uses the existing locked/atomic JSON utilities and corrupt-file backup handling.
+- Updated `Server_API/CRA/lib/profileRoutes.js`.
+  - `GET /api/profile/preferences`
+  - `PATCH /api/profile/preferences`
+  - Validates notification preference booleans.
+- Commits:
+  - `d8b49c2120f1886679b8537a04bc1ce71fad1f81` — userPreferences.js
+  - `bc6c23ecf3083f0ce47562dba394fb809cd3bbbe` — profile preference routes
+- Both changed JS files passed `node --check` in the handoff package.
+- Backend server handoff package: `CRA_notification_preferences_backend.zip`.
+- Server destinations:
+  - `/home/charl/projects/maintenix-dev-api/Server_API/CRA/lib/userPreferences.js`
+  - `/home/charl/projects/maintenix-dev-api/Server_API/CRA/lib/profileRoutes.js`
+- Restart required after placement: `maintenix-dev-api.service`.
+- The previously deployed frontend already calls `/api/profile/preferences` when available, so no additional frontend deployment is required for this backend step.

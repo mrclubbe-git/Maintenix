@@ -55,7 +55,7 @@ function playNotificationSound() {
 
     oscillator.type = "sine";
     oscillator.frequency.value = 880;
-    gain.gain.setValueAtTime(0.035, context.currentTime);
+    gain.gain.setValueAtTime(1, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.12);
 
     oscillator.connect(gain);

@@ -1272,3 +1272,16 @@ VAPID/runtime behavior:
 - Browser/device subscriptions are stored separately at `data/push-subscriptions.json`; this runtime file is not committed.
 - Expired push subscriptions are removed automatically after provider HTTP 404/410 responses.
 - Backend handoff package generated as `CRA_web_push_backend.zip`; server deployment/validation is still pending user installation.
+
+## CRA Web Push DEV deployment validated — 2026-10-13
+
+- CRA Web Push backend was manually installed on DEV under `/home/charl/projects/maintenix-dev-api/Server_API/CRA/` and `web-push@3.6.7` was installed.
+- Initial restart failed because the `maintenix-dev` service account could not traverse/read the newly installed `node_modules/web-push` files even though the `charl` shell could resolve them.
+- Root cause confirmed by `sudo -u maintenix-dev node -e "require('web-push')"` returning `MODULE_NOT_FOUND`.
+- DEV-only fix: `sudo chmod -R a+rX node_modules`, preserving ownership while adding read/traverse access.
+- Service-account module checks then succeeded for `web-push`, `lib/pushNotifications.js`, `routes/push.js`, and `lib/notifications.js`.
+- `maintenix-dev-api.service` restarted successfully with API + servicing worker + callout worker all running.
+- API bound successfully to `127.0.0.1:5056`.
+- Local health `http://127.0.0.1:5056/api/health` returned HTTP 200 `{"ok":true}`.
+- Public DEV health `https://dev-api.main-tenix.com/CRA/api/health` returned HTTP 200 `{"ok":true}`.
+- Never run `npm audit fix`; the audit warnings are not part of this Web Push issue.

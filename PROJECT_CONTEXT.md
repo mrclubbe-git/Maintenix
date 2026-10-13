@@ -1229,3 +1229,46 @@ The one-time DEV server -> GitHub backend reconciliation is therefore complete. 
 - GitHub Actions run: `38395415814`
 - Both `build` and `deploy` jobs completed successfully.
 - Device/browser/system volume and muted-tab policies still control the final audible output.
+
+## CRA Web Push implementation — 2026-10-13
+
+Web Push/device notifications were implemented repo-first.
+
+Frontend:
+- Added push-only service worker: `Web_UI/public/maintenix-push-sw.js`.
+- Added browser subscription client: `Web_UI/src/lib/devicePush.js`.
+- Updated `Web_UI/src/index.js` so the legacy offline-worker cleanup preserves the new push-only worker and does not mistake it for the removed offline worker.
+- Updated `Web_UI/src/pages/Settings.js` with a Device notifications switch and Send test device notification button.
+- Device subscriptions are per browser/device. Disabling on one device removes that device's subscription without affecting the user's other devices.
+- Frontend main commits include:
+  - `e2cdc0d9e1b967b959ad942d074525934cf25584` push service worker
+  - `0a30c3039507d072295e5efed8ed85a7e083dd47` push client helper
+  - `bf16c53da7d1d81cfe01a07a6fd94a4d42cda2d9` service-worker cleanup compatibility
+  - `a56c389e87a8f9393371726b162d967904354056` Settings device notification UI
+- Selective deploy commit: `003cb04ba9894b98ff6eaf64ecfc8ee5595bfbb2`
+- GitHub Actions run: `38397991574`
+- Both build and deploy jobs completed successfully.
+
+Backend source of truth:
+- Added `Server_API/CRA/lib/pushNotifications.js`.
+- Added `Server_API/CRA/routes/push.js`.
+- Updated `Server_API/CRA/lib/notifications.js` so newly created notifications also queue Web Push delivery to eligible subscribed users.
+- Updated `Server_API/CRA/index.js` to mount `/api/push`.
+- Added pinned backend dependency `web-push@3.6.7` in package.json/package-lock.json.
+- Updated `.env.example` with optional VAPID overrides.
+- Backend commits include:
+  - `69b28bf82244b6f0998a108f136503d64a8e0e87`
+  - `abc9310df2a4512a1c5ad75b078bbc9dfde3fee5`
+  - `46f9433f4518bc9739a905995ca2a63402e7898c`
+  - `3a14af56ce418f2f1856eaed2eb408085f644f61`
+  - `d295bb31ea76346aefe5bf16d1033e854d259e7d`
+  - `0f72c438d5bdb175f7c57ff89ce0441bb04e438c`
+  - `e8209e80e7a42541e3c1cc73d36aa43c6c1333ba`
+  - `480aa7f1b05225a4a073f89b11e69db0de81039f`
+
+VAPID/runtime behavior:
+- If explicit VAPID environment variables are absent, CRA automatically generates one organization-specific VAPID keypair on first Web Push use.
+- The generated keypair is stored in DEV runtime data at `data/web-push-vapid.json`; the private key must never be committed.
+- Browser/device subscriptions are stored separately at `data/push-subscriptions.json`; this runtime file is not committed.
+- Expired push subscriptions are removed automatically after provider HTTP 404/410 responses.
+- Backend handoff package generated as `CRA_web_push_backend.zip`; server deployment/validation is still pending user installation.

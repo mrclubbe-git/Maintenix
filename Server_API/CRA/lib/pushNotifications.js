@@ -8,6 +8,8 @@ const { getUsers } = require("./userStore");
 
 const DATA_FILE = path.join(__dirname, "..", "data", "push-subscriptions.json");
 const LOCK_FILE = `${DATA_FILE}.lock`;
+const VAPID_FILE = path.join(__dirname, "..", "data", "web-push-vapid.json");
+const VAPID_LOCK_FILE = `${VAPID_FILE}.lock`;
 
 function nowIso() {
   return new Date().toISOString();
@@ -58,27 +60,81 @@ function writeDbUnlocked(db) {
   });
 }
 
+function validVapidDetails(value) {
+  const subject = String(value?.subject || "").trim();
+  const publicKey = String(value?.publicKey || "").trim();
+  const privateKey = String(value?.privateKey || "").trim();
+
+  if (!subject || !publicKey || !privateKey) return null;
+  return { subject, publicKey, privateKey };
+}
+
+function environmentVapidDetails() {
+  return validVapidDetails({
+    subject: process.env.VAPID_SUBJECT,
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY
+  });
+}
+
+function persistentVapidDetails() {
+  const release = acquireLockSync(VAPID_LOCK_FILE);
+  try {
+    try {
+      if (fs.existsSync(VAPID_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(VAPID_FILE, "utf8"));
+        const existing = validVapidDetails(parsed);
+        if (existing) return existing;
+      }
+    } catch {
+      const backup = VAPID_FILE.replace(/\.json$/i, `.corrupt.${Date.now()}.json`);
+      try { fs.copyFileSync(VAPID_FILE, backup); } catch {}
+    }
+
+    const generated = webpush.generateVAPIDKeys();
+    const details = {
+      subject: String(process.env.VAPID_SUBJECT || "https://main-tenix.com").trim(),
+      publicKey: generated.publicKey,
+      privateKey: generated.privateKey,
+      createdAt: nowIso()
+    };
+    writeJsonAtomicSync(VAPID_FILE, details);
+    return validVapidDetails(details);
+  } finally {
+    release();
+  }
+}
+
+function vapidDetails() {
+  return environmentVapidDetails() || persistentVapidDetails();
+}
+
 function pushConfigured() {
-  return Boolean(
-    String(process.env.VAPID_SUBJECT || "").trim() &&
-    String(process.env.VAPID_PUBLIC_KEY || "").trim() &&
-    String(process.env.VAPID_PRIVATE_KEY || "").trim()
-  );
+  try {
+    return Boolean(vapidDetails());
+  } catch {
+    return false;
+  }
 }
 
 function configureWebPush() {
-  if (!pushConfigured()) return false;
+  const details = vapidDetails();
+  if (!details) return false;
 
   webpush.setVapidDetails(
-    String(process.env.VAPID_SUBJECT || "").trim(),
-    String(process.env.VAPID_PUBLIC_KEY || "").trim(),
-    String(process.env.VAPID_PRIVATE_KEY || "").trim()
+    details.subject,
+    details.publicKey,
+    details.privateKey
   );
   return true;
 }
 
 function getPublicKey() {
-  return pushConfigured() ? String(process.env.VAPID_PUBLIC_KEY || "").trim() : "";
+  try {
+    return vapidDetails()?.publicKey || "";
+  } catch {
+    return "";
+  }
 }
 
 function validateSubscription(subscription) {

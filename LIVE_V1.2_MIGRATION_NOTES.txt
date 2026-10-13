@@ -1,6 +1,14 @@
 MAINTENIX LIVE v1.2 SOURCE MIGRATION
 ====================================
 
+CURRENT OPERATIONAL NOTE
+------------------------
+For the current DEV -> LIVE worker/service/runtime checklist, use:
+    LIVE_MIGRATION_CHECKLIST.md
+
+That file is the living migration runbook and takes precedence over this historical
+v1.2 source-migration note where the two differ.
+
 This migration imports the supplied live v1.2 application functionality into the
 GitHub repository while intentionally retaining the GitHub development deployment
 layer.

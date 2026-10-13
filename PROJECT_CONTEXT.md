@@ -1219,3 +1219,13 @@ The one-time DEV server -> GitHub backend reconciliation is therefore complete. 
   - notification sound enabled/disabled
   - sound is normalized to false when alerts are disabled
 - The frontend already reads/writes these preferences through `/api/profile/preferences` and retains organization-scoped local fallback behavior.
+
+## CRA notification sound volume increased — 2026-10-13
+
+- User requested the in-app notification sound volume be increased to the maximum application gain.
+- `Web_UI/src/components/Navbar.js` notification oscillator gain changed from `0.035` to `1`.
+- Main commit: `236a2dfd252428325cf04d58195e68734877e14d`
+- Selective deploy commit: `cbc09c9e38fb69c7f1902e87e521d395777d73e9`
+- GitHub Actions run: `38395415814`
+- Both `build` and `deploy` jobs completed successfully.
+- Device/browser/system volume and muted-tab policies still control the final audible output.

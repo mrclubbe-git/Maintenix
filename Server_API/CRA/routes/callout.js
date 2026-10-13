@@ -91,6 +91,61 @@ function photosDirPath(reportId) {
   return path.join(CALLOUT_PHOTOS_DIR, safeBasename(reportId));
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function validDraftId(value) {
+  const raw = String(value || "").trim();
+  const draftId = safeBasename(raw);
+  if (!draftId || draftId !== raw || !draftId.startsWith("callout_v2_draft_")) return "";
+  return draftId;
+}
+
+function draftFilePath(userKey, draftId) {
+  return path.join(CALLOUT_DRAFTS_DIR, safeBasename(userKey), `${draftId}.json`);
+}
+
+async function readDraftFile(filePath) {
+  try {
+    return JSON.parse(await fsp.readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT" || error instanceof SyntaxError) return null;
+    throw error;
+  }
+}
+
+async function writeDraftFileAtomic(filePath, record) {
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+  try {
+    await fsp.writeFile(tmp, JSON.stringify(record, null, 2), { encoding: "utf8", mode: 0o600 });
+    await fsp.rename(tmp, filePath);
+  } catch (error) {
+    await fsp.unlink(tmp).catch(() => {});
+    throw error;
+  }
+}
+
+function isCalloutV2Draft(record, expectedKey = "") {
+  return Boolean(
+    record &&
+    record.type === "calloutV2Draft" &&
+    validDraftId(record.key) &&
+    (!expectedKey || record.key === expectedKey)
+  );
+}
+
+function publicDraft(record) {
+  return {
+    key: String(record.key || ""),
+    type: "calloutV2Draft",
+    name: String(record.name || record.key || ""),
+    createdAt: String(record.createdAt || ""),
+    updatedAt: String(record.updatedAt || ""),
+    value: isPlainObject(record.value) ? record.value : {}
+  };
+}
+
 // -------------------- Multer (multipart form-data) --------------------
 // We accept many photo fields named "photo" (as the frontend sends).
 const upload = multer({
@@ -104,66 +159,54 @@ const upload = multer({
 
 // -------------------- Call Out V2 drafts --------------------
 
-function draftFilePath(userKey, draftId) {
-  return path.join(CALLOUT_DRAFTS_DIR, safeBasename(userKey), `${safeBasename(draftId)}.json`);
-}
-
-async function readDraftFile(filePath) {
-  try {
-    const raw = await fsp.readFile(filePath, "utf8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-function publicDraft(rec) {
-  if (!rec || typeof rec !== "object") return null;
-  return {
-    key: String(rec.key || ""),
-    type: "calloutV2Draft",
-    name: String(rec.name || rec.key || ""),
-    createdAt: String(rec.createdAt || ""),
-    updatedAt: String(rec.updatedAt || ""),
-    value: rec.value && typeof rec.value === "object" ? rec.value : {}
-  };
-}
+router.use("/drafts", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
 
 router.get("/drafts", requireAuth, async (req, res) => {
   try {
     const userKey = userKeyFromReq(req);
     const dir = path.join(CALLOUT_DRAFTS_DIR, userKey);
-    await ensureDir(dir);
+    let names = [];
 
-    const names = await fsp.readdir(dir).catch(() => []);
+    try {
+      names = await fsp.readdir(dir);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+
     const drafts = [];
     for (const name of names) {
       if (!name.endsWith(".json")) continue;
-      const rec = await readDraftFile(path.join(dir, name));
-      if (!rec || rec.type !== "calloutV2Draft" || !String(rec.key || "").startsWith("callout_v2_draft_")) continue;
-      drafts.push(publicDraft(rec));
+      const record = await readDraftFile(path.join(dir, name));
+      if (!isCalloutV2Draft(record)) continue;
+      drafts.push(publicDraft(record));
     }
 
     drafts.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
     return res.json({ ok: true, drafts });
-  } catch (e) {
-    return res.status(500).json({ ok: false, message: e?.message || "Failed to list Call Out drafts." });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: String(error?.message || "Failed to list Call Out drafts.") });
   }
 });
 
 router.get("/drafts/:draftId", requireAuth, async (req, res) => {
   try {
     const userKey = userKeyFromReq(req);
-    const draftId = safeBasename(req.params.draftId || "");
-    if (!draftId || !draftId.startsWith("callout_v2_draft_")) {
-      return res.status(400).json({ ok: false, message: "Invalid draft id." });
+    const draftId = validDraftId(req.params.draftId);
+    if (!draftId) return res.status(400).json({ ok: false, message: "Invalid draft id." });
+
+    const record = await readDraftFile(draftFilePath(userKey, draftId));
+    if (!isCalloutV2Draft(record, draftId)) {
+      return res.status(404).json({ ok: false, message: "Draft not found." });
     }
 
-    const rec = await readDraftFile(draftFilePath(userKey, draftId));
-    if (!rec) return res.status(404).json({ ok: false, message: "Draft not found." });
-    return res.json({ ok: true, draft: publicDraft(rec) });
-  } catch (e) {
-    return res.status(500).json({ ok: false, message: e?.message || "Failed to load Call Out draft." });
+    return res.json({ ok: true, draft: publicDraft(record) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: String(error?.message || "Failed to load Call Out draft.") });
   }
 });
 
@@ -171,51 +214,55 @@ router.post("/drafts", requireAuth, async (req, res) => {
   try {
     const userKey = userKeyFromReq(req);
     const body = req.body || {};
-    const now = new Date().toISOString();
-    const key = safeBasename(body.key || "");
-    if (!key || !key.startsWith("callout_v2_draft_")) {
-      return res.status(400).json({ ok: false, message: "Invalid Call Out draft id." });
+    const key = validDraftId(body.key || body.draftId);
+    if (!key) return res.status(400).json({ ok: false, message: "Invalid Call Out draft id." });
+
+    if (body.value !== undefined && !isPlainObject(body.value)) {
+      return res.status(400).json({ ok: false, message: "Draft value must be an object." });
     }
 
     const filePath = draftFilePath(userKey, key);
     await ensureDir(path.dirname(filePath));
-    const existing = await readDraftFile(filePath) || {};
-    const rec = {
-      ...existing,
+    const existing = await readDraftFile(filePath);
+    const now = new Date().toISOString();
+    const owner = ownerFromReq(req);
+    const record = {
       key,
       type: "calloutV2Draft",
-      name: String(body.name || existing.name || key).trim() || key,
-      createdAt: existing.createdAt || body.createdAt || now,
+      name: String(body.name || existing?.name || key).trim() || key,
+      createdAt: existing?.createdAt || String(body.createdAt || "").trim() || now,
       updatedAt: now,
-      owner: ownerFromReq(req),
-      value: body.value && typeof body.value === "object" ? body.value : existing.value || {}
+      owner,
+      ownerEmail: owner.email || "",
+      userKey,
+      value: isPlainObject(body.value) ? body.value : isPlainObject(existing?.value) ? existing.value : {}
     };
 
-    await fsp.writeFile(filePath, JSON.stringify(rec, null, 2), "utf8");
-    return res.json({ ok: true, draft: publicDraft(rec) });
-  } catch (e) {
-    return res.status(500).json({ ok: false, message: e?.message || "Failed to save Call Out draft." });
+    await writeDraftFileAtomic(filePath, record);
+    return res.json({ ok: true, draft: publicDraft(record) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: String(error?.message || "Failed to save Call Out draft.") });
   }
 });
 
 router.delete("/drafts/:draftId", requireAuth, async (req, res) => {
   try {
     const userKey = userKeyFromReq(req);
-    const draftId = safeBasename(req.params.draftId || "");
-    if (!draftId || !draftId.startsWith("callout_v2_draft_")) {
-      return res.status(400).json({ ok: false, message: "Invalid draft id." });
+    const draftId = validDraftId(req.params.draftId);
+    if (!draftId) return res.status(400).json({ ok: false, message: "Invalid draft id." });
+
+    const filePath = draftFilePath(userKey, draftId);
+    const record = await readDraftFile(filePath);
+    if (!isCalloutV2Draft(record, draftId)) {
+      return res.status(404).json({ ok: false, message: "Draft not found." });
     }
 
-    await fsp.unlink(draftFilePath(userKey, draftId)).catch((e) => {
-      if (e?.code !== "ENOENT") throw e;
-    });
+    await fsp.unlink(filePath);
     return res.json({ ok: true });
-  } catch (e) {
-    return res.status(500).json({ ok: false, message: e?.message || "Failed to delete Call Out draft." });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: String(error?.message || "Failed to delete Call Out draft.") });
   }
 });
-
-
 
 /**
  * POST /api/callout/submit-payload

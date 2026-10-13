@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const { getSession, extractBearer } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
 const { writeJsonAtomicSync, updateJsonWithLockSync } = require("../lib/lockedJson");
+const sharedAreas = require("./areas");
 
 // Multipart support (npm i multer)
 let multer = null;
@@ -38,7 +39,6 @@ const APPROVED_TEMPLATE_DOCX = path.join(TEMPLATES_DIR, "servicing_checklist_app
 // Keep the current production template working until the approved binary template is
 // committed. Once present, new servicing submissions use it automatically.
 const TEMPLATE_DOCX = fs.existsSync(APPROVED_TEMPLATE_DOCX) ? APPROVED_TEMPLATE_DOCX : LEGACY_TEMPLATE_DOCX;
-const AREAS_TXT = path.join(TEMPLATES_DIR, "areas.txt");
 const SERVICES_TXT = path.join(TEMPLATES_DIR, "services.txt");
 
 // Output folders
@@ -449,38 +449,25 @@ router.get("/checklist", requireAuth, (req, res) => {
  * GET /api/servicing/areas
  */
 router.get("/areas", requireAuth, (req, res) => {
-  res.json({ ok: true, areas: safeLinesFromTxt(AREAS_TXT) });
+  try {
+    return res.json({ ok: true, areas: sharedAreas.readAreas() });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: String(error?.message || "Failed to read areas.") });
+  }
 });
 
+/**
+ * POST /api/servicing/areas
+ * Compatibility route for the deployed frontend. It deliberately delegates to
+ * the shared Area implementation, so Servicing and Call Out cannot diverge.
+ */
 router.post("/areas", requireAuth, (req, res) => {
   try {
-    const area = String(req.body?.area || "")
-      .replace(/[\r\n\t]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 160);
-
-    if (!area) {
-      return res.status(400).json({ ok: false, message: "Area name is required." });
-    }
-
-    const areas = safeLinesFromTxt(AREAS_TXT);
-    const wanted = area.toLowerCase();
-    const existing = areas.find((value) => String(value || "").trim().replace(/\s+/g, " ").toLowerCase() === wanted);
-
-    if (existing) {
-      return res.json({ ok: true, area: existing, areas, created: false });
-    }
-
-    const updated = [...areas, area];
-    ensureDir(path.dirname(AREAS_TXT));
-    const tmp = AREAS_TXT + ".tmp";
-    fs.writeFileSync(tmp, updated.length ? updated.join("\n") + "\n" : "", "utf8");
-    fs.renameSync(tmp, AREAS_TXT);
-
-    return res.status(201).json({ ok: true, area, areas: updated, created: true });
-  } catch (e) {
-    return res.status(500).json({ ok: false, message: String(e?.message || "Failed to add area.") });
+    const result = sharedAreas.addArea(req.body?.area);
+    if (!result.ok) return res.status(result.status || 400).json(result);
+    return res.status(result.created ? 201 : 200).json(result);
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: String(error?.message || "Failed to add area.") });
   }
 });
 

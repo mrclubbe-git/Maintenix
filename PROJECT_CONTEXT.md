@@ -1171,3 +1171,13 @@ One binary reconciliation item remains:
 - The current GitHub connector cannot directly upload a local binary file by container path; do not substitute or regenerate this DOCX. Use the exact validated server binary.
 
 No server deployment is required for the reconciliation commits above because the server already contains those validated files. This was a server -> repo source-of-truth catch-up only.
+
+### CRA backend reconciliation completed — 2026-10-13
+
+The final missing binary template has now been verified on GitHub main:
+
+- `Server_API/CRA/data/templates/servicing_checklist_approved_v1.docx`
+- Git blob: `15b780524eed08919c030b25594423c4aed077f5`
+- This exactly matches the validated DEV server binary that was expected.
+
+The one-time DEV server -> GitHub backend reconciliation is therefore complete. GitHub `main` is now the source of truth for future CRA backend changes. Future workflow: make backend changes in GitHub first, commit them, then provide only the changed backend files for placement on the DEV server.

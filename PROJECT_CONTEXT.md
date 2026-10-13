@@ -1285,3 +1285,19 @@ VAPID/runtime behavior:
 - Local health `http://127.0.0.1:5056/api/health` returned HTTP 200 `{"ok":true}`.
 - Public DEV health `https://dev-api.main-tenix.com/CRA/api/health` returned HTTP 200 `{"ok":true}`.
 - Never run `npm audit fix`; the audit warnings are not part of this Web Push issue.
+
+## Living DEV → LIVE migration checklist — 2026-10-13
+
+- Added root-level `LIVE_MIGRATION_CHECKLIST.md` as the current operational migration runbook.
+- The file must be updated whenever development adds a long-running worker, scheduled task, systemd service, browser service worker, Python/background subprocess, external runtime dependency, persistent runtime file, or persistent secret/key.
+- Current long-running backend processes are:
+  - API: `index.js`
+  - Servicing worker: `servicingWorker.js`
+  - Call Out worker: `calloutWorker.js`
+  All three are started by `npm run start:all` through `startAll.js`.
+- Formal Reporting `report_worker.py` is on-demand and must not be daemonized; LIVE needs Python, python-docx, LibreOffice and pdftotext.
+- Web Push delivery runs inside the API; there is no separate server push worker.
+- `Web_UI/public/maintenix-push-sw.js` is a browser service worker deployed with the frontend, not a systemd service.
+- LIVE Web Push must preserve its production VAPID key after subscriptions exist; DEV push subscriptions must not be copied to LIVE.
+- Historical `LIVE_V1.2_MIGRATION_NOTES.txt` now points to `LIVE_MIGRATION_CHECKLIST.md` as the current operational reference.
+- Production remains untouched until an explicit LIVE migration is approved.

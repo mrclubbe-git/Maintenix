@@ -4,6 +4,7 @@ import { Col, Row, Card, Form, Button, Image, Alert, Spinner } from "@themesberg
 import { Link } from "react-router-dom";
 
 import { Routes } from "../routes";
+import { disableDevicePush, enableDevicePush, getDevicePushState, sendDevicePushTest } from "../lib/devicePush";
 import Profile3 from "../assets/img/team/profile-picture-3.jpg";
 
 function safeJsonParse(str, fallback = null) {
@@ -26,6 +27,15 @@ export default function Settings() {
   const [notificationPreferences, setNotificationPreferencesState] = useState(() =>
     getNotificationPreferences(storedUserId)
   );
+  const [devicePushState, setDevicePushState] = useState({
+    loading: true,
+    supported: false,
+    configured: false,
+    permission: "default",
+    subscribed: false
+  });
+  const [savingDevicePush, setSavingDevicePush] = useState(false);
+  const [testingDevicePush, setTestingDevicePush] = useState(false);
 
   const [err, setErr] = useState("");
   const [okMsg, setOkMsg] = useState("");
@@ -161,6 +171,77 @@ export default function Settings() {
       // Keep the locally saved preference if the API cannot be reached.
     } finally {
       setSavingNotificationPreferences(false);
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function refreshDevicePushState() {
+      try {
+        const state = await getDevicePushState(authToken);
+        if (mounted) setDevicePushState({ ...state, loading: false });
+      } catch {
+        if (mounted) {
+          setDevicePushState((current) => ({ ...current, loading: false }));
+        }
+      }
+    }
+
+    refreshDevicePushState();
+
+    return () => {
+      mounted = false;
+    };
+  }, [authToken]);
+
+  async function updateDevicePush(enabled) {
+    if (!authToken || savingDevicePush) return;
+
+    setSavingDevicePush(true);
+    setErr("");
+    setOkMsg("");
+
+    try {
+      const state = enabled
+        ? await enableDevicePush(authToken)
+        : await disableDevicePush(authToken);
+
+      setDevicePushState({ ...state, loading: false });
+      setOkMsg(
+        enabled
+          ? "Device notifications enabled on this device."
+          : "Device notifications disabled on this device."
+      );
+    } catch (error) {
+      setErr(String(error?.message || "Unable to update device notifications."));
+      try {
+        const state = await getDevicePushState(authToken);
+        setDevicePushState({ ...state, loading: false });
+      } catch {}
+    } finally {
+      setSavingDevicePush(false);
+    }
+  }
+
+  async function testDevicePush() {
+    if (!authToken || testingDevicePush) return;
+
+    setTestingDevicePush(true);
+    setErr("");
+    setOkMsg("");
+
+    try {
+      const result = await sendDevicePushTest(authToken);
+      setOkMsg(
+        result?.sent > 1
+          ? `Test notification sent to ${result.sent} registered devices.`
+          : "Test device notification sent."
+      );
+    } catch (error) {
+      setErr(String(error?.message || "Unable to send the test device notification."));
+    } finally {
+      setTestingDevicePush(false);
     }
   }
 
@@ -491,7 +572,7 @@ export default function Settings() {
                 />
               </div>
 
-              <div className="d-flex justify-content-between align-items-start gap-3">
+              <div className="d-flex justify-content-between align-items-start gap-3 mb-4">
                 <div>
                   <div className="fw-bold">Notification sound</div>
                   <div className="text-muted small">
@@ -506,6 +587,66 @@ export default function Settings() {
                   disabled={savingNotificationPreferences || !notificationPreferences.enabled}
                   aria-label="Enable notification sound"
                 />
+              </div>
+
+              <div className="border-top pt-4">
+                <div className="d-flex justify-content-between align-items-start gap-3">
+                  <div>
+                    <div className="fw-bold">Device notifications</div>
+                    <div className="text-muted small">
+                      Receive Maintenix notifications through this device even when the app is not open in the foreground.
+                    </div>
+                    {!devicePushState.supported ? (
+                      <div className="text-muted small mt-1">
+                        This browser does not currently support Web Push. On iPhone or iPad, open Maintenix from a Home Screen installation.
+                      </div>
+                    ) : !devicePushState.configured ? (
+                      <div className="text-muted small mt-1">
+                        Device notification delivery is waiting for CRA server configuration.
+                      </div>
+                    ) : devicePushState.permission === "denied" ? (
+                      <div className="text-danger small mt-1">
+                        Notification permission is blocked in this browser. Allow notifications in the browser or device settings, then reload Maintenix.
+                      </div>
+                    ) : devicePushState.subscribed ? (
+                      <div className="text-success small mt-1">Enabled on this device.</div>
+                    ) : null}
+                  </div>
+                  <Form.Check
+                    type="switch"
+                    id="device-notifications-enabled"
+                    checked={devicePushState.subscribed}
+                    onChange={(e) => updateDevicePush(e.target.checked)}
+                    disabled={
+                      devicePushState.loading ||
+                      savingDevicePush ||
+                      !devicePushState.supported ||
+                      !devicePushState.configured ||
+                      devicePushState.permission === "denied"
+                    }
+                    aria-label="Enable device notifications"
+                  />
+                </div>
+
+                {devicePushState.subscribed ? (
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={testDevicePush}
+                      disabled={testingDevicePush}
+                    >
+                      {testingDevicePush ? (
+                        <>
+                          <Spinner size="sm" className="me-2" /> Sending…
+                        </>
+                      ) : (
+                        "Send test device notification"
+                      )}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </Card.Body>
           </Card>

@@ -1206,3 +1206,16 @@ The one-time DEV server -> GitHub backend reconciliation is therefore complete. 
   - `/home/charl/projects/maintenix-dev-api/Server_API/CRA/lib/profileRoutes.js`
 - Restart required after placement: `maintenix-dev-api.service`.
 - The previously deployed frontend already calls `/api/profile/preferences` when available, so no additional frontend deployment is required for this backend step.
+
+## CRA notification preferences validated — 2026-10-13
+
+- User confirmed the new server-backed notification preference implementation is working on CRA DEV.
+- Backend source of truth:
+  - `Server_API/CRA/lib/userPreferences.js`
+  - `Server_API/CRA/lib/profileRoutes.js`
+- Preferences persist per user in the DEV runtime file `data/user-preferences.json`; this runtime data file is not committed.
+- Supported settings:
+  - notification alerts enabled/disabled
+  - notification sound enabled/disabled
+  - sound is normalized to false when alerts are disabled
+- The frontend already reads/writes these preferences through `/api/profile/preferences` and retains organization-scoped local fallback behavior.

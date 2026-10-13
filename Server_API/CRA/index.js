@@ -165,25 +165,29 @@ function diskUsage(mountPath = "/") {
   };
 }
 
-app.get("/api/server/status", (_req, res) => {
-  try {
-    const host = os.hostname();
-    const cpu = cpuUsagePercent();
-    const disk = diskUsage("/") || { storageUsedPercent: 0, storageFreeGB: 0 };
+// This endpoint discloses host details. It is disabled unless deliberately
+// enabled for a trusted, non-public environment.
+if (String(process.env.SERVER_STATUS_ENABLED || "").toLowerCase() === "true") {
+  app.get("/api/server/status", (_req, res) => {
+    try {
+      const host = os.hostname();
+      const cpu = cpuUsagePercent();
+      const disk = diskUsage("/") || { storageUsedPercent: 0, storageFreeGB: 0 };
 
-    res.json({
-      host,
-      cpuUsagePercent: cpu,
-      storageUsedPercent: disk.storageUsedPercent,
-      storageFreeGB: disk.storageFreeGB,
-    });
-  } catch (e) {
-    res.status(500).json({ error: "Failed to read server metrics" });
-  }
-});
+      res.json({
+        host,
+        cpuUsagePercent: cpu,
+        storageUsedPercent: disk.storageUsedPercent,
+        storageFreeGB: disk.storageFreeGB,
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to read server metrics" });
+    }
+  });
+}
 
 const PORT = process.env.PORT || 5055;
-const HOST = process.env.HOST || "0.0.0.0";
+const HOST = process.env.HOST || "127.0.0.1";
 app.listen(PORT, HOST, () => {
   console.log(`Maintenix server API listening on ${HOST}:${PORT}`);
 });

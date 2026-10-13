@@ -1142,3 +1142,32 @@ Repo is newer/preferred for:
 No functional reconciliation is needed for the three formal-report master DOCX templates: their Git blobs differ, but internal ZIP entry content/CRC and sizes match, so the document content is equivalent.
 
 Do not source-sync mutable runtime files such as `data/users.json`, `data/reports.meta.json`, `data/standby.json`, or runtime-modified `data/templates/areas.txt` simply because the live server differs. In particular, never overwrite live `users.json` during source reconciliation.
+
+## CRA backend reconciliation progress — 2026-10-13
+
+The one-time server-to-repository reconciliation has been applied for the validated DEV backend source files.
+
+Exact DEV server copies now present on GitHub main:
+- `Server_API/CRA/.env.example` — blob `293068f4a278e82d408175be46d5611f62d4f960`
+- `Server_API/CRA/index.js` — blob `9099ac344fe5dcae9b4825edfb9c9715af147c33`
+- `Server_API/CRA/routes/areas.js` — blob `b6896fc21d97728983bc60f3cb8f0af2e4664aac`
+- `Server_API/CRA/routes/servicing.js` — blob `ff81b2db66af9125467fbca082ea0a9c2ef6143f`
+- `Server_API/CRA/routes/callout.js` — blob `07234735bbc3019bc6048bab2d1d153e779fbc91`
+- `Server_API/CRA/data/templates/call_out_template.docx` — blob `5cd5404e8a9b638d52ee657659c34710f4fe65bb`
+
+Relevant commits:
+- `84f7227a600cc5c6ccd5f18a4f91234dac2157b4` — validated DEV index.js
+- `266fd6bf1fd6c6c1cd26b1b1c2f00cae92753729` — validated DEV areas.js
+- `e9dc8f86f6630567b3f2593daa26aae9b0c72648` — servicing.js, callout.js, .env.example and reconciled package lock
+- `7881d498768dca9af91598048152b1a2748e7cd9` — validated Call Out DOCX template
+
+`Server_API/CRA/package-lock.json` on main is a reconstructed lock matching the validated DEV dependency set; its current repo blob is `b04b7d3e9b3432ab9d3b4a40fea6b46910c5e4f4`. It is valid JSON and functionally represents the live dependency versions, although it is not byte-identical to the server lock blob `122f16ebc95dacc4d29275a15cee976d12b7b8c2`.
+
+One binary reconciliation item remains:
+- `Server_API/CRA/data/templates/servicing_checklist_approved_v1.docx`
+- DEV server SHA-256: `d837600a8059d46393905f208468b91d39695669598960fb95bc8c45fdbf02ad`
+- DEV server Git blob would be `15b780524eed08919c030b25594423c4aed077f5`
+- This template is actively preferred by `routes/servicing.js` when present and therefore must be added to GitHub before the repository can be considered a complete source-of-truth representation of the current Servicing runtime.
+- The current GitHub connector cannot directly upload a local binary file by container path; do not substitute or regenerate this DOCX. Use the exact validated server binary.
+
+No server deployment is required for the reconciliation commits above because the server already contains those validated files. This was a server -> repo source-of-truth catch-up only.

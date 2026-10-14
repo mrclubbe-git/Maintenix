@@ -232,38 +232,24 @@ export default function Administration() {
           <Nav
             variant="tabs"
             activeKey={activeTab}
-            className="d-flex flex-nowrap w-100"
             onSelect={(key) => {
               const tab = key || "areas";
               setAdministrationQuery(tab, tab === "areas" ? pendingOnly : false);
             }}
           >
-            <Nav.Item className="flex-fill" style={{ minWidth: 0, overflow: "hidden" }}>
-              <Nav.Link
-                eventKey="users"
-                className="d-flex align-items-center justify-content-center text-center w-100 h-100"
-              >
-                Users
-              </Nav.Link>
+            <Nav.Item>
+              <Nav.Link eventKey="users">Users</Nav.Link>
             </Nav.Item>
-            <Nav.Item className="flex-fill" style={{ minWidth: 0, overflow: "hidden" }}>
-              <Nav.Link
-                eventKey="areas"
-                className="d-flex align-items-center justify-content-center text-center w-100 h-100"
-              >
-                <span>Areas</span>
+            <Nav.Item>
+              <Nav.Link eventKey="areas">
+                Areas
                 {summary.pending > 0 ? (
                   <Badge bg="warning" text="dark" className="ms-2">{summary.pending}</Badge>
                 ) : null}
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item className="flex-fill" style={{ minWidth: 0, overflow: "hidden" }}>
-              <Nav.Link
-                eventKey="notifications"
-                className="d-flex align-items-center justify-content-center text-center w-100 h-100"
-              >
-                Notifications
-              </Nav.Link>
+            <Nav.Item>
+              <Nav.Link eventKey="notifications">Notifications</Nav.Link>
             </Nav.Item>
           </Nav>
         </Card.Body>

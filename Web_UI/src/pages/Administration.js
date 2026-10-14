@@ -228,7 +228,7 @@ export default function Administration() {
       </div>
 
       <Card border="light" className="shadow-sm mb-4">
-        <Card.Body className="pb-0">
+        <Card.Body>
           <Nav
             variant="tabs"
             activeKey={activeTab}

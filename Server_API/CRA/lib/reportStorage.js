@@ -1,6 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 
+const { getAreaMetadata } = require("./areaMetadata");
+
 const DATA_DIR = path.join(__dirname, "..", "data");
 const TEMPLATES_DIR = path.join(DATA_DIR, "templates");
 const AREA_SECTIONS_JSON = path.join(TEMPLATES_DIR, "area-sections.json");
@@ -120,6 +122,28 @@ function resolveSectionForArea(area, opts = {}) {
   const cleaned = cleanSpaces(area);
   const fallback = opts.fallback || "Unmapped";
   if (!cleaned) return { section: fallback, matched: false, reason: "missing_area" };
+
+  const runtimeMetadata = Object.prototype.hasOwnProperty.call(opts, "runtimeMetadata")
+    ? opts.runtimeMetadata
+    : getAreaMetadata(cleaned);
+
+  if (
+    runtimeMetadata &&
+    String(runtimeMetadata.status || "").toUpperCase() === "CONFIGURED" &&
+    cleanSpaces(runtimeMetadata.section)
+  ) {
+    return {
+      section: cleanSpaces(runtimeMetadata.section),
+      matched: true,
+      reason: "runtime_admin",
+      matchedArea: cleanSpaces(runtimeMetadata.area || cleaned),
+      metadata: {
+        baseArea: cleanSpaces(runtimeMetadata.baseArea || ""),
+        first: cleanSpaces(runtimeMetadata.first || ""),
+        second: cleanSpaces(runtimeMetadata.second || "")
+      }
+    };
+  }
 
   const loaded = opts.loaded || loadAreaSections(opts.filePath);
   const exact = loaded.direct[cleaned];

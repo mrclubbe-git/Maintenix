@@ -1368,3 +1368,8 @@ VAPID/runtime behavior:
 - Updated notification backend packaging workflow in commit `1401b7d1405013e84f27423cb252b7e87094b2f4` so relevant notification backend changes automatically produce a handoff artifact.
 - Packaging run `38565571592` completed SUCCESS; artifact ID `11895335828`, SHA-256 `fbeeffb6fede38cda245810dc9e995dec80a8ba43fa7d34c19f674f43a19fc9a`.
 - Backend fix is committed and CI-validated but still requires manual replacement of `Server_API/CRA/routes/reports.js` on CRA DEV followed by restart/validation.
+
+## Report moderation notifications validated on CRA DEV — 2026-10-14
+
+- User confirmed the corrected report approval/rejection notification flow works on CRA DEV after replacing `Server_API/CRA/routes/reports.js` and restarting the DEV service.
+- Report moderation notifications are therefore validated end-to-end on DEV, including the corrected owner resolution/self-review behavior.

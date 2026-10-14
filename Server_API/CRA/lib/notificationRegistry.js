@@ -36,6 +36,27 @@ const REGISTRY = Object.freeze({
       };
     }
   },
+  AREA_METADATA_REQUIRED: {
+    type: "AREA_METADATA_REQUIRED", category: "ADMIN",
+    description: "An administrator must configure metadata for a newly added area.",
+    deliveryChannels: ["IN_APP", "PUSH"], defaultRequiresAck: false, mandatory: false,
+    build(context) {
+      const actor = context?.actor || {};
+      const area = String(context?.area || "").trim();
+      return {
+        scope: "GLOBAL",
+        title: "Area metadata required",
+        message: `${userLabel(actor)} added “${area || "New area"}”. Configure its metadata in Administration → Areas.`,
+        severity: "warning",
+        requiresAck: false,
+        targetRoles: ["ADMIN"],
+        ...actorFields(actor),
+        relatedEntityType: "area",
+        relatedEntityId: area,
+        actionUrl: "#/administration?tab=areas&status=pending"
+      };
+    }
+  },
   PLANNER_ASSIGNED: {
     type: "PLANNER_TASK_ASSIGNED", category: "PLANNER",
     description: "Daily Planner task allocated or reallocated to a user.",

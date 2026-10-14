@@ -2,7 +2,6 @@ const express = require("express");
 const { extractBearer, getSession } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
 const {
-  createNotification,
   listForUser,
   markRead,
   markAllRead,
@@ -13,6 +12,9 @@ const {
   safeRole
 } = require("../lib/notifications");
 const planner = require("../lib/dailyPlanner");
+const { notify } = require("../lib/notificationService");
+const { listNotificationEventDefinitions } = require("../lib/notificationRegistry");
+const { getDeliveryForNotification } = require("../lib/notificationDelivery");
 
 const router = express.Router();
 
@@ -57,16 +59,11 @@ router.post("/broadcast", requireAdminOrL3, (req, res) => {
   if (title.length > 120) return res.status(400).json({ ok: false, message: "Title is too long." });
   if (message.length > 1000) return res.status(400).json({ ok: false, message: "Message is too long." });
 
-  const notification = createNotification({
-    type: "ADMIN_BROADCAST",
-    scope: "GLOBAL",
+  const notification = notify("ADMIN_BROADCAST", {
+    actor: req.user,
     title,
     message,
-    severity: requiresAck ? "warning" : "info",
-    requiresAck,
-    createdByUserId: req.user?.id || "",
-    createdByEmail: req.user?.email || "",
-    createdByName: userLabel(req.user)
+    requiresAck
   });
 
   res.json({ ok: true, notification });
@@ -98,6 +95,14 @@ router.post("/:id/ack", requireAuth, (req, res) => {
 router.post("/clear-visible", requireAuth, (req, res) => {
   const count = clearVisible(req.user);
   res.json({ ok: true, count });
+});
+
+router.get("/events", requireAdminOrL3, (_req, res) => {
+  res.json({ ok: true, events: listNotificationEventDefinitions() });
+});
+
+router.get("/:id/delivery", requireAdminOrL3, (req, res) => {
+  res.json({ ok: true, delivery: getDeliveryForNotification(req.params.id) });
 });
 
 router.get("/:id/acks", requireAdminOrL3, (req, res) => {

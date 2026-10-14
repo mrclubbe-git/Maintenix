@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { notifySafe } = require("./lib/notificationService");
 
 const { generateServicingDocx } = require("./lib/servicingGenerator");
 
@@ -330,6 +331,13 @@ async function processOne(jobFile) {
       error: ""
     });
 
+    notifySafe("SERVICING_COMPLETE", {
+      owner: resolvedOwner || { email: ownerEmail },
+      reportId,
+      fileName: finalFileName,
+      idempotencyKey: `SERVICING_COMPLETE:${reportId}`
+    });
+
     // ✅ REQUIREMENT: remove payload JSON ONLY on success
     try {
       fs.unlinkSync(payloadPath);
@@ -350,6 +358,13 @@ async function processOne(jobFile) {
       owner: resolvedOwner,
       ownerEmail,
       failedAt: new Date().toISOString()
+    });
+
+    notifySafe("SERVICING_FAILED", {
+      owner: resolvedOwner || { email: ownerEmail },
+      reportId,
+      error: msg,
+      idempotencyKey: `SERVICING_FAILED:${reportId}`
     });
 
     // Keep payload for retry (do NOT delete), but remove job file so it doesn't spin forever

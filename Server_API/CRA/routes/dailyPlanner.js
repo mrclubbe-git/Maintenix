@@ -73,7 +73,7 @@ router.delete("/:id", requireAuth, (req, res) => {
 router.post("/:id/ack", requireAuth, (req, res) => {
   const task = planner.acknowledge(req.params.id, req.user);
   if (!task) return res.status(404).json({ ok: false, message: "Task allocation acknowledgement is not available." });
-  const notifications = acknowledgeRelatedEntity("daily_planner_task", req.params.id, req.user, { createAckNotice: false });
+  const notifications = acknowledgeRelatedEntity("daily_planner_task", req.params.id, req.user);
   res.json({ ok: true, task, notifications });
 });
 

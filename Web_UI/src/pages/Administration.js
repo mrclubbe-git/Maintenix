@@ -228,9 +228,9 @@ export default function Administration() {
       </div>
 
       <Card border="light" className="shadow-sm mb-4">
-        <Card.Body className="p-2">
+        <Card.Body className="pb-0">
           <Nav
-            variant="pills"
+            variant="tabs"
             activeKey={activeTab}
             className="d-flex flex-nowrap w-100"
             onSelect={(key) => {
@@ -238,20 +238,18 @@ export default function Administration() {
               setAdministrationQuery(tab, tab === "areas" ? pendingOnly : false);
             }}
           >
-            <Nav.Item className="flex-fill p-1" style={{ minWidth: 0 }}>
+            <Nav.Item className="flex-fill" style={{ minWidth: 0, overflow: "hidden" }}>
               <Nav.Link
                 eventKey="users"
-                className="d-flex align-items-center justify-content-center text-center rounded w-100"
-                style={{ minHeight: 48 }}
+                className="d-flex align-items-center justify-content-center text-center w-100 h-100"
               >
                 Users
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item className="flex-fill p-1" style={{ minWidth: 0 }}>
+            <Nav.Item className="flex-fill" style={{ minWidth: 0, overflow: "hidden" }}>
               <Nav.Link
                 eventKey="areas"
-                className="d-flex align-items-center justify-content-center text-center rounded w-100"
-                style={{ minHeight: 48 }}
+                className="d-flex align-items-center justify-content-center text-center w-100 h-100"
               >
                 <span>Areas</span>
                 {summary.pending > 0 ? (
@@ -259,11 +257,10 @@ export default function Administration() {
                 ) : null}
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item className="flex-fill p-1" style={{ minWidth: 0 }}>
+            <Nav.Item className="flex-fill" style={{ minWidth: 0, overflow: "hidden" }}>
               <Nav.Link
                 eventKey="notifications"
-                className="d-flex align-items-center justify-content-center text-center rounded w-100"
-                style={{ minHeight: 48 }}
+                className="d-flex align-items-center justify-content-center text-center w-100 h-100"
               >
                 Notifications
               </Nav.Link>

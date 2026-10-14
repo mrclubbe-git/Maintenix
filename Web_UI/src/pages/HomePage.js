@@ -6,6 +6,7 @@ import { Routes } from "../routes";
 // pages (KEEP)
 import DashboardOverview from "./dashboard/DashboardOverview";
 import Settings from "./Settings";
+import Administration from "./Administration";
 
 // examples (KEEP)
 import Signin from "./examples/Signin";
@@ -224,6 +225,7 @@ export default function HomePage() {
       {/* App pages (with sidebar) */}
       <RouteWithSidebar exact path={Routes.DashboardOverview.path} component={DashboardOverview} />
       <RouteWithSidebar exact path={Routes.Settings.path} component={Settings} />
+      <RouteWithSidebar exact path={Routes.Administration.path} component={Administration} />
       <RouteWithSidebar exact path={Routes.Reports.path} component={Reports} />
       <RouteWithSidebar exact path={Routes.SectionReports.path} component={SectionReports} />
       <RouteWithSidebar exact path={Routes.Servicing.path} component={Servicing} />

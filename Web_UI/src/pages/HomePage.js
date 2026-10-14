@@ -123,6 +123,19 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
 
         // Backend profile is authoritative for route-level role checks.
         if (!mounted) return;
+
+        // Keep the cached public user in sync with the backend-verified role so
+        // role-gated navigation (including Administration) cannot remain visible
+        // because of stale local browser data.
+        try {
+          const cached = JSON.parse(orgLocalStorage.getItem("authUser") || "{}");
+          orgLocalStorage.setItem("authUser", JSON.stringify({ ...(cached || {}), ...user }));
+          window.dispatchEvent(new Event("authUserUpdated"));
+        } catch {
+          orgLocalStorage.setItem("authUser", JSON.stringify(user));
+          window.dispatchEvent(new Event("authUserUpdated"));
+        }
+
         setVerifiedUser(user);
         setAuthOk(true);
         setAuthChecked(true);

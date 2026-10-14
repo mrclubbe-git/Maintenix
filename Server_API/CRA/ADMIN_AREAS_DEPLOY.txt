@@ -16,6 +16,12 @@ lib/notificationRegistry.js
 routes/areas.js
 routes/admin.js
 routes/servicing.js
+package.json
+
+Validation support files in this handoff
+----------------------------------------
+test/area-metadata.test.js
+test/notifications.test.js
 
 Important runtime data
 ----------------------

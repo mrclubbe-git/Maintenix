@@ -1434,3 +1434,14 @@ Validation/deployment support:
 - Backend source is committed on GitHub `main` but still requires manual placement on CRA DEV followed by restart/validation under the established repo-first/server-manual workflow.
 - Production remains untouched.
 
+## Administration Areas CI/package/frontend deployment validated — 2026-10-14
+
+- CRA backend CI for main commit `c7d076ba7531531a3f1538582a19ee35f18c1aa1` completed successfully.
+- GitHub Actions run `38584713794` (`Test CRA Server API`) passed syntax checks and the combined backend regression suite, including notification and Area metadata tests.
+- Administration Areas backend packaging run `38584713798` completed successfully.
+- Handoff artifact: `cra-admin-areas-backend`, artifact ID `11904493974`, SHA-256 `67c781b5260dfda105d21c0d0eb4afa7dee8940f4929a7f1c2ed27861d671ae7`.
+- Selective frontend deployment head: `bd3ad46a567de1ddb8ed19e56248cf599126ebec`.
+- GitHub Pages run `38584369247` completed successfully: both `build` and `deploy` jobs passed.
+- The Administration frontend foundation is therefore deployed to the CRA GitHub Pages DEV UI. Backend-dependent Areas data/configuration will become functional after the packaged backend files are manually installed on CRA DEV and `maintenix-dev-api.service` is restarted/validated.
+- Production remains untouched.
+

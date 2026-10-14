@@ -108,59 +108,6 @@ function safeJsonParse(str, fallback = null) {
   }
 }
 
-function readNotifications() {
-  const raw = safeJsonParse(orgLocalStorage.getItem("appNotifications") || "[]", []);
-  return Array.isArray(raw) ? raw : [];
-}
-
-function writeNotifications(items) {
-  orgLocalStorage.setItem("appNotifications", JSON.stringify(Array.isArray(items) ? items : []));
-  window.dispatchEvent(new Event("notificationsUpdated"));
-}
-
-function makeNotificationId() {
-  return `notif_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-function extractTargetUserEmail(reportRow) {
-  return String(reportRow?.owner?.email || reportRow?.ownerEmail || "").trim().toLowerCase();
-}
-
-function getReportTypeForRow(reportRow) {
-  const explicitType = String(reportRow?.reportType || reportRow?.type || "").trim().toUpperCase();
-  if (explicitType === REPORT_TYPE.SERVICING || explicitType === "SERVICE") return REPORT_TYPE.SERVICING;
-  if (explicitType === REPORT_TYPE.CALLOUT || explicitType === "CALL_OUT" || explicitType === "CALL-OUT") return REPORT_TYPE.CALLOUT;
-
-  const fileName = String(reportRow?.fileName || "").trim();
-  if (/^Service_Report_/i.test(fileName)) return REPORT_TYPE.SERVICING;
-  if (/^callout(?:_|-|\b)/i.test(fileName) || /^(?:CallOut|Callout|Call_Out|Call-Out)_Report_/i.test(fileName)) {
-    return REPORT_TYPE.CALLOUT;
-  }
-
-  return "UNKNOWN";
-}
-
-function addUserSpecificRejectedNotification(reportRow, reportDisplayName) {
-  const userEmail = extractTargetUserEmail(reportRow);
-  if (!userEmail) return false;
-
-  const message = `"${String(reportDisplayName || reportRow?.fileName || "Report").trim()}" rejected`;
-  const items = readNotifications();
-
-  items.unshift({
-    id: makeNotificationId(),
-    type: "report_rejected",
-    message,
-    createdAt: new Date().toISOString(),
-    global: false,
-    userEmail,
-    readBy: []
-  });
-
-  writeNotifications(items);
-  return true;
-}
-
 export default function Reports() {
   const authToken = orgLocalStorage.getItem("authToken") || "";
   const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
@@ -326,10 +273,6 @@ export default function Reports() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr(data?.message || `Not approved failed (HTTP ${res.status}).`);
-      } else {
-        const reportRow = reports.find((r) => String(r?.fileName || "") === String(fileName || ""));
-        const reportDisplayName = reportRow ? getDisplayNameForRow(reportRow) : fileName;
-        addUserSpecificRejectedNotification(reportRow, reportDisplayName);
       }
     } catch {
       setErr("Not approved failed (API not reachable).");

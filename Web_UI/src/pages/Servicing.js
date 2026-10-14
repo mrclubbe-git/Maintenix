@@ -2534,25 +2534,26 @@ export default function Servicing() {
                     <Form.Label>ASD installed?</Form.Label>
                     <div className="d-flex flex-wrap" style={{ gap: 18 }}>
                       <Form.Check
-                        type="radio"
+                        type="checkbox"
                         id="servicing-asd-installed-yes"
-                        name="servicing-asd-installed"
                         label="Yes"
                         checked={normalizeAsdChoice(asdInstalled) === "yes"}
-                        onChange={() => setAsdInstalled("yes")}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          setAsdInstalled(checked ? "yes" : "");
+                        }}
                       />
                       <Form.Check
-                        type="radio"
+                        type="checkbox"
                         id="servicing-asd-installed-no"
-                        name="servicing-asd-installed"
                         label="No"
                         checked={normalizeAsdChoice(asdInstalled) === "no"}
-                        onChange={() => setAsdInstalled("no")}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          setAsdInstalled(checked ? "no" : "");
+                        }}
                       />
                     </div>
-                    <Form.Text className="text-muted">
-                      Select No to remove ASD-specific NFPA 72 questions from this servicing session, saved draft and generated report.
-                    </Form.Text>
                   </Form.Group>
                 </Col>
               ) : null}

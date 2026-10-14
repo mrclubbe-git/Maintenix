@@ -1,0 +1,53 @@
+name: Package CRA Administration Areas Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Server_API/CRA/lib/areaMetadata.js"
+      - "Server_API/CRA/lib/reportStorage.js"
+      - "Server_API/CRA/lib/notificationRegistry.js"
+      - "Server_API/CRA/routes/areas.js"
+      - "Server_API/CRA/routes/admin.js"
+      - "Server_API/CRA/routes/servicing.js"
+      - "Server_API/CRA/test/area-metadata.test.js"
+      - "Server_API/CRA/test/notifications.test.js"
+      - "Server_API/CRA/package.json"
+      - "Server_API/CRA/ADMIN_AREAS_DEPLOY.txt"
+      - ".github/workflows/package-cra-admin-areas-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build handoff directory
+        run: |
+          set -euo pipefail
+          ROOT="handoff/Server_API/CRA"
+          mkdir -p "$ROOT/lib" "$ROOT/routes" "$ROOT/test"
+          cp Server_API/CRA/lib/areaMetadata.js "$ROOT/lib/"
+          cp Server_API/CRA/lib/reportStorage.js "$ROOT/lib/"
+          cp Server_API/CRA/lib/notificationRegistry.js "$ROOT/lib/"
+          cp Server_API/CRA/routes/areas.js "$ROOT/routes/"
+          cp Server_API/CRA/routes/admin.js "$ROOT/routes/"
+          cp Server_API/CRA/routes/servicing.js "$ROOT/routes/"
+          cp Server_API/CRA/test/area-metadata.test.js "$ROOT/test/"
+          cp Server_API/CRA/test/notifications.test.js "$ROOT/test/"
+          cp Server_API/CRA/package.json "$ROOT/"
+          cp Server_API/CRA/ADMIN_AREAS_DEPLOY.txt "$ROOT/"
+
+      - name: Upload backend handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: cra-admin-areas-backend
+          path: handoff/
+          retention-days: 30

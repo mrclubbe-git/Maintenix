@@ -181,6 +181,7 @@ Important runtime files include, but are not limited to:
 - `push-subscriptions.json`
 - `web-push-vapid.json`
 - `notification-delivery.json`
+- `area-metadata.json`
 - drafts
 - queue/status data
 - uploaded files
@@ -196,6 +197,8 @@ Specific rules:
 - Do not migrate DEV push subscriptions to LIVE.
 - Preserve the LIVE VAPID key once LIVE push subscriptions exist.
 - Treat `data/templates/areas.txt` as operationally mutable data, not merely source.
+- Preserve LIVE `data/area-metadata.json`; it contains organisation-specific Admin overrides and pending metadata for dynamically added Areas.
+- Do not replace LIVE `area-metadata.json` with DEV runtime data during deployment.
 - Preserve LIVE uploads and generated reports unless an explicit data-migration plan says otherwise.
 - Source-controlled templates/configuration may be deployed from GitHub, but verify whether a file is runtime-mutated before replacing it.
 
@@ -216,6 +219,10 @@ At minimum the LIVE migration must include the current CRA backend source and de
 - `lib/notifications.js`
 - `lib/pushNotifications.js`
 - `lib/userPreferences.js`
+- `lib/areaMetadata.js`
+- `lib/reportStorage.js`
+- `routes/admin.js`
+- `routes/areas.js`
 - `routes/notifications.js`
 - `routes/push.js`
 - `lib/profileRoutes.js`
@@ -260,7 +267,8 @@ Before starting LIVE, validate that the dedicated service account can:
 - write uploads/generated reports;
 - create/update queue/status files;
 - create/read `web-push-vapid.json`;
-- create/read/update `push-subscriptions.json`.
+- create/read/update `push-subscriptions.json`;
+- create/read/update `area-metadata.json`.
 
 Avoid solving permission problems by running the application as root.
 
@@ -283,6 +291,10 @@ node --check lib/notificationService.js
 node --check lib/notificationDelivery.js
 node --check lib/notifications.js
 node --check lib/pushNotifications.js
+node --check lib/areaMetadata.js
+node --check lib/reportStorage.js
+node --check routes/admin.js
+node --check routes/areas.js
 node --check routes/push.js
 
 # Run module resolution as the LIVE service account.
@@ -344,6 +356,9 @@ Do not consider the migration complete until all applicable checks pass:
 - [ ] Admin/L3 broadcast produces both in-app and subscribed-device delivery.
 - [ ] Notification delivery worker processes queued push deliveries and retries transient failures without blocking the API.
 - [ ] Daily Planner allocation notification and acknowledgement work.
+- [ ] Administration → Areas lists baseline and runtime areas and shows pending metadata.
+- [ ] Adding a genuinely new Area creates a PENDING runtime metadata record and Admin notification without blocking Servicing.
+- [ ] Configured runtime Area metadata overrides baseline/fuzzy resolution for future reports.
 - [ ] Servicing queue worker processes a test job.
 - [ ] Call Out queue worker processes a test job.
 - [ ] Formal Reporting worker health passes.

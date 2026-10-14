@@ -1,12 +1,22 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { queueNotificationPush } = require("./pushNotifications");
 
-const DATA_FILE = path.join(__dirname, "..", "data", "notifications.json");
+const { acquireLockSync, writeJsonAtomicSync } = require("./lockedJson");
+const { enqueueNotificationDelivery } = require("./notificationDelivery");
+
+const DATA_FILE =
+  process.env.MAINTENIX_NOTIFICATIONS_FILE ||
+  path.join(__dirname, "..", "data", "notifications.json");
+const LOCK_FILE = `${DATA_FILE}.lock`;
+const MAX_NOTIFICATIONS = 2000;
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function emptyDb() {
+  return { version: 2, notifications: [] };
 }
 
 function safeRole(role) {
@@ -25,46 +35,105 @@ function userLabel(user) {
   return String(user?.name || user?.email || user?.id || "User").trim();
 }
 
-function ensureFile() {
+function normalizeChannels(value) {
+  const source = Array.isArray(value) ? value : ["IN_APP", "PUSH"];
+  return [...new Set(source.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean))];
+}
+
+function normalizeNotification(input) {
+  const createdAt = input?.createdAt || nowIso();
+  const type = String(input?.type || input?.eventType || "INFO").trim().toUpperCase();
+  return {
+    id: input?.id || `ntf_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,
+    eventType: String(input?.eventType || type).trim().toUpperCase(),
+    type,
+    category: String(input?.category || "GENERAL").trim().toUpperCase(),
+    scope: input?.scope === "USER" ? "USER" : "GLOBAL",
+    title: String(input?.title || "Notification").trim(),
+    message: String(input?.message || "").trim(),
+    severity: String(input?.severity || "info").trim().toLowerCase(),
+    mandatory: !!input?.mandatory,
+    deliveryChannels: normalizeChannels(input?.deliveryChannels),
+    createdByUserId: String(input?.createdByUserId || "").trim(),
+    createdByEmail: String(input?.createdByEmail || "").trim().toLowerCase(),
+    createdByName: String(input?.createdByName || "").trim(),
+    targetUserId: String(input?.targetUserId || "").trim(),
+    targetUserEmail: String(input?.targetUserEmail || input?.userEmail || "").trim().toLowerCase(),
+    targetRoles: Array.isArray(input?.targetRoles) ? input.targetRoles.map(safeRole).filter(Boolean) : [],
+    relatedEntityType: String(input?.relatedEntityType || "").trim(),
+    relatedEntityId: String(input?.relatedEntityId || "").trim(),
+    sourceEventId: String(input?.sourceEventId || "").trim(),
+    idempotencyKey: String(input?.idempotencyKey || "").trim(),
+    actionUrl: String(input?.actionUrl || "").trim(),
+    requiresAck: !!input?.requiresAck,
+    createdAt,
+    expiresAt: input?.expiresAt || null,
+    readBy: Array.isArray(input?.readBy) ? input.readBy : [],
+    clearedBy: Array.isArray(input?.clearedBy) ? input.clearedBy : [],
+    acknowledgements: Array.isArray(input?.acknowledgements) ? input.acknowledgements : []
+  };
+}
+
+function normalizeDb(input) {
+  return {
+    version: 2,
+    notifications: Array.isArray(input?.notifications)
+      ? input.notifications.map((item) => normalizeNotification(item))
+      : []
+  };
+}
+
+function readDbUnlocked() {
   if (!fs.existsSync(DATA_FILE)) {
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ notifications: [] }, null, 2), "utf8");
+    const clean = emptyDb();
+    writeJsonAtomicSync(DATA_FILE, clean);
+    return clean;
+  }
+
+  try {
+    const raw = fs.readFileSync(DATA_FILE, "utf8").trim();
+    return raw ? normalizeDb(JSON.parse(raw)) : emptyDb();
+  } catch {
+    const backup = DATA_FILE.replace(/\.json$/i, `.corrupt.${Date.now()}.json`);
+    try { fs.copyFileSync(DATA_FILE, backup); } catch {}
+    const clean = emptyDb();
+    writeJsonAtomicSync(DATA_FILE, clean);
+    return clean;
+  }
+}
+
+function writeDbUnlocked(db) {
+  writeJsonAtomicSync(DATA_FILE, {
+    version: 2,
+    notifications: Array.isArray(db?.notifications)
+      ? db.notifications.slice(0, MAX_NOTIFICATIONS)
+      : []
+  });
+}
+
+function withDbLock(mutator) {
+  const release = acquireLockSync(LOCK_FILE);
+  try {
+    const db = readDbUnlocked();
+    const result = mutator(db);
+    writeDbUnlocked(db);
+    return result;
+  } finally {
+    release();
   }
 }
 
 function readDb() {
-  ensureFile();
+  const release = acquireLockSync(LOCK_FILE);
   try {
-    const raw = fs.readFileSync(DATA_FILE, "utf8").trim();
-    if (!raw) return { notifications: [] };
-    const parsed = JSON.parse(raw);
-    return {
-      notifications: Array.isArray(parsed?.notifications) ? parsed.notifications : []
-    };
-  } catch {
-    const backup = DATA_FILE.replace(/\.json$/i, `.corrupt.${Date.now()}.json`);
-    try { fs.copyFileSync(DATA_FILE, backup); } catch {}
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ notifications: [] }, null, 2), "utf8");
-    return { notifications: [] };
+    return readDbUnlocked();
+  } finally {
+    release();
   }
 }
 
-function writeDb(db) {
-  ensureFile();
-  const tmp = `${DATA_FILE}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ notifications: Array.isArray(db?.notifications) ? db.notifications : [] }, null, 2), "utf8");
-  fs.renameSync(tmp, DATA_FILE);
-}
-
-function newId(prefix = "ntf") {
-  return `${prefix}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-}
-
 function hasUser(list, user) {
-  const keys = new Set([
-    userKey(user),
-    userEmail(user)
-  ].filter(Boolean));
+  const keys = new Set([userKey(user), userEmail(user)].filter(Boolean));
   return (Array.isArray(list) ? list : []).some((entry) => {
     const value = typeof entry === "string" ? entry : (entry?.userId || entry?.email || "");
     return keys.has(String(value || "").trim().toLowerCase());
@@ -74,179 +143,219 @@ function hasUser(list, user) {
 function visibleToUser(notification, user) {
   if (!notification || typeof notification !== "object") return false;
   if (notification.scope === "GLOBAL" || notification.global === true) {
-    const roles = Array.isArray(notification.targetRoles) ? notification.targetRoles.map(safeRole).filter(Boolean) : [];
+    const roles = Array.isArray(notification.targetRoles)
+      ? notification.targetRoles.map(safeRole).filter(Boolean)
+      : [];
     return roles.length === 0 || roles.includes(safeRole(user?.role));
   }
 
   const targetUserId = String(notification.targetUserId || "").trim().toLowerCase();
   const targetEmail = String(notification.targetUserEmail || notification.userEmail || "").trim().toLowerCase();
-  return (!!targetUserId && targetUserId === userKey(user)) || (!!targetEmail && targetEmail === userEmail(user));
-}
-
-function normalizeNotification(input) {
-  const createdAt = input.createdAt || nowIso();
-  return {
-    id: input.id || newId(),
-    type: String(input.type || "INFO").trim().toUpperCase(),
-    scope: input.scope === "USER" ? "USER" : "GLOBAL",
-    title: String(input.title || "Notification").trim(),
-    message: String(input.message || "").trim(),
-    severity: String(input.severity || "info").trim().toLowerCase(),
-    createdByUserId: String(input.createdByUserId || "").trim(),
-    createdByEmail: String(input.createdByEmail || "").trim().toLowerCase(),
-    createdByName: String(input.createdByName || "").trim(),
-    targetUserId: String(input.targetUserId || "").trim(),
-    targetUserEmail: String(input.targetUserEmail || input.userEmail || "").trim().toLowerCase(),
-    targetRoles: Array.isArray(input.targetRoles) ? input.targetRoles.map(safeRole).filter(Boolean) : [],
-    relatedEntityType: String(input.relatedEntityType || "").trim(),
-    relatedEntityId: String(input.relatedEntityId || "").trim(),
-    actionUrl: String(input.actionUrl || "").trim(),
-    requiresAck: !!input.requiresAck,
-    createdAt,
-    expiresAt: input.expiresAt || null,
-    readBy: Array.isArray(input.readBy) ? input.readBy : [],
-    clearedBy: Array.isArray(input.clearedBy) ? input.clearedBy : [],
-    acknowledgements: Array.isArray(input.acknowledgements) ? input.acknowledgements : []
-  };
+  return (
+    (!!targetUserId && targetUserId === userKey(user)) ||
+    (!!targetEmail && targetEmail === userEmail(user))
+  );
 }
 
 function createNotification(input) {
-  const db = readDb();
-  const notification = normalizeNotification(input || {});
-  db.notifications.unshift(notification);
-  // Keep a generous but bounded local JSON store.
-  db.notifications = db.notifications.slice(0, 2000);
-  writeDb(db);
-  queueNotificationPush(notification);
+  let created = null;
+  const notification = withDbLock((db) => {
+    const candidate = normalizeNotification(input || {});
+    if (candidate.idempotencyKey) {
+      const existing = db.notifications.find(
+        (item) => String(item?.idempotencyKey || "") === candidate.idempotencyKey
+      );
+      if (existing) return existing;
+    }
+
+    db.notifications.unshift(candidate);
+    db.notifications = db.notifications.slice(0, MAX_NOTIFICATIONS);
+    created = candidate;
+    return candidate;
+  });
+
+  if (created) {
+    try { enqueueNotificationDelivery(created); } catch {}
+  }
   return notification;
 }
 
-function notificationForClient(n, user) {
+function notificationForClient(notification, user) {
   return {
-    ...n,
-    read: hasUser(n.readBy, user),
-    acknowledged: hasUser(n.acknowledgements, user),
-    acknowledgementCount: Array.isArray(n.acknowledgements) ? n.acknowledgements.length : 0
+    ...notification,
+    read: hasUser(notification.readBy, user),
+    acknowledged: hasUser(notification.acknowledgements, user),
+    acknowledgementCount: Array.isArray(notification.acknowledgements)
+      ? notification.acknowledgements.length
+      : 0
   };
 }
 
 function listForUser(user, { includeCleared = false } = {}) {
   const now = Date.now();
   return readDb().notifications
-    .filter((n) => visibleToUser(n, user))
-    .filter((n) => {
-      if (!n.expiresAt) return true;
-      const t = Date.parse(n.expiresAt);
-      return Number.isNaN(t) || t >= now;
+    .filter((notification) => visibleToUser(notification, user))
+    .filter((notification) => {
+      if (!notification.expiresAt) return true;
+      const expiresAt = Date.parse(notification.expiresAt);
+      return Number.isNaN(expiresAt) || expiresAt >= now;
     })
-    .filter((n) => includeCleared || !hasUser(n.clearedBy, user))
+    .filter((notification) => includeCleared || !hasUser(notification.clearedBy, user))
     .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0))
-    .map((n) => notificationForClient(n, user));
+    .map((notification) => notificationForClient(notification, user));
 }
 
 function markRead(id, user) {
-  const db = readDb();
-  let out = null;
-  db.notifications = db.notifications.map((n) => {
-    if (String(n.id) !== String(id) || !visibleToUser(n, user)) return n;
-    const readBy = Array.isArray(n.readBy) ? [...n.readBy] : [];
-    if (!hasUser(readBy, user)) readBy.push({ userId: user?.id || "", email: user?.email || "", at: nowIso() });
-    out = { ...n, readBy };
-    return out;
+  const out = withDbLock((db) => {
+    let updated = null;
+    db.notifications = db.notifications.map((notification) => {
+      if (String(notification.id) !== String(id) || !visibleToUser(notification, user)) return notification;
+      const readBy = Array.isArray(notification.readBy) ? [...notification.readBy] : [];
+      if (!hasUser(readBy, user)) readBy.push({ userId: user?.id || "", email: user?.email || "", at: nowIso() });
+      updated = { ...notification, readBy };
+      return updated;
+    });
+    return updated;
   });
-  writeDb(db);
   return out ? notificationForClient(out, user) : null;
 }
 
 function markAllRead(user) {
-  const db = readDb();
-  let count = 0;
-  db.notifications = db.notifications.map((n) => {
-    if (!visibleToUser(n, user) || hasUser(n.readBy, user)) return n;
-    count += 1;
-    return { ...n, readBy: [...(Array.isArray(n.readBy) ? n.readBy : []), { userId: user?.id || "", email: user?.email || "", at: nowIso() }] };
+  return withDbLock((db) => {
+    let count = 0;
+    db.notifications = db.notifications.map((notification) => {
+      if (!visibleToUser(notification, user) || hasUser(notification.readBy, user)) return notification;
+      count += 1;
+      return {
+        ...notification,
+        readBy: [
+          ...(Array.isArray(notification.readBy) ? notification.readBy : []),
+          { userId: user?.id || "", email: user?.email || "", at: nowIso() }
+        ]
+      };
+    });
+    return count;
   });
-  writeDb(db);
-  return count;
 }
 
-function acknowledgementNoticeFor(n, user) {
-  if (!n.createdByUserId && !n.createdByEmail) return null;
+function acknowledgementNoticeFor(notification, user) {
+  if (!notification.createdByUserId && !notification.createdByEmail) return null;
   return normalizeNotification({
+    eventType: "ACKNOWLEDGEMENT",
     type: "ACKNOWLEDGEMENT",
+    category: "SYSTEM",
     scope: "USER",
     title: "Notification acknowledged",
-    message: `${userLabel(user)} acknowledged: ${n.title || n.message || "Notification"}`,
+    message: `${userLabel(user)} acknowledged: ${notification.title || notification.message || "Notification"}`,
     severity: "success",
     createdByUserId: user?.id || "",
     createdByEmail: user?.email || "",
     createdByName: userLabel(user),
-    targetUserId: n.createdByUserId || "",
-    targetUserEmail: n.createdByEmail || "",
+    targetUserId: notification.createdByUserId || "",
+    targetUserEmail: notification.createdByEmail || "",
     relatedEntityType: "notification",
-    relatedEntityId: n.id
+    relatedEntityId: notification.id,
+    idempotencyKey: `ACKNOWLEDGEMENT:${notification.id}:${userKey(user)}`
   });
 }
 
 function acknowledgeMatching(predicate, user, { createAckNotice = true } = {}) {
-  const db = readDb();
-  const out = [];
   const ackNotices = [];
-  const ackAt = nowIso();
+  const out = withDbLock((db) => {
+    const updatedNotifications = [];
+    const ackAt = nowIso();
 
-  db.notifications = db.notifications.map((n) => {
-    if (!predicate(n) || !visibleToUser(n, user) || !n.requiresAck) return n;
+    db.notifications = db.notifications.map((notification) => {
+      if (!predicate(notification) || !visibleToUser(notification, user) || !notification.requiresAck) return notification;
 
-    const acknowledgements = Array.isArray(n.acknowledgements) ? [...n.acknowledgements] : [];
-    const readBy = Array.isArray(n.readBy) ? [...n.readBy] : [];
-    if (!hasUser(acknowledgements, user)) {
-      acknowledgements.push({ userId: user?.id || "", email: user?.email || "", name: userLabel(user), acknowledgedAt: ackAt });
-      const ackNotice = createAckNotice ? acknowledgementNoticeFor(n, user) : null;
-      if (ackNotice) ackNotices.push(ackNotice);
-    }
-    if (!hasUser(readBy, user)) readBy.push({ userId: user?.id || "", email: user?.email || "", at: ackAt });
+      const acknowledgements = Array.isArray(notification.acknowledgements)
+        ? [...notification.acknowledgements]
+        : [];
+      const readBy = Array.isArray(notification.readBy) ? [...notification.readBy] : [];
 
-    const updated = { ...n, acknowledgements, readBy };
-    out.push(updated);
-    return updated;
+      if (!hasUser(acknowledgements, user)) {
+        acknowledgements.push({
+          userId: user?.id || "",
+          email: user?.email || "",
+          name: userLabel(user),
+          acknowledgedAt: ackAt
+        });
+
+        const ackNotice = createAckNotice ? acknowledgementNoticeFor(notification, user) : null;
+        if (
+          ackNotice &&
+          !db.notifications.some(
+            (item) => item.idempotencyKey && item.idempotencyKey === ackNotice.idempotencyKey
+          )
+        ) {
+          ackNotices.push(ackNotice);
+        }
+      }
+
+      if (!hasUser(readBy, user)) readBy.push({ userId: user?.id || "", email: user?.email || "", at: ackAt });
+
+      const updated = { ...notification, acknowledgements, readBy };
+      updatedNotifications.push(updated);
+      return updated;
+    });
+
+    if (ackNotices.length) db.notifications.unshift(...ackNotices);
+    db.notifications = db.notifications.slice(0, MAX_NOTIFICATIONS);
+    return updatedNotifications;
   });
 
-  if (ackNotices.length) db.notifications.unshift(...ackNotices);
-  writeDb(db);
-  ackNotices.forEach((notice) => queueNotificationPush(notice));
-  return out.map((n) => notificationForClient(n, user));
+  for (const notice of ackNotices) {
+    try { enqueueNotificationDelivery(notice); } catch {}
+  }
+
+  return out.map((notification) => notificationForClient(notification, user));
 }
 
 function acknowledge(id, user) {
-  return acknowledgeMatching((n) => String(n.id) === String(id), user)[0] || null;
+  return acknowledgeMatching((notification) => String(notification.id) === String(id), user)[0] || null;
 }
 
 function acknowledgeRelatedEntity(relatedEntityType, relatedEntityId, user, options = {}) {
   const type = String(relatedEntityType || "").trim();
   const id = String(relatedEntityId || "").trim();
   if (!type || !id) return [];
-  return acknowledgeMatching((n) => String(n.relatedEntityType || "") === type && String(n.relatedEntityId || "") === id, user, options);
+  return acknowledgeMatching(
+    (notification) =>
+      String(notification.relatedEntityType || "") === type &&
+      String(notification.relatedEntityId || "") === id,
+    user,
+    options
+  );
 }
 
 function clearVisible(user) {
-  const db = readDb();
-  let count = 0;
-  db.notifications = db.notifications.map((n) => {
-    if (!visibleToUser(n, user)) return n;
-    // Do not clear required acknowledgement items until this user has acknowledged them.
-    if (n.requiresAck && !hasUser(n.acknowledgements, user)) return n;
-    if (hasUser(n.clearedBy, user)) return n;
-    count += 1;
-    return { ...n, clearedBy: [...(Array.isArray(n.clearedBy) ? n.clearedBy : []), { userId: user?.id || "", email: user?.email || "", at: nowIso() }] };
+  return withDbLock((db) => {
+    let count = 0;
+    db.notifications = db.notifications.map((notification) => {
+      if (!visibleToUser(notification, user)) return notification;
+      if (notification.requiresAck && !hasUser(notification.acknowledgements, user)) return notification;
+      if (hasUser(notification.clearedBy, user)) return notification;
+      count += 1;
+      return {
+        ...notification,
+        clearedBy: [
+          ...(Array.isArray(notification.clearedBy) ? notification.clearedBy : []),
+          { userId: user?.id || "", email: user?.email || "", at: nowIso() }
+        ]
+      };
+    });
+    return count;
   });
-  writeDb(db);
-  return count;
 }
 
 function getAcknowledgements(id, user) {
-  const n = readDb().notifications.find((item) => String(item.id) === String(id));
-  if (!n || !visibleToUser(n, user)) return null;
-  return Array.isArray(n.acknowledgements) ? n.acknowledgements : [];
+  const notification = readDb().notifications.find((item) => String(item.id) === String(id));
+  if (!notification || !visibleToUser(notification, user)) return null;
+  return Array.isArray(notification.acknowledgements) ? notification.acknowledgements : [];
+}
+
+function getNotificationById(id) {
+  return readDb().notifications.find((item) => String(item.id) === String(id)) || null;
 }
 
 module.exports = {
@@ -258,6 +367,7 @@ module.exports = {
   acknowledgeRelatedEntity,
   clearVisible,
   getAcknowledgements,
+  getNotificationById,
   userLabel,
   safeRole
 };

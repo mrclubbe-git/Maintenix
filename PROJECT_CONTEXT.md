@@ -1462,3 +1462,17 @@ Validation/deployment support:
 - GitHub Pages Actions run `38602924023` completed successfully; both build and deploy jobs passed.
 - No backend files, runtime data, CRA DEV service, or LIVE service were changed for this refinement.
 
+## Administration navigation style correction — 2026-10-14
+
+- User confirmed the Area metadata form fix works and the compact table layout is correct.
+- The prior UI refinement had changed the Administration navigation from the original tab styling to pill-style navigation; that was not desired.
+- Restored the original `variant="tabs"` visual style while keeping only the requested containment changes:
+  - each Users / Areas / Notifications tab owns an equal bounded tile;
+  - active highlighting is clipped to its own tile;
+  - label content is centered within the tile.
+- No changes were made to the validated compact metadata table or the React 16 form crash fix.
+- Main commit: `b4a66ba44ee5a1d0d4d8574235f44a8ff73dab8c`.
+- Deploy commit: `50bb604fd04503bf8b6fe9a145ec0de768420521`.
+- GitHub Pages run `38604152119` completed successfully; both build and deploy jobs passed.
+- No backend or LIVE changes were involved.
+

@@ -4,7 +4,7 @@ import SimpleBar from "simplebar-react";
 import { useLocation, Link } from "react-router-dom";
 import { CSSTransition } from "react-transition-group";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faImage, faBoxes, faChartPie, faCog, faFileAlt, faSignOutAlt, faTimes, faClipboardList, faPhoneSquare, faCalendarAlt, faStickyNote} from "@fortawesome/free-solid-svg-icons";
+import { faImage, faBoxes, faChartPie, faCog, faFileAlt, faSignOutAlt, faTimes, faClipboardList, faPhoneSquare, faCalendarAlt, faStickyNote, faUserShield } from "@fortawesome/free-solid-svg-icons";
 import { Nav, Badge, Image, Button, Navbar } from "@themesberg/react-bootstrap";
 
 import { Routes } from "../routes";
@@ -30,6 +30,7 @@ export default function Sidebar(props = {}) {
 
   const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);
   const displayName = authUser?.name || authUser?.email || "User";
+  const isAdmin = String(authUser?.role || "").trim().toUpperCase() === "ADMIN";
 
   // ✅ Use uploaded profile pic if present
   const avatarSrc = useMemo(() => {
@@ -127,6 +128,9 @@ export default function Sidebar(props = {}) {
               <NavItem title="Section Reports" link={Routes.SectionReports.path} icon={faFileAlt} />
               <NavItem title="Pictures" link={Routes.Pictures.path} icon={faImage} />
               <NavItem title="Stock Control" link={Routes.StockControl.path} icon={faBoxes} />
+              {isAdmin ? (
+                <NavItem title="Administration" link={Routes.Administration.path} icon={faUserShield} />
+              ) : null}
               <NavItem title="Settings" icon={faCog} link={Routes.Settings.path} />
             </Nav>
           </div>

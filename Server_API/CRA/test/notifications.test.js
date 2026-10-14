@@ -60,6 +60,17 @@ test("notification architecture: visibility, idempotency, acknowledgement and de
   assert.equal(listForUser(admin).some((item) => item.eventType === "ROLE_TEST"), true);
   assert.equal(listForUser(userA).some((item) => item.eventType === "ROLE_TEST"), false);
 
+  const areaRequired = notify("AREA_METADATA_REQUIRED", {
+    actor: userA,
+    area: "New Compressor Substation F895-G1234",
+    idempotencyKey: "test:area:metadata"
+  });
+  assert.equal(areaRequired.requiresAck, false);
+  assert.equal(areaRequired.severity, "warning");
+  assert.equal(areaRequired.actionUrl, "#/administration?tab=areas&status=pending");
+  assert.equal(listForUser(admin).some((item) => item.id === areaRequired.id), true);
+  assert.equal(listForUser(userA).some((item) => item.id === areaRequired.id), false);
+
   const selfApproved = notify("REPORT_APPROVED", {
     actor: admin,
     targetUserId: admin.id,

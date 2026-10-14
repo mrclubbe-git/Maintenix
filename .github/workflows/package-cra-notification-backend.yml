@@ -5,6 +5,24 @@ on:
     branches:
       - main
     paths:
+      - "Server_API/CRA/lib/notificationDelivery.js"
+      - "Server_API/CRA/lib/notificationRegistry.js"
+      - "Server_API/CRA/lib/notificationService.js"
+      - "Server_API/CRA/lib/notifications.js"
+      - "Server_API/CRA/lib/pushNotifications.js"
+      - "Server_API/CRA/lib/dailyPlanner.js"
+      - "Server_API/CRA/routes/dailyPlanner.js"
+      - "Server_API/CRA/routes/reports.js"
+      - "Server_API/CRA/routes/standby.js"
+      - "Server_API/CRA/routes/notifications.js"
+      - "Server_API/CRA/routes/formalReports.js"
+      - "Server_API/CRA/servicingWorker.js"
+      - "Server_API/CRA/calloutWorker.js"
+      - "Server_API/CRA/notificationWorker.js"
+      - "Server_API/CRA/startAll.js"
+      - "Server_API/CRA/package.json"
+      - "Server_API/CRA/test/notifications.test.js"
+      - "Server_API/CRA/NOTIFICATION_ARCHITECTURE_DEPLOY.txt"
       - ".github/workflows/package-cra-notification-backend.yml"
   workflow_dispatch:
 

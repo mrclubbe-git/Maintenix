@@ -7,6 +7,7 @@ const {
   resolveUnder,
   ensureDir: ensureReportDir
 } = require("./reportStorage");
+const { filterServicingResponses, normalizeYesNoChoice } = require("./servicingFeatures");
 
 // DOCX templating
 let PizZip = null;
@@ -176,7 +177,10 @@ async function generateServicingDocx(opts) {
   ensureDir(reportPhotosDir);
   ensureDir(signaturesDir);
 
-  const responses = Array.isArray(payload?.responses) ? payload.responses : [];
+  const rawResponses = Array.isArray(payload?.responses) ? payload.responses : [];
+  const responses = filterServicingResponses(rawResponses, {
+    asdInstalled: payload?.asdInstalled
+  });
 
   // Build table rows and enforce required photos.
   // A checklist item with multiple defects becomes one report row per defect so
@@ -462,6 +466,11 @@ async function generateServicingDocx(opts) {
     service: payload?.service || "",
     frequencyKey: payload?.frequencyKey || "",
     standards: Array.isArray(payload?.standards) ? payload.standards.join(", ") : "",
+    asdInstalled: normalizeYesNoChoice(payload?.asdInstalled) === "yes"
+      ? "Yes"
+      : normalizeYesNoChoice(payload?.asdInstalled) === "no"
+        ? "No"
+        : "",
     technician: payload?.technician || resolvedOwner?.name || resolvedOwner?.email || "",
     createdAt: createdDateOnly,
     items,

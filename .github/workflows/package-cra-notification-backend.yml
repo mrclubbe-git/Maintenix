@@ -1,0 +1,53 @@
+name: Package CRA Notification Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/package-cra-notification-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stage backend handoff
+        run: |
+          set -e
+          mkdir -p notification-handoff/Server_API/CRA/lib
+          mkdir -p notification-handoff/Server_API/CRA/routes
+          mkdir -p notification-handoff/Server_API/CRA/test
+          cp Server_API/CRA/lib/notificationDelivery.js notification-handoff/Server_API/CRA/lib/
+          cp Server_API/CRA/lib/notificationRegistry.js notification-handoff/Server_API/CRA/lib/
+          cp Server_API/CRA/lib/notificationService.js notification-handoff/Server_API/CRA/lib/
+          cp Server_API/CRA/lib/notifications.js notification-handoff/Server_API/CRA/lib/
+          cp Server_API/CRA/lib/pushNotifications.js notification-handoff/Server_API/CRA/lib/
+          cp Server_API/CRA/lib/dailyPlanner.js notification-handoff/Server_API/CRA/lib/
+          cp Server_API/CRA/routes/dailyPlanner.js notification-handoff/Server_API/CRA/routes/
+          cp Server_API/CRA/routes/reports.js notification-handoff/Server_API/CRA/routes/
+          cp Server_API/CRA/routes/standby.js notification-handoff/Server_API/CRA/routes/
+          cp Server_API/CRA/routes/notifications.js notification-handoff/Server_API/CRA/routes/
+          cp Server_API/CRA/routes/formalReports.js notification-handoff/Server_API/CRA/routes/
+          cp Server_API/CRA/servicingWorker.js notification-handoff/Server_API/CRA/
+          cp Server_API/CRA/calloutWorker.js notification-handoff/Server_API/CRA/
+          cp Server_API/CRA/notificationWorker.js notification-handoff/Server_API/CRA/
+          cp Server_API/CRA/startAll.js notification-handoff/Server_API/CRA/
+          cp Server_API/CRA/package.json notification-handoff/Server_API/CRA/
+          cp Server_API/CRA/test/notifications.test.js notification-handoff/Server_API/CRA/test/
+          cp Server_API/CRA/NOTIFICATION_ARCHITECTURE_DEPLOY.txt notification-handoff/
+
+      - name: Upload backend handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: cra-notification-architecture-backend
+          path: notification-handoff
+          if-no-files-found: error
+          retention-days: 30

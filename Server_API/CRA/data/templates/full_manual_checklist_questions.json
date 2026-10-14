@@ -23,11 +23,13 @@
             },
             {
                 "question": "ASD: no airflow/filter/fan faults; display normal",
-                "extra": "text"
+                "extra": "text",
+                "requiresFeature": "ASD"
             },
             {
                 "question": "ASD sampling points visually unobstructed (walk-by)",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "ASD"
             },
             {
                 "question": "Gas termination unit (GTU): indicators normal (healthy/power)",
@@ -93,11 +95,13 @@
             },
             {
                 "question": "ASD pipework: supports intact; joints secure; no damage",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "ASD"
             },
             {
                 "question": "ASD filter condition checked",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "ASD"
             },
             {
                 "question": "Remote status/control units: lamp test / indication test",
@@ -159,7 +163,8 @@
             },
             {
                 "question": "Check ASD airflow and thresholds",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "ASD"
             },
             {
                 "question": "Test one device per zone: ensure panel reacts correctly",
@@ -193,7 +198,8 @@
             },
             {
                 "question": "Test ASD per manufacturer procedure",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "ASD"
             },
             {
                 "question": "Check panel firmware/software and documentation updates",

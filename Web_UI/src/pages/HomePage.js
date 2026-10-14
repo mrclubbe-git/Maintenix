@@ -53,12 +53,13 @@ const RouteWithLoader = ({ component: Component, ...rest }) => {
   );
 };
 
-const RouteWithSidebar = ({ component: Component, ...rest }) => {
+const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) => {
   const [loaded, setLoaded] = useState(false);
 
   // ✅ NEW: auth verification state
   const [authChecked, setAuthChecked] = useState(false);
   const [authOk, setAuthOk] = useState(false);
+  const [verifiedUser, setVerifiedUser] = useState(null);
 
   // read token each render (good enough for routing)
   const authToken = orgLocalStorage.getItem("authToken") || "";
@@ -80,6 +81,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
         orgLocalStorage.removeItem("authUser");
         orgLocalStorage.removeItem("authExpiresAt");
         if (!mounted) return;
+        setVerifiedUser(null);
         setAuthOk(false);
         setAuthChecked(true);
         return;
@@ -88,6 +90,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
       if (isOrgAuthExpired()) {
         clearOrgAuth();
         if (!mounted) return;
+        setVerifiedUser(null);
         setAuthOk(false);
         setAuthChecked(true);
         return;
@@ -106,6 +109,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
         if (res.status === 401 || res.status === 403) {
           clearOrgAuth();
           if (!mounted) return;
+          setVerifiedUser(null);
           setAuthOk(false);
           setAuthChecked(true);
           return;
@@ -113,14 +117,20 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        // if backend returns ok, session is valid
+        const data = await res.json().catch(() => ({}));
+        const user = data?.user && typeof data.user === "object" ? data.user : null;
+        if (!user) throw new Error("Profile response did not include a user.");
+
+        // Backend profile is authoritative for route-level role checks.
         if (!mounted) return;
+        setVerifiedUser(user);
         setAuthOk(true);
         setAuthChecked(true);
       } catch (e) {
         if (e?.name === "AbortError") return;
         if (!mounted) return;
         // API/network failures do not erase a potentially valid stored session.
+        setVerifiedUser(null);
         setAuthOk(false);
         setAuthChecked(true);
       }
@@ -128,6 +138,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
 
     setAuthChecked(false);
     setAuthOk(false);
+    setVerifiedUser(null);
     verify();
 
     return () => {
@@ -145,6 +156,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
 
     if (remaining <= 0) {
       clearOrgAuth();
+      setVerifiedUser(null);
       setAuthOk(false);
       setAuthChecked(true);
       return undefined;
@@ -152,6 +164,7 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
 
     const timer = window.setTimeout(() => {
       clearOrgAuth();
+      setVerifiedUser(null);
       setAuthOk(false);
       setAuthChecked(true);
     }, remaining);
@@ -179,9 +192,17 @@ const RouteWithSidebar = ({ component: Component, ...rest }) => {
           return <Redirect to={Routes.Signin.path} />;
         }
 
-        // ✅ While verifying, show loader only (prevents flashing Overview)
+        // ✅ While verifying, show loader only (prevents flashing protected content)
         if (!authChecked) {
           return <Preloader show={true} />;
+        }
+
+        // Administration is route-protected using the backend-verified profile,
+        // not the locally cached role. Manually typing the URL as a non-Admin
+        // redirects away before the Administration component is rendered.
+        const verifiedRole = String(verifiedUser?.role || "").trim().toUpperCase();
+        if (adminOnly && verifiedRole !== "ADMIN") {
+          return <Redirect to={Routes.DashboardOverview.path} />;
         }
 
         return (
@@ -225,7 +246,7 @@ export default function HomePage() {
       {/* App pages (with sidebar) */}
       <RouteWithSidebar exact path={Routes.DashboardOverview.path} component={DashboardOverview} />
       <RouteWithSidebar exact path={Routes.Settings.path} component={Settings} />
-      <RouteWithSidebar exact path={Routes.Administration.path} component={Administration} />
+      <RouteWithSidebar exact path={Routes.Administration.path} component={Administration} adminOnly />
       <RouteWithSidebar exact path={Routes.Reports.path} component={Reports} />
       <RouteWithSidebar exact path={Routes.SectionReports.path} component={SectionReports} />
       <RouteWithSidebar exact path={Routes.Servicing.path} component={Servicing} />

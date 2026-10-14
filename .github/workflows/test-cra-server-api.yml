@@ -1,0 +1,55 @@
+name: Test CRA Server API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Server_API/CRA/**"
+      - ".github/workflows/test-cra-server-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notification-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Server_API/CRA
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: Server_API/CRA/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax checks
+        run: |
+          node --check index.js
+          node --check startAll.js
+          node --check servicingWorker.js
+          node --check calloutWorker.js
+          node --check notificationWorker.js
+          node --check lib/notificationDelivery.js
+          node --check lib/notificationRegistry.js
+          node --check lib/notificationService.js
+          node --check lib/notifications.js
+          node --check lib/pushNotifications.js
+          node --check routes/notifications.js
+          node --check routes/dailyPlanner.js
+          node --check routes/reports.js
+          node --check routes/standby.js
+          node --check routes/formalReports.js
+
+      - name: Notification regression tests
+        run: npm run test:notifications

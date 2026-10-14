@@ -1445,3 +1445,20 @@ Validation/deployment support:
 - The Administration frontend foundation is therefore deployed to the CRA GitHub Pages DEV UI. Backend-dependent Areas data/configuration will become functional after the packaged backend files are manually installed on CRA DEV and `maintenix-dev-api.service` is restarted/validated.
 - Production remains untouched.
 
+## Administration Areas UI refinement + form crash fix — 2026-10-14
+
+- Refined `Web_UI/src/pages/Administration.js` after first user testing.
+- Administration page navigation now uses three equal contained pill/tile controls for Users, Areas, and Notifications. Active highlighting stays inside the selected tile and labels are centered.
+- Area metadata table was compacted:
+  - removed the Mapping diagnostics column from the UI;
+  - reduced cell padding and font size;
+  - assigned tighter column proportions;
+  - removed the inner `table-responsive` wrapper so ordinary desktop use no longer introduces an unnecessary table scrollbar.
+- Fixed the configuration form crash while typing.
+- Root cause: CRA is still on React 16.13, where SyntheticEvent objects are pooled. The original controlled inputs referenced `event.target.value` inside a functional state updater, which can run after the event has been released.
+- Fix: each form control now reads `event.currentTarget.value` synchronously and passes the plain value into `updateFormField()`; no pooled event object is retained by state updates.
+- Main implementation commit: `8a8d7e11769bc7d568cc2065214d1641c19df8ae`.
+- Selective deploy commit: `b083a7eb4bbf044717d534f542ff3461e20a69f1`.
+- GitHub Pages Actions run `38602924023` completed successfully; both build and deploy jobs passed.
+- No backend files, runtime data, CRA DEV service, or LIVE service were changed for this refinement.
+

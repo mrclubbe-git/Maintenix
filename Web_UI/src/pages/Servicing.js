@@ -127,6 +127,33 @@ function standardsFromDraftValue(v) {
   return out;
 }
 
+function normalizeAsdChoice(value) {
+  if (value === true) return "yes";
+  if (value === false) return "no";
+  const normalized = String(value == null ? "" : value).trim().toLowerCase();
+  if (["yes", "y", "true", "1"].includes(normalized)) return "yes";
+  if (["no", "n", "false", "0"].includes(normalized)) return "no";
+  return "";
+}
+
+function questionRequiresAsd(question) {
+  const single = String(question?.requiresFeature || question?.requires || "").trim().toUpperCase();
+  const multiple = Array.isArray(question?.requiresFeatures)
+    ? question.requiresFeatures.map((value) => String(value || "").trim().toUpperCase())
+    : [];
+
+  if (single === "ASD" || multiple.includes("ASD")) return true;
+
+  // Backward compatibility for older saved drafts created before feature metadata.
+  return /\bASD\b/i.test(String(question?.question || ""));
+}
+
+function filterRowsForAsdSelection(rows, asdChoice) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (normalizeAsdChoice(asdChoice) !== "no") return list;
+  return list.filter((row) => !questionRequiresAsd(row));
+}
+
 function makeQid(std, qText, idx) {
   const base = `${std}__${idx}__${String(qText || "").slice(0, 40)}`;
   return base.replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -508,6 +535,7 @@ export default function Servicing() {
   const [serviceType, setServiceType] = useState("");
   const [systemType, setSystemType] = useState("substation");
   const [selectedStandardsState, setSelectedStandardsState] = useState([]);
+  const [asdInstalled, setAsdInstalled] = useState("");
   // Legacy draft booleans are still read by standardsFromDraftValue().
 
   // Loaded lists
@@ -658,7 +686,7 @@ export default function Servicing() {
     });
   }, [checklist]);
 
-  const questionRows = useMemo(() => {
+  const allQuestionRows = useMemo(() => {
     if (!merged) return [];
     const rows = [];
     Object.keys(merged).forEach((std) => {
@@ -670,12 +698,24 @@ export default function Servicing() {
           id: makeQid(std, qText, idx),
           std,
           question: qText,
-          extra: q?.extra ?? ""
+          extra: q?.extra ?? "",
+          requiresFeature: q?.requiresFeature || q?.requires || ""
         });
       });
     });
     return rows;
   }, [merged]);
+
+  const needsAsdSelection = useMemo(() => (
+    systemType === "substation" &&
+    selectedStandards.includes("NFPA 72") &&
+    allQuestionRows.some((q) => questionRequiresAsd(q))
+  ), [systemType, selectedStandards, allQuestionRows]);
+
+  const questionRows = useMemo(
+    () => filterRowsForAsdSelection(allQuestionRows, needsAsdSelection ? asdInstalled : ""),
+    [allQuestionRows, needsAsdSelection, asdInstalled]
+  );
 
   const [answers, setAnswers] = useState({});
 
@@ -905,6 +945,7 @@ export default function Servicing() {
     if (!area) return "Please select an Area.";
     if (!serviceType) return "Please select a Service Type.";
     if (!selectedStandards.length) return "Please select at least one standard.";
+    if (needsAsdSelection && !normalizeAsdChoice(asdInstalled)) return "Please select whether an ASD is installed.";
     if (!checklist) return "Checklist is not loaded yet.";
     return "";
   }
@@ -1618,6 +1659,7 @@ export default function Servicing() {
       serviceType,
       systemType,
       selectedStandards,
+      asdInstalled: needsAsdSelection ? normalizeAsdChoice(asdInstalled) : "",
       nfpa72: selectedStandards.includes("NFPA 72"),
       nfpa2001: selectedStandards.includes("NFPA 2001"),
       areaSearch,
@@ -1628,7 +1670,8 @@ export default function Servicing() {
         id: q.id,
         std: q.std,
         question: q.question,
-        extra: q.extra || ""
+        extra: q.extra || "",
+        requiresFeature: q.requiresFeature || ""
       }))
     };
   }
@@ -1640,6 +1683,7 @@ export default function Servicing() {
     setSystemType(v.systemType === "conveyor" ? "conveyor" : "substation");
     const draftStandards = standardsFromDraftValue(v);
     setSelectedStandardsState(draftStandards);
+    setAsdInstalled(normalizeAsdChoice(v.asdInstalled));
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
@@ -1780,9 +1824,11 @@ export default function Servicing() {
           id: q?.id || makeQid(q?.std || "General", q?.question || `Question ${idx + 1}`, idx),
           std: q?.std || "General",
           question: String(q?.question || "").trim(),
-          extra: q?.extra || ""
+          extra: q?.extra || "",
+          requiresFeature: q?.requiresFeature || q?.requires || ""
         }))
-        .filter((q) => q.question);
+        .filter((q) => q.question)
+        .filter((q) => normalizeAsdChoice(v?.asdInstalled) !== "no" || !questionRequiresAsd(q));
     }
 
     const draftStandards = makeSelectedStandardsFromValue(v);
@@ -1800,11 +1846,12 @@ export default function Servicing() {
           id: makeQid(std, qText, idx),
           std,
           question: qText,
-          extra: q?.extra ?? ""
+          extra: q?.extra ?? "",
+          requiresFeature: q?.requiresFeature || q?.requires || ""
         });
       });
     });
-    return rows;
+    return filterRowsForAsdSelection(rows, v?.asdInstalled);
   }
 
   function validateDraftValueForGeneration(v, draftQuestionRows) {
@@ -1875,6 +1922,11 @@ export default function Servicing() {
         checklistType: v.systemType || "substation",
         frequencyKey: draftFrequencyKey,
         standards,
+        asdInstalled: normalizeAsdChoice(v.asdInstalled) === "yes"
+          ? true
+          : normalizeAsdChoice(v.asdInstalled) === "no"
+            ? false
+            : null,
         createdAt,
         correctionOfReport: correctionContext?.correctionOf || "",
         correctionReason: correctionContext?.reason || "",
@@ -1895,6 +1947,7 @@ export default function Servicing() {
             photoField: defectEntries[0]?.photoField || `photo_${q.id}`,
             standard: q.std,
             question: q.question,
+            requiresFeature: q.requiresFeature || "",
             answer: responseRecord.answer || "",
             defectsFound: responseRecord.defectsFound || defectStateFromAnswer(responseRecord.answer),
             // Keep this empty so old generators use the comment text verbatim.
@@ -2075,6 +2128,7 @@ export default function Servicing() {
     setAreaOpen(false);
     setServiceType("");
     setSelectedStandardsState(defaultStandardsForChecklist(checklist));
+    setAsdInstalled("");
     setAnswers({});
     setHighlightMissing(false);
     setHighlightMissingPhotos(false);
@@ -2296,6 +2350,7 @@ export default function Servicing() {
                       setChecklist(null);
                       setAnswers({});
                       setSelectedStandardsState([]);
+                      setAsdInstalled("");
                       setStep(0);
                     }}
                     disabled={loadingChecklist}
@@ -2472,6 +2527,35 @@ export default function Servicing() {
                   )}
                 </div>
               </Col>
+
+              {needsAsdSelection ? (
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label>ASD installed?</Form.Label>
+                    <div className="d-flex flex-wrap" style={{ gap: 18 }}>
+                      <Form.Check
+                        type="radio"
+                        id="servicing-asd-installed-yes"
+                        name="servicing-asd-installed"
+                        label="Yes"
+                        checked={normalizeAsdChoice(asdInstalled) === "yes"}
+                        onChange={() => setAsdInstalled("yes")}
+                      />
+                      <Form.Check
+                        type="radio"
+                        id="servicing-asd-installed-no"
+                        name="servicing-asd-installed"
+                        label="No"
+                        checked={normalizeAsdChoice(asdInstalled) === "no"}
+                        onChange={() => setAsdInstalled("no")}
+                      />
+                    </div>
+                    <Form.Text className="text-muted">
+                      Select No to remove ASD-specific NFPA 72 questions from this servicing session, saved draft and generated report.
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+              ) : null}
 
               <Col md={12}>
                 {!checklist ? (
@@ -2750,6 +2834,9 @@ export default function Servicing() {
             <div className="mb-2"><strong>System Type:</strong> {systemType === "conveyor" ? "Conveyor" : "Substation"}</div>
             <div className="mb-2"><strong>Area:</strong> {area}</div>
             <div className="mb-2"><strong>Service Type:</strong> {serviceType}</div>
+            {needsAsdSelection ? (
+              <div className="mb-2"><strong>ASD installed:</strong> {normalizeAsdChoice(asdInstalled) === "yes" ? "Yes" : "No"}</div>
+            ) : null}
             <div className="mb-3">
               <strong>Standards:</strong> {selectedStandards.length ? selectedStandards.join(", ") : "-"}
             </div>

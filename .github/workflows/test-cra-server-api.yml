@@ -47,6 +47,8 @@ jobs:
           node --check lib/pushNotifications.js
           node --check lib/areaMetadata.js
           node --check lib/reportStorage.js
+          node --check lib/servicingFeatures.js
+          node --check lib/servicingGenerator.js
           node --check routes/notifications.js
           node --check routes/dailyPlanner.js
           node --check routes/reports.js

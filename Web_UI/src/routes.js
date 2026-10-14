@@ -5,6 +5,7 @@ export const Routes = {
   // app pages (with sidebar)
   DashboardOverview: { path: "/dashboard/overview" },
   Settings: { path: "/settings" },
+  Administration: { path: "/administration" },
 
   // placeholders (sidebar links - pages can be added later)
   ServerInfo: { path: "/server-info" },

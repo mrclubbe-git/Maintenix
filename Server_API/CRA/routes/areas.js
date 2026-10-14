@@ -4,6 +4,9 @@ const path = require("path");
 
 const { getSession, extractBearer } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
+const { loadAreaSections } = require("../lib/reportStorage");
+const { ensurePendingAreaMetadata, normalizeAreaKey } = require("../lib/areaMetadata");
+const { notifySafe } = require("../lib/notificationService");
 
 const router = express.Router();
 const AREAS_TXT = path.join(__dirname, "..", "data", "templates", "areas.txt");
@@ -95,7 +98,43 @@ function writeAreasTextAtomic(contents) {
   }
 }
 
-function addArea(value) {
+function hasExactBaselineArea(area) {
+  const key = normalizeArea(area);
+  if (!key) return false;
+  const loaded = loadAreaSections();
+  return Boolean(loaded?.normalized?.[key]);
+}
+
+function registerNewAreaMetadata(area, actor) {
+  if (hasExactBaselineArea(area)) {
+    return {
+      metadataStatus: "CONFIGURED",
+      metadataSource: "BASELINE",
+      adminNotificationCreated: false
+    };
+  }
+
+  const pending = ensurePendingAreaMetadata(area, actor);
+  let notification = null;
+
+  if (pending?.created) {
+    const key = normalizeAreaKey(area);
+    notification = notifySafe("AREA_METADATA_REQUIRED", {
+      actor,
+      area,
+      sourceEventId: `area:${key}`,
+      idempotencyKey: `AREA_METADATA_REQUIRED:${key}`
+    });
+  }
+
+  return {
+    metadataStatus: pending?.record?.status || "PENDING",
+    metadataSource: "RUNTIME",
+    adminNotificationCreated: Boolean(notification?.id)
+  };
+}
+
+function addArea(value, options = {}) {
   const area = cleanAreaName(value);
   if (!area) {
     return { ok: false, status: 400, message: "Area name is required." };
@@ -113,7 +152,26 @@ function addArea(value) {
   const separator = source && !source.endsWith("\n") ? newline : "";
   writeAreasTextAtomic(`${source}${separator}${area}${newline}`);
 
-  return { ok: true, area, areas: [...areas, area], created: true };
+  let metadata = {
+    metadataStatus: "PENDING",
+    metadataSource: "RUNTIME",
+    adminNotificationCreated: false
+  };
+
+  try {
+    metadata = registerNewAreaMetadata(area, options?.actor || null);
+  } catch (error) {
+    // Area creation must remain available even if metadata follow-up fails.
+    console.error("Area metadata registration failed:", error?.message || error);
+  }
+
+  return {
+    ok: true,
+    area,
+    areas: [...areas, area],
+    created: true,
+    ...metadata
+  };
 }
 
 router.get("/", requireAuth, (_req, res) => {
@@ -126,7 +184,7 @@ router.get("/", requireAuth, (_req, res) => {
 
 router.post("/", requireAuth, (req, res) => {
   try {
-    const result = addArea(req.body?.area);
+    const result = addArea(req.body?.area, { actor: req.user });
     if (!result.ok) return res.status(result.status || 400).json(result);
     return res.status(result.created ? 201 : 200).json(result);
   } catch (error) {

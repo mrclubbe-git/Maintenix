@@ -1505,3 +1505,29 @@ Validation/deployment support:
 - GitHub Pages run `38607644529` completed successfully; both build and deploy jobs passed.
 - The compact Area metadata table and React 16 form crash fix remain unchanged.
 
+## Administration Users tab implemented — 2026-10-14
+
+- Implemented the next Administration phase: permanent User Management UI under `Administration -> Users`.
+- This phase reuses the existing CRA Admin user-management endpoints; no backend source or service restart was required.
+- Users tab now provides:
+  - summary cards for All users, Pending, Active, and Denied;
+  - search by name, email, role, or status;
+  - filter buttons for All / Pending / Active / Denied;
+  - compact user table showing name, email, role, status, created date, approval attribution and actions;
+  - role assignment for L1, L2, L3 and ADMIN;
+  - Approve action for Pending or Denied users;
+  - Deny action for Pending users;
+  - Remove action with confirmation for non-self accounts.
+- Current Admin account is protected in the UI from role changes and removal, matching backend self-protection rules.
+- User actions call the existing endpoints:
+  - `GET /api/admin/users`
+  - `POST /api/admin/users/:id/approve`
+  - `POST /api/admin/users/:id/deny`
+  - `PATCH /api/admin/users/:id/role`
+  - `DELETE /api/admin/users/:id`
+- The accepted Administration navigation containment and Areas table/form behavior were not changed.
+- Main implementation commit: `288c5b73fbec0bbfdee60061bd51f66305320a1c`.
+- Deploy commit: `d32dc08ad52bbab7d3e3b7bc7e0830596b25b664`.
+- GitHub Pages run `38608502940` completed successfully; build and deploy both passed.
+- Notifications remains the next unimplemented Administration tab.
+

@@ -66,20 +66,6 @@ function sourceLabel(area) {
   return area?.source || "—";
 }
 
-function mappingDiagnostic(area) {
-  if (area?.status === "CONFIGURED") {
-    if (area?.source === "RUNTIME") return "Runtime Admin mapping";
-    return "Baseline mapping";
-  }
-
-  const diagnostics = area?.diagnostics || {};
-  if (diagnostics.matched && diagnostics.resolvedSection && diagnostics.resolvedSection !== "Unmapped") {
-    return `Current resolver suggests ${diagnostics.resolvedSection} (${diagnostics.reason || "fuzzy"}), but explicit metadata is still required.`;
-  }
-
-  return "Future reports use Unmapped until metadata is configured.";
-}
-
 export default function Administration() {
   const history = useHistory();
   const location = useLocation();
@@ -176,6 +162,10 @@ export default function Administration() {
     setSaveError("");
   }
 
+  function updateFormField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
   async function saveMetadata(event) {
     event.preventDefault();
     if (!editingArea) return;
@@ -238,28 +228,45 @@ export default function Administration() {
       </div>
 
       <Card border="light" className="shadow-sm mb-4">
-        <Card.Body className="pb-0">
+        <Card.Body className="p-2">
           <Nav
-            variant="tabs"
+            variant="pills"
             activeKey={activeTab}
+            className="d-flex flex-nowrap w-100"
             onSelect={(key) => {
               const tab = key || "areas";
               setAdministrationQuery(tab, tab === "areas" ? pendingOnly : false);
             }}
           >
-            <Nav.Item>
-              <Nav.Link eventKey="users">Users</Nav.Link>
+            <Nav.Item className="flex-fill p-1" style={{ minWidth: 0 }}>
+              <Nav.Link
+                eventKey="users"
+                className="d-flex align-items-center justify-content-center text-center rounded w-100"
+                style={{ minHeight: 48 }}
+              >
+                Users
+              </Nav.Link>
             </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="areas">
-                Areas
+            <Nav.Item className="flex-fill p-1" style={{ minWidth: 0 }}>
+              <Nav.Link
+                eventKey="areas"
+                className="d-flex align-items-center justify-content-center text-center rounded w-100"
+                style={{ minHeight: 48 }}
+              >
+                <span>Areas</span>
                 {summary.pending > 0 ? (
                   <Badge bg="warning" text="dark" className="ms-2">{summary.pending}</Badge>
                 ) : null}
               </Nav.Link>
             </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="notifications">Notifications</Nav.Link>
+            <Nav.Item className="flex-fill p-1" style={{ minWidth: 0 }}>
+              <Nav.Link
+                eventKey="notifications"
+                className="d-flex align-items-center justify-content-center text-center rounded w-100"
+                style={{ minHeight: 48 }}
+              >
+                Notifications
+              </Nav.Link>
             </Nav.Item>
           </Nav>
         </Card.Body>
@@ -376,62 +383,61 @@ export default function Administration() {
                   No areas match the current filter.
                 </Alert>
               ) : (
-                <div className="table-responsive">
-                  <Table hover className="align-middle mb-0">
-                    <thead>
-                      <tr>
-                        <th>Area</th>
-                        <th>Section</th>
-                        <th>F / First</th>
-                        <th>G / Second</th>
-                        <th>Status</th>
-                        <th>Added by</th>
-                        <th>Mapping diagnostics</th>
-                        <th className="text-end">Action</th>
+                <Table
+                  hover
+                  size="sm"
+                  className="align-middle mb-0"
+                  style={{ fontSize: "0.875rem", width: "100%" }}
+                >
+                  <thead>
+                    <tr>
+                      <th className="px-2 py-2" style={{ width: "31%" }}>Area</th>
+                      <th className="px-2 py-2" style={{ width: "16%" }}>Section</th>
+                      <th className="px-2 py-2 text-nowrap" style={{ width: "8%" }}>F / First</th>
+                      <th className="px-2 py-2 text-nowrap" style={{ width: "8%" }}>G / Second</th>
+                      <th className="px-2 py-2" style={{ width: "15%" }}>Status</th>
+                      <th className="px-2 py-2" style={{ width: "14%" }}>Added by</th>
+                      <th className="px-2 py-2 text-end" style={{ width: "8%" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleAreas.map((area) => (
+                      <tr key={area.area}>
+                        <td className="px-2 py-2" style={{ overflowWrap: "anywhere" }}>
+                          <div className="fw-bold">{area.area}</div>
+                          {area.baseArea ? <div className="text-muted small">{area.baseArea}</div> : null}
+                        </td>
+                        <td className="px-2 py-2" style={{ overflowWrap: "anywhere" }}>{area.section || "—"}</td>
+                        <td className="px-2 py-2">{area.first || "—"}</td>
+                        <td className="px-2 py-2">{area.second || "—"}</td>
+                        <td className="px-2 py-2">
+                          {area.status === "CONFIGURED" ? (
+                            <Badge bg="success">Configured</Badge>
+                          ) : (
+                            <Badge bg="warning" text="dark">Metadata required</Badge>
+                          )}
+                          <div className="text-muted small mt-1">{sourceLabel(area)}</div>
+                        </td>
+                        <td className="px-2 py-2" style={{ overflowWrap: "anywhere" }}>
+                          {area.addedBy || "—"}
+                          {area.updatedBy ? (
+                            <div className="text-muted small">Updated by {area.updatedBy}</div>
+                          ) : null}
+                        </td>
+                        <td className="px-2 py-2 text-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={area.status === "PENDING" ? "primary" : "outline-primary"}
+                            onClick={() => openEditor(area)}
+                          >
+                            {area.status === "PENDING" ? "Configure" : "Edit"}
+                          </Button>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {visibleAreas.map((area) => (
-                        <tr key={area.area}>
-                          <td>
-                            <div className="fw-bold">{area.area}</div>
-                            {area.baseArea ? <div className="text-muted small">{area.baseArea}</div> : null}
-                          </td>
-                          <td>{area.section || "—"}</td>
-                          <td>{area.first || "—"}</td>
-                          <td>{area.second || "—"}</td>
-                          <td>
-                            {area.status === "CONFIGURED" ? (
-                              <Badge bg="success">Configured</Badge>
-                            ) : (
-                              <Badge bg="warning" text="dark">Metadata required</Badge>
-                            )}
-                            <div className="text-muted small mt-1">{sourceLabel(area)}</div>
-                          </td>
-                          <td>
-                            {area.addedBy || "—"}
-                            {area.updatedBy ? (
-                              <div className="text-muted small">Updated by {area.updatedBy}</div>
-                            ) : null}
-                          </td>
-                          <td style={{ minWidth: 220 }}>
-                            <div className="small">{mappingDiagnostic(area)}</div>
-                          </td>
-                          <td className="text-end">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={area.status === "PENDING" ? "primary" : "outline-primary"}
-                              onClick={() => openEditor(area)}
-                            >
-                              {area.status === "PENDING" ? "Configure" : "Edit"}
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
+                    ))}
+                  </tbody>
+                </Table>
               )}
             </Card.Body>
           </Card>
@@ -458,7 +464,7 @@ export default function Administration() {
               <Form.Label>Section</Form.Label>
               <Form.Select
                 value={form.section}
-                onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}
+                onChange={(event) => updateFormField("section", event.currentTarget.value)}
                 required
               >
                 <option value="">Select a section</option>
@@ -472,7 +478,7 @@ export default function Administration() {
               <Form.Label>Base area</Form.Label>
               <Form.Control
                 value={form.baseArea}
-                onChange={(event) => setForm((current) => ({ ...current, baseArea: event.target.value }))}
+                onChange={(event) => updateFormField("baseArea", event.currentTarget.value)}
                 maxLength={160}
                 placeholder="Optional base area description"
               />
@@ -484,7 +490,7 @@ export default function Administration() {
                   <Form.Label>F / First code</Form.Label>
                   <Form.Control
                     value={form.first}
-                    onChange={(event) => setForm((current) => ({ ...current, first: event.target.value }))}
+                    onChange={(event) => updateFormField("first", event.currentTarget.value)}
                     maxLength={40}
                     placeholder="Optional"
                   />
@@ -495,7 +501,7 @@ export default function Administration() {
                   <Form.Label>G / Second code</Form.Label>
                   <Form.Control
                     value={form.second}
-                    onChange={(event) => setForm((current) => ({ ...current, second: event.target.value }))}
+                    onChange={(event) => updateFormField("second", event.currentTarget.value)}
                     maxLength={40}
                     placeholder="Optional"
                   />

@@ -60,6 +60,27 @@ test("notification architecture: visibility, idempotency, acknowledgement and de
   assert.equal(listForUser(admin).some((item) => item.eventType === "ROLE_TEST"), true);
   assert.equal(listForUser(userA).some((item) => item.eventType === "ROLE_TEST"), false);
 
+  const selfApproved = notify("REPORT_APPROVED", {
+    actor: admin,
+    targetUserId: admin.id,
+    targetUserEmail: admin.email,
+    fileName: "self-approved.docx",
+    idempotencyKey: "test:report:self-approved"
+  });
+  assert.equal(listForUser(admin).some((item) => item.id === selfApproved.id), true);
+
+  const rejected = notify("REPORT_REJECTED", {
+    actor: admin,
+    targetUserId: userA.id,
+    targetUserEmail: userA.email,
+    fileName: "rejected.docx",
+    reason: "Correction required.",
+    idempotencyKey: "test:report:rejected"
+  });
+  assert.equal(listForUser(userA).some((item) => item.id === rejected.id), true);
+
   const delivery = JSON.parse(fs.readFileSync(process.env.MAINTENIX_NOTIFICATION_DELIVERY_FILE, "utf8"));
   assert.equal(delivery.jobs.filter((job) => job.notificationId === assigned.id).length, 1);
+  assert.equal(delivery.jobs.filter((job) => job.notificationId === selfApproved.id).length, 1);
+  assert.equal(delivery.jobs.filter((job) => job.notificationId === rejected.id).length, 1);
 });

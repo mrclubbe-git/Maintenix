@@ -12,7 +12,7 @@ Historical migration notes may still exist in the repository. Where they conflic
 
 ## 1. Current runtime process inventory
 
-The CRA backend currently has **three long-running Node.js processes**. They are launched together by:
+The CRA backend currently has **four long-running Node.js processes**. They are launched together by:
 
 ```bash
 npm run start:all
@@ -25,8 +25,9 @@ npm run start:all
 | API server | `Server_API/CRA/index.js` | Yes | Yes |
 | Servicing queue worker | `Server_API/CRA/servicingWorker.js` | Yes | Yes |
 | Call Out queue worker | `Server_API/CRA/calloutWorker.js` | Yes | Yes |
+| Notification delivery worker | `Server_API/CRA/notificationWorker.js` | Yes | Yes |
 
-**Do not start duplicate Servicing or Call Out workers unless multi-worker queue processing has explicitly been designed and tested.**
+**Do not start duplicate Servicing or Call Out workers unless multi-worker queue processing has explicitly been designed and tested.** The notification delivery queue uses atomic claims and stale-claim recovery, but one supervised notification worker remains the standard deployment.
 
 Recommended LIVE supervision is one systemd service whose working directory is the CRA backend and whose start command is:
 
@@ -93,7 +94,7 @@ Web Push delivery is integrated into the API process through:
 - `Server_API/CRA/lib/notifications.js`
 - `Server_API/CRA/index.js`
 
-There is **no separate Web Push server worker** to start.
+Web Push delivery is dispatched by the separate long-running `notificationWorker.js`. The API persists the notification and enqueues delivery; the worker performs Web Push asynchronously so a push-provider outage does not block the business operation that created the notification.
 
 Required Node dependency:
 
@@ -179,6 +180,7 @@ Important runtime files include, but are not limited to:
 - `user-preferences.json`
 - `push-subscriptions.json`
 - `web-push-vapid.json`
+- `notification-delivery.json`
 - drafts
 - queue/status data
 - uploaded files
@@ -207,6 +209,10 @@ At minimum the LIVE migration must include the current CRA backend source and de
 - `startAll.js`
 - `servicingWorker.js`
 - `calloutWorker.js`
+- `notificationWorker.js`
+- `lib/notificationRegistry.js`
+- `lib/notificationService.js`
+- `lib/notificationDelivery.js`
 - `lib/notifications.js`
 - `lib/pushNotifications.js`
 - `lib/userPreferences.js`
@@ -271,6 +277,10 @@ node --check index.js
 node --check startAll.js
 node --check servicingWorker.js
 node --check calloutWorker.js
+node --check notificationWorker.js
+node --check lib/notificationRegistry.js
+node --check lib/notificationService.js
+node --check lib/notificationDelivery.js
 node --check lib/notifications.js
 node --check lib/pushNotifications.js
 node --check routes/push.js
@@ -289,11 +299,12 @@ Do not proceed if any required check fails.
 
 ## 10. LIVE startup validation
 
-After starting/restarting the LIVE service, verify that **all three long-running Node processes** are present:
+After starting/restarting the LIVE service, verify that **all four long-running Node processes** are present:
 
 - API
 - Servicing worker
 - Call Out worker
+- Notification delivery worker
 
 Example checks:
 
@@ -331,6 +342,7 @@ Do not consider the migration complete until all applicable checks pass:
 - [ ] Device Web Push subscription can be enabled.
 - [ ] Native test push arrives while Maintenix is backgrounded.
 - [ ] Admin/L3 broadcast produces both in-app and subscribed-device delivery.
+- [ ] Notification delivery worker processes queued push deliveries and retries transient failures without blocking the API.
 - [ ] Daily Planner allocation notification and acknowledgement work.
 - [ ] Servicing queue worker processes a test job.
 - [ ] Call Out queue worker processes a test job.
@@ -351,8 +363,9 @@ Do not consider the migration complete until all applicable checks pass:
 | API | Node.js `index.js` | Long-running via `startAll.js` | Required | Start/supervise |
 | Servicing worker | Node.js `servicingWorker.js` | Long-running via `startAll.js` | Required | Start/supervise |
 | Call Out worker | Node.js `calloutWorker.js` | Long-running via `startAll.js` | Required | Start/supervise |
+| Notification delivery worker | Node.js `notificationWorker.js` | Long-running via `startAll.js` | Required | Start/supervise; processes persistent Web Push outbox |
 | Formal Reporting worker | Python `report_worker.py` | Spawned on demand by API | Required dependency | Do not daemonize; install/validate dependencies |
-| Web Push delivery | Node.js library inside API | Runs inside API process | Required | No separate process |
+| Web Push delivery | Node.js `notificationWorker.js` + `lib/pushNotifications.js` | Persistent outbox worker | Required | Start with `startAll.js`; preserve `notification-delivery.json` as runtime state |
 | Push service worker | Browser JS `maintenix-push-sw.js` | Registered by browser | Required for device push | Deploy with Web UI; no systemd process |
 
 ### Rule for future development

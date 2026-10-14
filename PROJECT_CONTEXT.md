@@ -1531,3 +1531,24 @@ Validation/deployment support:
 - GitHub Pages run `38608502940` completed successfully; build and deploy both passed.
 - Notifications remains the next unimplemented Administration tab.
 
+## Administration Notifications tab implemented — 2026-10-14
+
+- Implemented the next Administration phase: functional Notifications UI under `Administration -> Notifications`.
+- This phase reuses the existing centralized notification backend and existing Admin/L3 diagnostic/broadcast endpoints; no backend source changes or CRA DEV restart were required.
+- Notifications tab now provides:
+  - summary cards for Registered events, Mandatory events, events requiring acknowledgement by default, and Categories;
+  - Admin broadcast composer with title/message character limits matching backend validation;
+  - optional "Require acknowledgement" switch;
+  - broadcast delivery through the existing `POST /api/notifications/broadcast` endpoint;
+  - notification event registry loaded from `GET /api/notifications/events`;
+  - search and category filter;
+  - compact registry table showing Event, Category, Delivery Channels, default acknowledgement behaviour, and Mandatory/Standard rule.
+- Mandatory system events are deliberately presented as locked architecture rules rather than editable disable switches. This preserves the centralized notification contract and existing mandatory notification guarantees.
+- Broadcasts in this first UI pass target all users, matching the current backend broadcast route. Role-targeted broadcast configuration has not been added.
+- In-app notification persistence remains first; PUSH delivery continues asynchronously through the existing notification delivery outbox/worker.
+- React 16 pooled-event safety was preserved in all new controlled inputs by reading `event.currentTarget` synchronously.
+- The accepted Administration navigation, Users tab, Areas table, and Area metadata form were not changed.
+- Main implementation commit: `1e19496f183e64ee5bc110573d5554b6323f686f`.
+- Deploy commit: `3a7eadce07c6b810bdc3218631edf910f4313d82`.
+- GitHub Pages run `38610299642` completed successfully; build and deploy both passed.
+

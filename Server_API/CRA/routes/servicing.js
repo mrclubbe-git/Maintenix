@@ -463,7 +463,7 @@ router.get("/areas", requireAuth, (req, res) => {
  */
 router.post("/areas", requireAuth, (req, res) => {
   try {
-    const result = sharedAreas.addArea(req.body?.area);
+    const result = sharedAreas.addArea(req.body?.area, { actor: req.user });
     if (!result.ok) return res.status(result.status || 400).json(result);
     return res.status(result.created ? 201 : 200).json(result);
   } catch (error) {

@@ -108,6 +108,20 @@ function safeJsonParse(str, fallback = null) {
   }
 }
 
+function getReportTypeForRow(reportRow) {
+  const explicitType = String(reportRow?.reportType || reportRow?.type || "").trim().toUpperCase();
+  if (explicitType === REPORT_TYPE.SERVICING || explicitType === "SERVICE") return REPORT_TYPE.SERVICING;
+  if (explicitType === REPORT_TYPE.CALLOUT || explicitType === "CALL_OUT" || explicitType === "CALL-OUT") return REPORT_TYPE.CALLOUT;
+
+  const fileName = String(reportRow?.fileName || "").trim();
+  if (/^Service_Report_/i.test(fileName)) return REPORT_TYPE.SERVICING;
+  if (/^callout(?:_|-|\b)/i.test(fileName) || /^(?:CallOut|Callout|Call_Out|Call-Out)_Report_/i.test(fileName)) {
+    return REPORT_TYPE.CALLOUT;
+  }
+
+  return "UNKNOWN";
+}
+
 export default function Reports() {
   const authToken = orgLocalStorage.getItem("authToken") || "";
   const authUser = safeJsonParse(orgLocalStorage.getItem("authUser") || "null", null);

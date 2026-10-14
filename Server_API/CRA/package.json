@@ -9,7 +9,9 @@
     "worker:servicing": "node servicingWorker.js",
     "worker:callout": "node calloutWorker.js",
     "seed:admin": "node seedAdmin.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "worker:notifications": "node notificationWorker.js",
+    "test:notifications": "node --test test/notifications.test.js"
   },
   "keywords": [],
   "author": "",

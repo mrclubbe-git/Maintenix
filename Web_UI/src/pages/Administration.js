@@ -66,6 +66,34 @@ function sourceLabel(area) {
   return area?.source || "—";
 }
 
+function normalizeUserStatus(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function userStatusLabel(value) {
+  const status = normalizeUserStatus(value);
+  if (status === "APPROVED") return "Active";
+  if (status === "PENDING") return "Pending";
+  if (status === "DENIED") return "Denied";
+  return status || "Unknown";
+}
+
+function userStatusVariant(value) {
+  const status = normalizeUserStatus(value);
+  if (status === "APPROVED") return "success";
+  if (status === "PENDING") return "warning";
+  if (status === "DENIED") return "danger";
+  return "secondary";
+}
+
+function formatAdminDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "—";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleString();
+}
+
 export default function Administration() {
   const history = useHistory();
   const location = useLocation();
@@ -75,6 +103,16 @@ export default function Administration() {
   const initial = queryState(location.search);
   const [activeTab, setActiveTab] = useState(initial.tab);
   const [pendingOnly, setPendingOnly] = useState(initial.pendingOnly);
+
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userError, setUserError] = useState("");
+  const [userMessage, setUserMessage] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [userFilter, setUserFilter] = useState("ALL");
+  const [userActionId, setUserActionId] = useState("");
+  const [userToDelete, setUserToDelete] = useState(null);
+
   const [areas, setAreas] = useState([]);
   const [sections, setSections] = useState([]);
   const [summary, setSummary] = useState({ total: 0, configured: 0, pending: 0, runtimeConfigured: 0 });
@@ -101,6 +139,79 @@ export default function Administration() {
     history.replace(`${Routes.Administration.path}?${params.toString()}`);
   }, [history]);
 
+  const loadUsers = useCallback(async () => {
+    if (!isAdmin) return;
+    setLoadingUsers(true);
+    setUserError("");
+
+    try {
+      const data = await apiRequest("/api/admin/users");
+      setUsers(Array.isArray(data?.users) ? data.users : []);
+    } catch (error) {
+      setUserError(String(error?.message || "Unable to load users."));
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [isAdmin]);
+
+  async function runUserAction(userId, action, successMessage) {
+    const id = String(userId || "");
+    if (!id || userActionId) return;
+
+    setUserActionId(id);
+    setUserError("");
+    setUserMessage("");
+
+    try {
+      await action();
+      setUserMessage(successMessage);
+      await loadUsers();
+    } catch (error) {
+      setUserError(String(error?.message || "Unable to update user."));
+    } finally {
+      setUserActionId("");
+    }
+  }
+
+  function approveUser(user) {
+    return runUserAction(
+      user?.id,
+      () => apiRequest(`/api/admin/users/${encodeURIComponent(user.id)}/approve`, { method: "POST" }),
+      `${user?.name || user?.email || "User"} approved.`
+    );
+  }
+
+  function denyUser(user) {
+    return runUserAction(
+      user?.id,
+      () => apiRequest(`/api/admin/users/${encodeURIComponent(user.id)}/deny`, { method: "POST" }),
+      `${user?.name || user?.email || "User"} denied.`
+    );
+  }
+
+  function changeUserRole(user, nextRole) {
+    return runUserAction(
+      user?.id,
+      () => apiRequest(`/api/admin/users/${encodeURIComponent(user.id)}/role`, {
+        method: "PATCH",
+        body: JSON.stringify({ role: nextRole })
+      }),
+      `${user?.name || user?.email || "User"} role updated to ${nextRole}.`
+    );
+  }
+
+  async function confirmDeleteUser() {
+    const user = userToDelete;
+    if (!user) return;
+
+    await runUserAction(
+      user.id,
+      () => apiRequest(`/api/admin/users/${encodeURIComponent(user.id)}`, { method: "DELETE" }),
+      `${user?.name || user?.email || "User"} removed.`
+    );
+    setUserToDelete(null);
+  }
+
   const loadAreas = useCallback(async () => {
     if (!isAdmin) return;
     setLoadingAreas(true);
@@ -124,8 +235,43 @@ export default function Administration() {
   }, [isAdmin]);
 
   useEffect(() => {
+    if (activeTab === "users") loadUsers();
+  }, [activeTab, loadUsers]);
+
+  useEffect(() => {
     if (activeTab === "areas") loadAreas();
   }, [activeTab, loadAreas]);
+
+  const userSummary = useMemo(() => ({
+    total: users.length,
+    pending: users.filter((user) => normalizeUserStatus(user.status) === "PENDING").length,
+    active: users.filter((user) => normalizeUserStatus(user.status) === "APPROVED").length,
+    denied: users.filter((user) => normalizeUserStatus(user.status) === "DENIED").length
+  }), [users]);
+
+  const visibleUsers = useMemo(() => {
+    const needle = String(userSearch || "").trim().toLowerCase();
+
+    return users
+      .filter((user) => {
+        const status = normalizeUserStatus(user.status);
+        if (userFilter === "PENDING" && status !== "PENDING") return false;
+        if (userFilter === "APPROVED" && status !== "APPROVED") return false;
+        if (userFilter === "DENIED" && status !== "DENIED") return false;
+
+        if (!needle) return true;
+        return [user.name, user.email, user.role, userStatusLabel(user.status)]
+          .some((value) => String(value || "").toLowerCase().includes(needle));
+      })
+      .sort((a, b) => {
+        const statusOrder = { PENDING: 0, APPROVED: 1, DENIED: 2 };
+        const aStatus = normalizeUserStatus(a.status);
+        const bStatus = normalizeUserStatus(b.status);
+        const statusDiff = (statusOrder[aStatus] ?? 9) - (statusOrder[bStatus] ?? 9);
+        if (statusDiff !== 0) return statusDiff;
+        return String(a.name || a.email || "").localeCompare(String(b.name || b.email || ""));
+      });
+  }, [users, userFilter, userSearch]);
 
   const visibleAreas = useMemo(() => {
     const needle = String(search || "").trim().toLowerCase();
@@ -256,14 +402,233 @@ export default function Administration() {
       </Card>
 
       {activeTab === "users" ? (
-        <Card border="light" className="shadow-sm">
-          <Card.Body>
-            <h5>Users</h5>
-            <p className="text-muted mb-0">
-              Existing Admin user-management APIs remain unchanged. Their permanent Administration UI will be migrated into this tab next.
-            </p>
-          </Card.Body>
-        </Card>
+        <>
+          {userError ? <Alert variant="danger">{userError}</Alert> : null}
+          {userMessage ? <Alert variant="success">{userMessage}</Alert> : null}
+
+          <Row className="g-3 mb-4">
+            <Col xs={6} md={3}>
+              <Card border="light" className="shadow-sm h-100">
+                <Card.Body>
+                  <div className="text-muted small">All users</div>
+                  <div className="h4 mb-0">{userSummary.total}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6} md={3}>
+              <Card border="light" className="shadow-sm h-100">
+                <Card.Body>
+                  <div className="text-muted small">Pending</div>
+                  <div className="h4 mb-0">{userSummary.pending}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6} md={3}>
+              <Card border="light" className="shadow-sm h-100">
+                <Card.Body>
+                  <div className="text-muted small">Active</div>
+                  <div className="h4 mb-0">{userSummary.active}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6} md={3}>
+              <Card border="light" className="shadow-sm h-100">
+                <Card.Body>
+                  <div className="text-muted small">Denied</div>
+                  <div className="h4 mb-0">{userSummary.denied}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+
+          <Card border="light" className="shadow-sm">
+            <Card.Header>
+              <div className="d-flex flex-wrap justify-content-between align-items-center" style={{ gap: 12 }}>
+                <div>
+                  <h5 className="mb-1">User management</h5>
+                  <div className="text-muted small">
+                    Approve registrations, assign access roles and remove user accounts.
+                  </div>
+                </div>
+                <Button type="button" variant="outline-primary" size="sm" onClick={loadUsers} disabled={loadingUsers}>
+                  {loadingUsers ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Refresh"}
+                </Button>
+              </div>
+            </Card.Header>
+
+            <Card.Body>
+              <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
+                <Form.Group style={{ minWidth: 240, flex: "1 1 320px" }}>
+                  <Form.Label>Search users</Form.Label>
+                  <Form.Control
+                    type="search"
+                    value={userSearch}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value;
+                      setUserSearch(value);
+                    }}
+                    placeholder="Name, email, role or status"
+                  />
+                </Form.Group>
+
+                <div className="d-flex flex-wrap" style={{ gap: 8 }}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={userFilter === "ALL" ? "primary" : "outline-primary"}
+                    onClick={() => setUserFilter("ALL")}
+                  >
+                    All ({userSummary.total})
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={userFilter === "PENDING" ? "warning" : "outline-warning"}
+                    onClick={() => setUserFilter("PENDING")}
+                  >
+                    Pending ({userSummary.pending})
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={userFilter === "APPROVED" ? "success" : "outline-success"}
+                    onClick={() => setUserFilter("APPROVED")}
+                  >
+                    Active ({userSummary.active})
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={userFilter === "DENIED" ? "danger" : "outline-danger"}
+                    onClick={() => setUserFilter("DENIED")}
+                  >
+                    Denied ({userSummary.denied})
+                  </Button>
+                </div>
+              </div>
+
+              {loadingUsers && users.length === 0 ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" role="status" />
+                  <div className="text-muted mt-2">Loading users…</div>
+                </div>
+              ) : visibleUsers.length === 0 ? (
+                <Alert variant="info" className="mb-0">
+                  No users match the current filter.
+                </Alert>
+              ) : (
+                <Table
+                  hover
+                  size="sm"
+                  className="align-middle mb-0"
+                  style={{ fontSize: "0.875rem", width: "100%" }}
+                >
+                  <thead>
+                    <tr>
+                      <th className="px-2 py-2" style={{ width: "22%" }}>User</th>
+                      <th className="px-2 py-2" style={{ width: "23%" }}>Email</th>
+                      <th className="px-2 py-2" style={{ width: "13%" }}>Role</th>
+                      <th className="px-2 py-2" style={{ width: "12%" }}>Status</th>
+                      <th className="px-2 py-2" style={{ width: "15%" }}>Created</th>
+                      <th className="px-2 py-2 text-end" style={{ width: "15%" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleUsers.map((user) => {
+                      const status = normalizeUserStatus(user.status);
+                      const isSelf = String(user.id || "") === String(authUser?.id || "");
+                      const busy = userActionId === String(user.id || "");
+
+                      return (
+                        <tr key={user.id}>
+                          <td className="px-2 py-2" style={{ overflowWrap: "anywhere" }}>
+                            <div className="fw-bold">{user.name || "Unnamed user"}</div>
+                            {isSelf ? <div className="text-muted small">Current account</div> : null}
+                          </td>
+                          <td className="px-2 py-2" style={{ overflowWrap: "anywhere" }}>{user.email || "—"}</td>
+                          <td className="px-2 py-2">
+                            <Form.Select
+                              size="sm"
+                              value={String(user.role || "L1").toUpperCase()}
+                              disabled={busy || isSelf}
+                              onChange={(event) => {
+                                const value = event.currentTarget.value;
+                                changeUserRole(user, value);
+                              }}
+                              aria-label={`Role for ${user.name || user.email || "user"}`}
+                            >
+                              <option value="L1">L1</option>
+                              <option value="L2">L2</option>
+                              <option value="L3">L3</option>
+                              <option value="ADMIN">ADMIN</option>
+                            </Form.Select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <Badge
+                              bg={userStatusVariant(user.status)}
+                              text={status === "PENDING" ? "dark" : undefined}
+                            >
+                              {userStatusLabel(user.status)}
+                            </Badge>
+                          </td>
+                          <td className="px-2 py-2">
+                            <div>{formatAdminDate(user.createdAt)}</div>
+                            {user.approvedBy ? (
+                              <div className="text-muted small">By {user.approvedBy}</div>
+                            ) : null}
+                          </td>
+                          <td className="px-2 py-2 text-end">
+                            <div className="d-flex flex-wrap justify-content-end" style={{ gap: 6 }}>
+                              {status !== "APPROVED" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="success"
+                                  disabled={busy}
+                                  onClick={() => approveUser(user)}
+                                >
+                                  {busy ? <Spinner size="sm" /> : "Approve"}
+                                </Button>
+                              ) : null}
+
+                              {status === "PENDING" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline-danger"
+                                  disabled={busy}
+                                  onClick={() => denyUser(user)}
+                                >
+                                  Deny
+                                </Button>
+                              ) : null}
+
+                              {!isSelf ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline-danger"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setUserError("");
+                                    setUserMessage("");
+                                    setUserToDelete(user);
+                                  }}
+                                >
+                                  Remove
+                                </Button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              )}
+            </Card.Body>
+          </Card>
+        </>
       ) : null}
 
       {activeTab === "notifications" ? (
@@ -426,6 +791,44 @@ export default function Administration() {
           </Card>
         </>
       ) : null}
+
+      <Modal
+        show={Boolean(userToDelete)}
+        onHide={() => {
+          if (!userActionId) setUserToDelete(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton={!userActionId}>
+          <Modal.Title>Remove user</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-2">
+            Remove <strong>{userToDelete?.name || userToDelete?.email || "this user"}</strong> from CRA?
+          </p>
+          <div className="text-muted small">
+            This deletes the user account record. It does not remove historical reports or other records that may reference the user.
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            type="button"
+            variant="outline-secondary"
+            disabled={Boolean(userActionId)}
+            onClick={() => setUserToDelete(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            disabled={Boolean(userActionId)}
+            onClick={confirmDeleteUser}
+          >
+            {userActionId ? <><Spinner size="sm" className="me-2" /> Removing…</> : "Remove user"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal show={Boolean(editingArea)} onHide={closeEditor} centered>
         <Form onSubmit={saveMetadata}>

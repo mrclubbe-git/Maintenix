@@ -45,11 +45,16 @@ jobs:
           node --check lib/notificationService.js
           node --check lib/notifications.js
           node --check lib/pushNotifications.js
+          node --check lib/areaMetadata.js
+          node --check lib/reportStorage.js
           node --check routes/notifications.js
           node --check routes/dailyPlanner.js
           node --check routes/reports.js
           node --check routes/standby.js
           node --check routes/formalReports.js
+          node --check routes/areas.js
+          node --check routes/admin.js
+          node --check routes/servicing.js
 
-      - name: Notification regression tests
-        run: npm run test:notifications
+      - name: Backend regression tests
+        run: npm run test:backend

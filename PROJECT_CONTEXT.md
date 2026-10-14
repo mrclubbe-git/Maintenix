@@ -1349,3 +1349,22 @@ VAPID/runtime behavior:
 - Public CRA DEV health check `https://dev-api.main-tenix.com/CRA/api/health` returned HTTP 200 with `{"ok":true}`.
 - The process listing also showed the separate production processes under `/opt/apps/maintenix/api`; they were only observed and were not modified.
 - CRA DEV notification worker infrastructure is therefore installed and operational. Next validation is functional delivery/outbox processing with a real notification event.
+
+## Report moderation notification fix — 2026-10-14
+
+- User testing found that approving/rejecting a report did not produce a notification.
+- Inspection identified two weaknesses in `Server_API/CRA/routes/reports.js`:
+  1. report moderation notifications were explicitly skipped when the reviewer email matched the report owner email, so self-approval/self-rejection testing produced no notification;
+  2. fallback owner resolution looked for servicing/callout runtime status and payload JSON directly under their root directories, while the current queue/status layout stores them under per-user subdirectories.
+- Fixed in main commit `366d46b6fc84baef1e8966d05541e83a4bb88cc6`:
+  - report moderation now notifies the resolved report owner even when the moderator is the same user;
+  - owner resolution canonicalizes against `users.json` by ID/email and uniquely matching name;
+  - legacy/report metadata fallbacks now consider ownerUserId, ownerEmail, by, userEmail, createdByEmail, technicianEmail and technician;
+  - servicing/callout runtime owner lookup now searches the direct path plus one per-user directory level;
+  - approve/deny responses expose `notificationCreated` and `notificationId` for safe diagnostics;
+  - moderation remains successful even if notification creation fails, but the server now logs a safe warning instead of silently swallowing the condition.
+- Added regression coverage in commit `8c30be2b36f7267dd52c86049ce4b5374911e33a` for report-approved self-target delivery and report-rejected owner delivery, including outbox job creation.
+- CRA backend CI runs `38565502676` and `38565533650` both completed SUCCESS.
+- Updated notification backend packaging workflow in commit `1401b7d1405013e84f27423cb252b7e87094b2f4` so relevant notification backend changes automatically produce a handoff artifact.
+- Packaging run `38565571592` completed SUCCESS; artifact ID `11895335828`, SHA-256 `fbeeffb6fede38cda245810dc9e995dec80a8ba43fa7d34c19f674f43a19fc9a`.
+- Backend fix is committed and CI-validated but still requires manual replacement of `Server_API/CRA/routes/reports.js` on CRA DEV followed by restart/validation.

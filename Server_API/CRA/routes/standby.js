@@ -5,7 +5,7 @@ const path = require("path");
 
 const { getSession, extractBearer } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
-const { createNotification, userLabel } = require("../lib/notifications");
+const { notifySafe } = require("../lib/notificationService");
 
 const router = express.Router();
 
@@ -215,18 +215,12 @@ router.post("/schedule", requireAdminOrL3, (req, res) => {
     try {
       const first = out.schedule[0];
       const last = out.schedule[out.schedule.length - 1];
-      createNotification({
-        type: "STANDBY_CHANGE",
-        scope: "GLOBAL",
-        title: "Standby rotation updated",
-        message: `Standby rotation was updated by ${userLabel(req.user)} for ${config.startDate} to ${config.endDate}. Current first rotation: ${first?.userName || "—"}${first ? ` (${first.startDate} to ${first.endDate})` : ""}.`,
-        severity: "info",
-        createdByUserId: req.user?.id || "",
-        createdByEmail: req.user?.email || "",
-        createdByName: userLabel(req.user),
-        relatedEntityType: "standby",
-        relatedEntityId: `${config.startDate}:${config.endDate}`,
-        actionUrl: "#/standby"
+      notifySafe("STANDBY_UPDATED", {
+        actor: req.user,
+        startDate: config.startDate,
+        endDate: config.endDate,
+        first,
+        idempotencyKey: `STANDBY_UPDATED:${config.startDate}:${config.endDate}:${config.createdAt}`
       });
     } catch {}
 
@@ -242,18 +236,9 @@ router.delete("/schedule", requireAdminOrL3, (req, res) => {
   try {
     writeDb({ config: null, schedule: [] });
     try {
-      createNotification({
-        type: "STANDBY_CHANGE",
-        scope: "GLOBAL",
-        title: "Standby rotation cleared",
-        message: `Standby rotation was cleared by ${userLabel(req.user)}.`,
-        severity: "warning",
-        createdByUserId: req.user?.id || "",
-        createdByEmail: req.user?.email || "",
-        createdByName: userLabel(req.user),
-        relatedEntityType: "standby",
-        relatedEntityId: "cleared",
-        actionUrl: "#/standby"
+      notifySafe("STANDBY_CLEARED", {
+        actor: req.user,
+        idempotencyKey: `STANDBY_CLEARED:${new Date().toISOString()}`
       });
     } catch {}
     return res.json({ ok: true, message: "Standby schedule cleared." });

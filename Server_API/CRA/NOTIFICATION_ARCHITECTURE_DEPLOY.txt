@@ -1,0 +1,129 @@
+CRA NOTIFICATION ARCHITECTURE — DEV DEPLOYMENT
+================================================
+
+Target:
+  /home/charl/projects/maintenix-dev-api/Server_API/CRA/
+
+Scope:
+  DEV CRA only. Never alter production while validating this change.
+  Do not git clone, pull, push, or synchronize the DEV server with GitHub.
+  Do not run npm audit fix.
+
+WHAT CHANGED
+------------
+The notification system now uses:
+- a central event registry;
+- a central notification service;
+- locked/atomic notification persistence;
+- idempotency keys to suppress duplicate event notifications;
+- a persistent notification delivery outbox;
+- a dedicated notification delivery worker;
+- Web Push retries and delivery diagnostics;
+- consistent Planner acknowledgement behavior;
+- completion/failure notifications for Servicing, Call Out, and Formal Reporting.
+
+The long-running CRA stack is now:
+1. API server — index.js
+2. Servicing worker — servicingWorker.js
+3. Call Out worker — calloutWorker.js
+4. Notification delivery worker — notificationWorker.js
+
+All four are launched by:
+  npm run start:all
+
+RUNTIME FILE
+------------
+The notification delivery worker creates/uses:
+  data/notification-delivery.json
+
+This is runtime state and must not be committed to GitHub.
+
+COPY THESE FILES TO THE MATCHING DEV PATHS
+------------------------------------------
+  lib/notificationDelivery.js
+  lib/notificationRegistry.js
+  lib/notificationService.js
+  lib/notifications.js
+  lib/pushNotifications.js
+  lib/dailyPlanner.js
+
+  routes/dailyPlanner.js
+  routes/reports.js
+  routes/standby.js
+  routes/notifications.js
+  routes/formalReports.js
+
+  servicingWorker.js
+  calloutWorker.js
+  notificationWorker.js
+  startAll.js
+  package.json
+
+Optional regression test file:
+  test/notifications.test.js
+
+NO NEW NPM DEPENDENCY
+---------------------
+web-push@3.6.7 was already installed for the existing Web Push implementation.
+No additional npm install is required for this architecture change.
+
+PRE-RESTART VALIDATION
+----------------------
+Run from:
+  /home/charl/projects/maintenix-dev-api/Server_API/CRA/
+
+  node --check startAll.js
+  node --check notificationWorker.js
+  node --check servicingWorker.js
+  node --check calloutWorker.js
+  node --check lib/notificationDelivery.js
+  node --check lib/notificationRegistry.js
+  node --check lib/notificationService.js
+  node --check lib/notifications.js
+  node --check lib/pushNotifications.js
+  node --check routes/notifications.js
+  node --check routes/dailyPlanner.js
+  node --check routes/reports.js
+  node --check routes/standby.js
+  node --check routes/formalReports.js
+
+Run the regression test:
+  npm run test:notifications
+
+Confirm the service account can resolve the notification modules:
+  sudo -u maintenix-dev node -e "require('./lib/notificationService'); console.log('notificationService OK')"
+  sudo -u maintenix-dev node -e "require('./lib/notificationDelivery'); console.log('notificationDelivery OK')"
+  sudo -u maintenix-dev node -e "require('./lib/pushNotifications'); console.log('pushNotifications OK')"
+
+RESTART DEV ONLY
+----------------
+  sudo systemctl restart maintenix-dev-api.service
+  sleep 3
+  sudo systemctl status maintenix-dev-api.service --no-pager
+
+The status should show all four child processes, including:
+  notificationWorker.js
+
+Check:
+  ps -ef | grep -E 'index\.js|servicingWorker\.js|calloutWorker\.js|notificationWorker\.js' | grep -v grep
+
+HEALTH
+------
+  curl -i http://127.0.0.1:5056/api/health
+  curl -i https://dev-api.main-tenix.com/CRA/api/health
+
+Both should return HTTP 200 and:
+  {"ok":true}
+
+RUNTIME VALIDATION
+------------------
+After restart, send a normal Maintenix notification.
+
+Confirm:
+  ls -lh data/notification-delivery.json
+
+The delivery worker should process PUSH jobs from PENDING/RETRY to COMPLETED.
+The in-app notification is persisted before push delivery, so a push-provider
+failure must not prevent the business operation or the in-app notification.
+
+Do not copy DEV notification-delivery.json to LIVE during a future migration.

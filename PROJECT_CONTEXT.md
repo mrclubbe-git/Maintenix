@@ -1301,3 +1301,32 @@ VAPID/runtime behavior:
 - LIVE Web Push must preserve its production VAPID key after subscriptions exist; DEV push subscriptions must not be copied to LIVE.
 - Historical `LIVE_V1.2_MIGRATION_NOTES.txt` now points to `LIVE_MIGRATION_CHECKLIST.md` as the current operational reference.
 - Production remains untouched until an explicit LIVE migration is approved.
+
+## Central notification architecture + delivery worker — 2026-10-14
+
+- Implemented a centralized CRA notification architecture on GitHub `main`.
+- Added `lib/notificationRegistry.js` as the event contract/registry. Current registered event families include Admin broadcast, Daily Planner assignment, report approval/rejection, Standby update/clear, Servicing completion/failure, Call Out completion/failure, and Formal Reporting completion/failure.
+- Added `lib/notificationService.js` so application modules emit named events through `notify()` / `notifySafe()` rather than constructing delivery behavior independently.
+- Reworked `lib/notifications.js` to schema version 2 with locked/atomic persistence, event/category metadata, mandatory/channel metadata, source event IDs, and idempotency keys. Duplicate idempotency keys return the existing notification instead of creating another.
+- Added persistent delivery outbox `lib/notificationDelivery.js`, runtime file `data/notification-delivery.json`, stale-claim recovery, bounded delivery history, retry scheduling, and Admin/L3 delivery-diagnostic access.
+- Added long-running `notificationWorker.js`. CRA `startAll.js` now launches FOUR processes: API, Servicing worker, Call Out worker, and Notification delivery worker.
+- Web Push is now a secondary asynchronous delivery channel. Business actions first persist the in-app notification and enqueue delivery; the notification worker sends push and retries transient failures. Dead 404/410 subscriptions remain permanently removed.
+- `lib/pushNotifications.js` now exposes structured delivery outcomes including sent/failed/retryable/permanent counts while retaining existing test-push behavior.
+- Daily Planner assignment notifications now use the registry/service. Acknowledging from Daily Planner and from the bell now follows the same backend acknowledgement-notice behavior.
+- Report approval/rejection and Standby notifications were migrated to the central service.
+- Servicing and Call Out workers now generate owner-targeted success/failure notifications. Failure notifications require acknowledgement and are idempotent per report ID.
+- Formal Reporting now creates success/failure notifications for the generating user, keyed to its generation ID.
+- Added Admin/L3 notification metadata endpoints: `GET /api/notifications/events` and `GET /api/notifications/:id/delivery`.
+- Added backend regression test `test/notifications.test.js` plus `npm run test:notifications`.
+- Added GitHub Actions workflow `.github/workflows/test-cra-server-api.yml` with Node 22, `npm ci`, syntax validation, and notification regression tests.
+- Backend CI run `38552304037` succeeded. Latest backend CI run `38552619984` also succeeded after the deployment-instruction file was added.
+- Added `Server_API/CRA/NOTIFICATION_ARCHITECTURE_DEPLOY.txt` with the exact DEV manual deployment/restart/validation procedure.
+- Updated `LIVE_MIGRATION_CHECKLIST.md` to include the notification worker as the fourth long-running Node process, the persistent delivery outbox, required source files, service-account checks, and LIVE acceptance checks. Migration checklist update commit: `0dbf5823ff364ada824f4f85ff7fff4776679d6e`.
+- Frontend notification hardening:
+  - Navbar badge now remains active for required acknowledgements even after the item is marked read.
+  - Removed obsolete browser-only Reports `appNotifications` rejection notifications so the server notification store is the single source of truth.
+- First selective frontend deploy commit `93133df96d0d4617dba95b270e3867b4e91d09d2` failed build because the Reports cleanup accidentally removed `getReportTypeForRow`; deploy was skipped. The helper was restored on main in commit `74677a9cb92412bfc715c91ee6e07c30f0637cb2`.
+- Final selective frontend deploy commit `5677077ef169101aad72bf78721144e017cb3a53`, Actions run `38552466948`: build SUCCESS and deploy SUCCESS.
+- Added packaging workflow `.github/workflows/package-cra-notification-backend.yml`; run `38553004271` succeeded and produced artifact `cra-notification-architecture-backend` (artifact ID `11886799140`, SHA-256 `b10e272e90ec25cf3a9d37b2a26f43b4f8e2d34d8d8e9df561ece8168cbd2d62`).
+- Backend source is committed and CI-validated but the central architecture is NOT yet installed on the CRA DEV server. The next operational step is manual copy of the packaged backend files to `/home/charl/projects/maintenix-dev-api/Server_API/CRA/`, run the supplied checks, restart only `maintenix-dev-api.service`, verify all four processes and both health endpoints, then validate notification delivery.
+- Production remains untouched.

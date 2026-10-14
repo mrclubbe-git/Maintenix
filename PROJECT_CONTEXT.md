@@ -1599,3 +1599,12 @@ Validation/deployment support:
 - Backend DEV installation is still manual. Until the user confirms copying the backend handoff and restarting `maintenix-dev-api.service`, do not claim the generator-side filter is deployed/validated on CRA DEV.
 - LIVE remains untouched. `LIVE_MIGRATION_CHECKLIST.md` now includes ASD = No exclusion as a future Servicing acceptance check.
 
+## Servicing ASD selector visual refinement — 2026-10-14
+
+- Changed the Pre-Start "ASD installed?" Yes/No controls from round radio selectors to the same square tick-box style used by the NFPA standard selectors.
+- Yes/No remain mutually exclusive through the single `asdInstalled` state.
+- Removed the explanatory text under the ASD selectors at the user's request.
+- No ASD filtering, draft, validation, generation, or backend behaviour changed.
+- Main commit: `2f8a462c1ad418aaadbfbc1efd1499205776322b`.
+- Deploy commit: `ee78574ca3952cb5cf85b34144f24dae361669af`.
+

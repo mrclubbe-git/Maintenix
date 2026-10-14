@@ -1,0 +1,41 @@
+name: Package CRA Servicing ASD Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Server_API/CRA/lib/servicingFeatures.js"
+      - "Server_API/CRA/lib/servicingGenerator.js"
+      - "Server_API/CRA/data/templates/full_manual_checklist_questions.json"
+      - "Server_API/CRA/SERVICING_ASD_OPTION_DEPLOY.txt"
+      - ".github/workflows/package-cra-servicing-asd-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build handoff directory
+        run: |
+          set -euo pipefail
+          ROOT="handoff/Server_API/CRA"
+          mkdir -p "$ROOT/lib" "$ROOT/data/templates"
+          cp Server_API/CRA/lib/servicingFeatures.js "$ROOT/lib/"
+          cp Server_API/CRA/lib/servicingGenerator.js "$ROOT/lib/"
+          cp Server_API/CRA/data/templates/full_manual_checklist_questions.json "$ROOT/data/templates/"
+          cp Server_API/CRA/SERVICING_ASD_OPTION_DEPLOY.txt "$ROOT/"
+
+      - name: Upload backend handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: cra-servicing-asd-backend
+          path: handoff/
+          retention-days: 30

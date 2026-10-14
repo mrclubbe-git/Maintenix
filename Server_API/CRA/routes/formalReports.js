@@ -8,6 +8,7 @@ const { spawn } = require("child_process");
 const { extractBearer, getSession } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
 const { updateJsonWithLockSync } = require("../lib/lockedJson");
+const { notifySafe } = require("../lib/notificationService");
 
 const router = express.Router();
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -356,8 +357,9 @@ router.post("/generate", async (req, res) => {
   if (payload.responses.length !== section.systems.length || payload.responses.some((item) => !["yes", "no"].includes(item.defectsFound))) {
     return res.status(400).json({ ok: false, error: "Every system must be answered before report generation" });
   }
+  let currentGenerationId = "";
   try {
-    const currentGenerationId = generationId();
+    currentGenerationId = generationId();
     const generatedAt = new Date().toISOString();
     const result = await runWorker("generate", { ...payload, systems: section.systems, generationId: currentGenerationId });
     updateJsonWithLockSync(REPORTS_META, { reports: {} }, (meta) => {
@@ -390,9 +392,21 @@ router.post("/generate", async (req, res) => {
       return meta;
     });
     result.outputs = result.outputs.map(outputUrls);
+    notifySafe("FORMAL_REPORT_COMPLETE", {
+      owner: req.user,
+      reportId: baseId,
+      outputCount: result.outputs.length,
+      idempotencyKey: `FORMAL_REPORT_COMPLETE:${baseId}:${currentGenerationId}`
+    });
     res.json(result);
   } catch (workerError) {
     console.error("Formal report generation failed:", workerError.message);
+    notifySafe("FORMAL_REPORT_FAILED", {
+      owner: req.user,
+      reportId: baseId,
+      error: workerError,
+      idempotencyKey: `FORMAL_REPORT_FAILED:${baseId}:${currentGenerationId || "unknown"}`
+    });
     res.status(500).json({ ok: false, error: workerError.message });
   }
 });

@@ -274,8 +274,14 @@ export default function NavbarTop() {
     return visibleNotifications.filter((n) => n.requiresAck && !n.acknowledged).length;
   }, [visibleNotifications]);
 
+  const attentionCount = useMemo(() => {
+    return visibleNotifications.filter(
+      (n) => !n.read || (n.requiresAck && !n.acknowledged)
+    ).length;
+  }, [visibleNotifications]);
+
   const notificationBadgeCount = notificationPreferences.enabled
-    ? unreadCount
+    ? attentionCount
     : requiredAcknowledgementCount;
 
   const hasClearableNotifications = useMemo(() => {

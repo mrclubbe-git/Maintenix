@@ -1552,3 +1552,17 @@ Validation/deployment support:
 - Deploy commit: `3a7eadce07c6b810bdc3218631edf910f4313d82`.
 - GitHub Pages run `38610299642` completed successfully; build and deploy both passed.
 
+## Administration route hardened to Admin-only access — 2026-10-14
+
+- Administration is now protected at the routing layer, not only hidden in the sidebar or checked inside the page.
+- `RouteWithSidebar` in `Web_UI/src/pages/HomePage.js` now accepts an `adminOnly` flag.
+- The Administration route is declared with `adminOnly`.
+- Route authorization uses the backend-verified `GET /api/profile/me` response as the authoritative user/role source.
+- A logged-in non-Admin who manually types `#/administration` is redirected to `#/dashboard/overview` before the Administration component is rendered.
+- The backend-verified public user is also synchronized into organisation-scoped `authUser` browser storage so stale local role data cannot leave Administration visible in role-gated navigation.
+- Existing Admin API routes remain independently protected by backend `requireAdmin` checks, so this frontend route guard is defense-in-depth rather than the sole security boundary.
+- Main commits: `acbca77b2db7df4f4d9ec9ca8dd113252cce6847`, `ee4673b7957d8f7b68c8af9dbebfb066e435ea48`.
+- Deploy commit: `a64839a2c604c14894ae20087b77157d20b75072`.
+- GitHub Pages run `38611270089` completed successfully; both build and deploy passed.
+- No backend source, runtime data, CRA DEV service, or LIVE service was changed for this hardening.
+

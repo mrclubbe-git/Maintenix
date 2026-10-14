@@ -2,7 +2,7 @@
 
 > **Purpose:** This file is the persistent source of truth for critical Maintenix development context across ChatGPT project sessions.
 >
-> **Last updated:** 2026-10-07
+> **Last updated:** 2026-10-14
 >
 > Future work should read this file before making architecture, workflow, report-template, or servicing changes.
 
@@ -1373,3 +1373,64 @@ VAPID/runtime behavior:
 
 - User confirmed the corrected report approval/rejection notification flow works on CRA DEV after replacing `Server_API/CRA/routes/reports.js` and restarting the DEV service.
 - Report moderation notifications are therefore validated end-to-end on DEV, including the corrected owner resolution/self-review behavior.
+
+## Administration foundation + Area metadata management — 2026-10-14
+
+- Implemented the permanent CRA Administration foundation with tabs for Users, Areas, and Notifications. The Areas tab is functional in this phase; Users and Notifications remain placeholders for their later migration/configuration phases.
+- Frontend route: `#/administration`. Admin area-notification deep link: `#/administration?tab=areas&status=pending`.
+- The Administration navigation item is only shown to users whose role is `ADMIN`; backend Admin endpoints remain authoritative for access control.
+- Added `Web_UI/src/pages/Administration.js` with:
+  - merged Area estate listing;
+  - All Areas / Metadata Required filters;
+  - search;
+  - status, source and mapping diagnostics;
+  - Section dropdown sourced from existing baseline metadata;
+  - read-only Area name;
+  - editable Section, Base area, F/First and G/Second values;
+  - optional F/G values for legitimate no-code areas.
+- Frontend source changes were committed to `main` and selectively synchronized to `deploy`; final deploy-branch source commit for the route wiring is `bd3ad46a567de1ddb8ed19e56248cf599126ebec`. The GitHub Pages workflow is expected to run from that deploy change; do not describe the new page as validated live until the Pages run is confirmed successful.
+
+Backend Area metadata architecture:
+- Added `Server_API/CRA/lib/areaMetadata.js`.
+- Runtime organisation metadata file: `Server_API/CRA/data/area-metadata.json`.
+- `area-metadata.json` is runtime data, is ignored by Git, must be preserved across deployments, and must not be replaced with DEV data during a LIVE migration.
+- Pending records contain Area identity and creator audit data. Admin configuration sets status `CONFIGURED`, Section, Base area, optional First/F code and optional Second/G code, plus update audit fields.
+- `area-sections.json` remains untouched baseline/reference data originating from the service-list workbook.
+- `reportStorage.resolveSectionForArea()` now resolves in this order:
+  1. configured runtime Admin metadata;
+  2. existing baseline `area-sections.json` exact/normalized matching;
+  3. existing fuzzy/code matching;
+  4. `Unmapped`.
+- Pending runtime metadata does not override the existing resolver; servicing remains available while metadata is incomplete.
+- Historical reports are not moved automatically when metadata is configured. Runtime metadata changes affect future report placement only.
+
+Area creation:
+- Existing case/whitespace-normalized Area duplicate handling remains authoritative.
+- When a genuinely new Area is appended through either `POST /api/areas` or the Servicing compatibility `POST /api/servicing/areas`, CRA creates a PENDING runtime metadata record unless that Area already has an exact baseline mapping.
+- Area creation is deliberately not blocked if metadata/notification follow-up fails; the Area remains immediately usable.
+- Added centralized notification event `AREA_METADATA_REQUIRED`:
+  - category ADMIN;
+  - warning severity;
+  - targets ADMIN role only;
+  - no acknowledgement required;
+  - Open action routes to Administration -> Areas pending filter;
+  - idempotent per normalized Area.
+- Existing operational Areas that predate this feature and have no exact baseline/runtime metadata are backfilled as PENDING when Admin loads the Area estate, without generating retroactive notification spam.
+
+Admin Area API:
+- `GET /api/admin/areas`
+- `GET /api/admin/areas/pending`
+- `PATCH /api/admin/areas/:area/metadata`
+- The Admin listing merges `data/templates/areas.txt`, baseline `data/templates/area-sections.json`, and runtime `data/area-metadata.json`.
+- Rename and delete are intentionally not implemented in this first pass because existing drafts/reports may already reference Area names.
+
+Validation/deployment support:
+- Added `test/area-metadata.test.js` and extended notification regression coverage for Admin-only Area metadata notifications.
+- `npm run test:areas` and `npm run test:backend` are available.
+- CRA backend CI now syntax-checks Area/Admin files and runs both notification and Area regression suites.
+- Added `Server_API/CRA/ADMIN_AREAS_DEPLOY.txt`.
+- Added packaging workflow `.github/workflows/package-cra-admin-areas-backend.yml` producing the `cra-admin-areas-backend` handoff artifact.
+- `LIVE_MIGRATION_CHECKLIST.md` now records `area-metadata.json` as preserved runtime organisation data and includes Area Administration acceptance checks.
+- Backend source is committed on GitHub `main` but still requires manual placement on CRA DEV followed by restart/validation under the established repo-first/server-manual workflow.
+- Production remains untouched.
+

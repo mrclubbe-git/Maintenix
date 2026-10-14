@@ -1330,3 +1330,22 @@ VAPID/runtime behavior:
 - Added packaging workflow `.github/workflows/package-cra-notification-backend.yml`; run `38553004271` succeeded and produced artifact `cra-notification-architecture-backend` (artifact ID `11886799140`, SHA-256 `b10e272e90ec25cf3a9d37b2a26f43b4f8e2d34d8d8e9df561ece8168cbd2d62`).
 - Backend source is committed and CI-validated but the central architecture is NOT yet installed on the CRA DEV server. The next operational step is manual copy of the packaged backend files to `/home/charl/projects/maintenix-dev-api/Server_API/CRA/`, run the supplied checks, restart only `maintenix-dev-api.service`, verify all four processes and both health endpoints, then validate notification delivery.
 - Production remains untouched.
+
+## Central notification architecture validated on CRA DEV — 2026-10-14
+
+- User manually deployed the GitHub-main notification architecture files to `/home/charl/projects/maintenix-dev-api/Server_API/CRA/` and restarted only `maintenix-dev-api.service`.
+- CRA DEV systemd service started successfully at 2026-10-14 13:09:28 SAST.
+- Verified all four expected DEV long-running Node processes are running under the CRA DEV stack:
+  - `index.js`
+  - `servicingWorker.js`
+  - `calloutWorker.js`
+  - `notificationWorker.js`
+- Service log explicitly reported:
+  - `Notification delivery worker started.`
+  - `Servicing worker started.`
+  - `CallOut worker running...`
+  - `Maintenix server API listening on 127.0.0.1:5056`
+- Local CRA DEV health check `http://127.0.0.1:5056/api/health` returned HTTP 200 with `{"ok":true}`.
+- Public CRA DEV health check `https://dev-api.main-tenix.com/CRA/api/health` returned HTTP 200 with `{"ok":true}`.
+- The process listing also showed the separate production processes under `/opt/apps/maintenix/api`; they were only observed and were not modified.
+- CRA DEV notification worker infrastructure is therefore installed and operational. Next validation is functional delivery/outbox processing with a real notification event.

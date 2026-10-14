@@ -321,6 +321,7 @@ async function sendToRecord(record, payload, options = {}) {
     return {
       ok: false,
       statusCode,
+      retryable: statusCode !== 404 && statusCode !== 410,
       message: String(error?.message || "Push delivery failed.")
     };
   }
@@ -343,11 +344,18 @@ async function sendNotificationPush(notification) {
     sendToRecord(record, payload, { TTL: 300, urgency })
   ));
 
+  const failures = results.filter((result) => !result.ok);
   return {
-    ok: true,
+    ok: failures.length === 0,
     configured: true,
     sent: results.filter((result) => result.ok).length,
-    failed: results.filter((result) => !result.ok).length
+    failed: failures.length,
+    retryableFailed: failures.filter((result) => result.retryable).length,
+    permanentFailed: failures.filter((result) => !result.retryable).length,
+    errors: failures.slice(0, 5).map((result) => ({
+      statusCode: result.statusCode || 0,
+      message: result.message || "Push delivery failed."
+    }))
   };
 }
 
@@ -393,6 +401,7 @@ module.exports = {
   getPublicKey,
   upsertSubscription,
   removeSubscription,
+  sendNotificationPush,
   queueNotificationPush,
   sendTestPush
 };

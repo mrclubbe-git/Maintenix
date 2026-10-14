@@ -1566,3 +1566,36 @@ Validation/deployment support:
 - GitHub Pages run `38611270089` completed successfully; both build and deploy passed.
 - No backend source, runtime data, CRA DEV service, or LIVE service was changed for this hardening.
 
+## Servicing NFPA 72 ASD session option — 2026-10-14
+
+- Added an explicit ASD-installed choice to the Substation Servicing Pre-Start workflow when NFPA 72 is selected and the checklist contains ASD-specific items.
+- Technician must choose Yes or No before entering the checklist.
+- Current Substation NFPA 72 source contains six ASD-specific questions across Weekly/Monthly/Quarterly/Annual. They are now tagged in `data/templates/full_manual_checklist_questions.json` with `"requiresFeature": "ASD"`.
+- Session behaviour:
+  - ASD = Yes: ASD questions remain in the servicing checklist.
+  - ASD = No: ASD questions are removed from the active checklist and do not count toward completion/validation.
+- The ASD selection is persisted into servicing drafts. New draft snapshots contain only the active question rows and preserve `requiresFeature` metadata.
+- Generation payloads include `asdInstalled` and per-response feature metadata.
+- Server-side report generation now applies a second defensive filter through new `lib/servicingFeatures.js`; when `asdInstalled` is explicitly false, ASD responses are removed before both legacy and Approved V1 report structures are built.
+- Backward compatibility:
+  - older drafts without `asdInstalled` keep their historical question set;
+  - older snapshots/checklists without feature metadata still recognize ASD-specific rows by the existing `ASD` wording.
+- Review shows the ASD-installed choice for applicable Substation NFPA 72 sessions.
+- Frontend main commit: `23374302c04ccb386ea3c149ed9db17504c66dbf`.
+- Frontend deploy commit: `5d6aed64ab6c5df801f9f4b04b3c5a0a1ed171c9`.
+- GitHub Pages run `38622782720` passed build and deploy.
+- Backend commits:
+  - checklist metadata `ff8e6a90dca5e2dfeae3dc7caa2632561870a9bb`;
+  - feature rules `449ca7ab808b19efa3f7a7df8be7cca0a8472ef9`;
+  - generator filtering `81d8906c61065b150b29f6764de2bca122993bc6`.
+- Backend regression test `test/servicing-features.test.js` verifies all six source questions are tagged and that ASD = No removes ASD responses while Yes/legacy drafts retain them.
+- Backend CI run `38622909447` completed successfully.
+- DEV backend handoff:
+  - deploy guide `Server_API/CRA/SERVICING_ASD_OPTION_DEPLOY.txt`;
+  - workflow `.github/workflows/package-cra-servicing-asd-backend.yml`;
+  - packaging run `38623086384` success;
+  - artifact `cra-servicing-asd-backend`, ID `11922612751`;
+  - SHA-256 `32a38f3568b0cc8469ee8851660b6a47e97d101ee480d721acc356d3ebcf2b78`.
+- Backend DEV installation is still manual. Until the user confirms copying the backend handoff and restarting `maintenix-dev-api.service`, do not claim the generator-side filter is deployed/validated on CRA DEV.
+- LIVE remains untouched. `LIVE_MIGRATION_CHECKLIST.md` now includes ASD = No exclusion as a future Servicing acceptance check.
+

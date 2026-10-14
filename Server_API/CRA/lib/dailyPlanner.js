@@ -2,7 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { getUsers } = require("./userStore");
-const { createNotification, userLabel, safeRole } = require("./notifications");
+const { userLabel, safeRole } = require("./notifications");
+const { notifySafe } = require("./notificationService");
 
 const DATA_FILE = path.join(__dirname, "..", "data", "daily-planner.json");
 
@@ -182,21 +183,11 @@ function listAssignableUsers() {
 function notifyAssignee(task, actor) {
   const assignee = assigneeForTask(task);
   if (!assignee) return null;
-  return createNotification({
-    type: "PLANNER_TASK_ASSIGNED",
-    scope: "USER",
-    title: "Daily planner task allocated",
-    message: `${userLabel(actor)} allocated you a planner task: ${task.title || "Untitled task"}${task.startDate ? ` starting ${task.startDate}` : ""}. Please open Daily Planner and acknowledge the allocation.`,
-    severity: "warning",
-    requiresAck: true,
-    createdByUserId: actor?.id || "",
-    createdByEmail: actor?.email || "",
-    createdByName: userLabel(actor),
-    targetUserId: assignee.id || "",
-    targetUserEmail: assignee.email || "",
-    relatedEntityType: "daily_planner_task",
-    relatedEntityId: task.id,
-    actionUrl: `#/daily-planner?date=${encodeURIComponent(task.date || todayKey())}`
+  return notifySafe("PLANNER_ASSIGNED", {
+    task,
+    actor,
+    assignee,
+    idempotencyKey: `PLANNER_ASSIGNED:${task.id}:${assignee.id || assignee.email || ""}:${task.updatedAt || task.createdAt || ""}`
   });
 }
 

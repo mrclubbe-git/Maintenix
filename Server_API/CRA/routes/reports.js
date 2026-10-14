@@ -6,7 +6,8 @@ const { execFile } = require("child_process");
 
 const { extractBearer, getSession } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
-const { createNotification, userLabel } = require("../lib/notifications");
+const { userLabel } = require("../lib/notifications");
+const { notifySafe } = require("../lib/notificationService");
 const { writeJsonAtomicSync, updateJsonWithLockSync } = require("../lib/lockedJson");
 const {
   listFilesRecursive,
@@ -320,20 +321,13 @@ function notifyReportOwner(fileName, status, entry, actor) {
     const approved = String(status || "").toUpperCase() === "APPROVED";
     const displayName = path.basename(String(fileName || ""));
     const reason = cleanDecisionReason(entry?.approvalDecision?.reason || entry?.rejectionReason);
-    createNotification({
-      type: "REPORT_STATUS",
-      scope: "USER",
-      title: approved ? "Report approved" : "Report rejected",
-      message: `Your report ${displayName} was ${approved ? "approved" : "rejected"} by ${userLabel(actor)}.${!approved && reason ? ` Reason: ${reason}` : ""}`,
-      severity: approved ? "success" : "danger",
-      createdByUserId: actor?.id || "",
-      createdByEmail: actor?.email || "",
-      createdByName: userLabel(actor),
+    notifySafe(approved ? "REPORT_APPROVED" : "REPORT_REJECTED", {
+      actor,
+      fileName: displayName,
       targetUserId,
       targetUserEmail,
-      relatedEntityType: "report",
-      relatedEntityId: fileName,
-      actionUrl: "#/reports"
+      reason,
+      idempotencyKey: `${approved ? "REPORT_APPROVED" : "REPORT_REJECTED"}:${fileName}:${entry?.updatedAt || entry?.approvalDecision?.decidedAt || ""}`
     });
   } catch {
     // Notifications must not block report moderation.

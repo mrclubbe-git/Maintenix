@@ -3,6 +3,7 @@ const fsp = fs.promises;
 const path = require("path");
 const { writeJsonAtomicSync: atomicWriteJsonSync, updateJsonWithLockSync } = require("./lib/lockedJson");
 const { findOldestQueuedJobSync, claimJobSync } = require("./lib/jobQueue");
+const { notifySafe } = require("./lib/notificationService");
 
 // DOCX generation dependencies shared with Servicing.
 let PizZip = null;
@@ -566,10 +567,13 @@ async function processOneJob(jobEntry) {
 
   await setStatus(userKey, reportId, { status: "running" });
 
+  let resolvedOwner = null;
+  let ownerEmail = "";
+
   try {
     const payload = await readJson(pPath);
 
-    const resolvedOwner =
+    resolvedOwner =
       normalizeOwner(payload?._server?.owner) ||
       normalizeOwner(payload?.owner) ||
       normalizeOwner({
@@ -578,7 +582,7 @@ async function processOneJob(jobEntry) {
         role: ""
       });
 
-    const ownerEmail =
+    ownerEmail =
       pickNonEmpty(
         resolvedOwner?.email,
         payload?._server?.owner?.email,
@@ -622,12 +626,28 @@ async function processOneJob(jobEntry) {
       }
     });
 
+    notifySafe("CALLOUT_COMPLETE", {
+      owner: resolvedOwner || { email: ownerEmail },
+      reportId,
+      fileName: filename,
+      idempotencyKey: `CALLOUT_COMPLETE:${reportId}`
+    });
+
     // Delete payload file on success (mirrors servicing)
     await fsp.unlink(pPath).catch(() => {});
   } catch (e) {
+    const message = String(e?.message || "Callout generation failed");
     await setStatus(userKey, reportId, {
       status: "error",
-      error: String(e?.message || "Callout generation failed")
+      error: message,
+      owner: resolvedOwner,
+      ownerEmail
+    });
+    notifySafe("CALLOUT_FAILED", {
+      owner: resolvedOwner || { email: ownerEmail },
+      reportId,
+      error: message,
+      idempotencyKey: `CALLOUT_FAILED:${reportId}`
     });
   } finally {
     // Always remove queue job (mirrors servicing behavior)

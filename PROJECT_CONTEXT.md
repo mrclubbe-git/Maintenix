@@ -1476,3 +1476,18 @@ Validation/deployment support:
 - GitHub Pages run `38604152119` completed successfully; both build and deploy jobs passed.
 - No backend or LIVE changes were involved.
 
+## Administration navigation fully reverted to original — 2026-10-14
+
+- User rejected both Navigation containment redesign attempts and requested a complete rollback of the Administration navigation to the exact original implementation from before the first navigation-change request.
+- Restored the original Administration navigation markup:
+  - `Nav variant="tabs"`;
+  - plain `Nav.Item` wrappers;
+  - original `Nav.Link` contents and badge placement;
+  - no equal-width/flex-fill tile sizing;
+  - no custom centering or clipping styles.
+- The approved compact Area metadata table and React 16 configuration-form crash fix remain unchanged.
+- Main rollback commit: `5b69e8d40c269dd097715f81f523e867019e66be`.
+- Deploy rollback commit: `e85ffa2a5b2753315ed65fd6ed66197262312451`.
+- GitHub Pages run: `38604770769`.
+- This entry supersedes the two earlier navigation-style refinement entries; do not reapply their navigation styling unless the user explicitly requests a new design.
+

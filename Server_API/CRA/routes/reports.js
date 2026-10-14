@@ -97,21 +97,72 @@ function normalizeOwner(ownerLike) {
   return { id, email, name };
 }
 
+function canonicalOwner(ownerLike) {
+  const normalized = normalizeOwner(ownerLike);
+  if (!normalized) return null;
+
+  const users = getUsers();
+  const id = String(normalized.id || "").trim().toLowerCase();
+  const email = String(normalized.email || "").trim().toLowerCase();
+  const name = String(normalized.name || "").trim().toLowerCase();
+
+  let user = null;
+  if (id) user = users.find((candidate) => String(candidate?.id || "").trim().toLowerCase() === id) || null;
+  if (!user && email) {
+    user = users.find((candidate) => String(candidate?.email || "").trim().toLowerCase() === email) || null;
+  }
+  if (!user && name) {
+    const matches = users.filter((candidate) => String(candidate?.name || "").trim().toLowerCase() === name);
+    if (matches.length === 1) user = matches[0];
+  }
+
+  return user
+    ? {
+        id: String(user.id || normalized.id || "").trim(),
+        email: String(user.email || normalized.email || "").trim(),
+        name: String(user.name || normalized.name || "").trim()
+      }
+    : normalized;
+}
+
 function ensureOwnerShape(metaEntry) {
   if (!metaEntry || typeof metaEntry !== "object") return;
 
-  const normalized = normalizeOwner(metaEntry.owner);
-  if (normalized) {
-    metaEntry.owner = normalized;
-    metaEntry.ownerEmail = normalized.email || "";
-    return;
-  }
+  const inferred = canonicalOwner(
+    normalizeOwner(metaEntry.owner) || {
+      id: pickNonEmpty(metaEntry.ownerUserId, metaEntry.userId, metaEntry.createdByUserId),
+      email: pickNonEmpty(
+        metaEntry.ownerEmail,
+        metaEntry.by,
+        metaEntry.userEmail,
+        metaEntry.createdByEmail,
+        metaEntry.technicianEmail
+      ),
+      name: pickNonEmpty(metaEntry.technician, metaEntry.createdByName)
+    }
+  );
 
-  const ownerEmail = pickNonEmpty(metaEntry.ownerEmail);
-  if (ownerEmail) {
-    metaEntry.owner = { id: "", email: ownerEmail, name: "" };
-    metaEntry.ownerEmail = ownerEmail;
-  }
+  if (!inferred) return;
+  metaEntry.owner = inferred;
+  metaEntry.ownerEmail = inferred.email || pickNonEmpty(metaEntry.ownerEmail);
+}
+
+function findRuntimeJson(rootDir, reportId) {
+  const rid = String(reportId || "").trim();
+  if (!rid) return null;
+
+  const direct = path.join(rootDir, `${rid}.json`);
+  if (fs.existsSync(direct)) return direct;
+
+  try {
+    for (const entry of fs.readdirSync(rootDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const candidate = path.join(rootDir, entry.name, `${rid}.json`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  } catch {}
+
+  return null;
 }
 
 function extractServicingReportId(fileName) {
@@ -130,11 +181,11 @@ function resolveServicingOwner(reportId) {
   const rid = String(reportId || "").trim();
   if (!rid) return null;
 
-  const statusPath = path.join(SERVICING_STATUS_DIR, `${rid}.json`);
-  const payloadPath = path.join(SERVICING_PAYLOADS_DIR, `${rid}.json`);
+  const statusPath = findRuntimeJson(SERVICING_STATUS_DIR, rid);
+  const payloadPath = findRuntimeJson(SERVICING_PAYLOADS_DIR, rid);
 
-  const statusData = readJsonFileSafe(statusPath, null);
-  const payloadData = readJsonFileSafe(payloadPath, null);
+  const statusData = statusPath ? readJsonFileSafe(statusPath, null) : null;
+  const payloadData = payloadPath ? readJsonFileSafe(payloadPath, null) : null;
 
   const owner =
     normalizeOwner(statusData?.owner) ||
@@ -162,11 +213,11 @@ function resolveCalloutOwner(reportId) {
   const rid = String(reportId || "").trim();
   if (!rid) return null;
 
-  const statusPath = path.join(CALLOUT_STATUS_DIR, `${rid}.json`);
-  const payloadPath = path.join(CALLOUT_PAYLOADS_DIR, `${rid}.json`);
+  const statusPath = findRuntimeJson(CALLOUT_STATUS_DIR, rid);
+  const payloadPath = findRuntimeJson(CALLOUT_PAYLOADS_DIR, rid);
 
-  const statusData = readJsonFileSafe(statusPath, null);
-  const payloadData = readJsonFileSafe(payloadPath, null);
+  const statusData = statusPath ? readJsonFileSafe(statusPath, null) : null;
+  const payloadData = payloadPath ? readJsonFileSafe(payloadPath, null) : null;
 
   const owner =
     normalizeOwner(statusData?.owner) ||
@@ -310,18 +361,24 @@ function setReportStatus(fileName, status, actor, opts = {}) {
 
 function notifyReportOwner(fileName, status, entry, actor) {
   try {
-    const owner = entry?.owner || {};
-    const targetUserEmail = pickNonEmpty(entry?.ownerEmail, owner?.email);
-    const targetUserId = pickNonEmpty(owner?.id, entry?.ownerUserId);
-    if (!targetUserEmail && !targetUserId) return;
+    const owner = canonicalOwner(entry?.owner || {
+      id: entry?.ownerUserId || "",
+      email: entry?.ownerEmail || entry?.by || "",
+      name: entry?.technician || ""
+    }) || {};
 
-    const actorEmail = String(actor?.email || "").trim().toLowerCase();
-    if (targetUserEmail && actorEmail && targetUserEmail.toLowerCase() === actorEmail) return;
+    const targetUserEmail = pickNonEmpty(owner?.email, entry?.ownerEmail, entry?.by);
+    const targetUserId = pickNonEmpty(owner?.id, entry?.ownerUserId);
+    if (!targetUserEmail && !targetUserId) {
+      console.warn(`Report moderation notification skipped: owner could not be resolved for ${fileName}`);
+      return null;
+    }
 
     const approved = String(status || "").toUpperCase() === "APPROVED";
     const displayName = path.basename(String(fileName || ""));
     const reason = cleanDecisionReason(entry?.approvalDecision?.reason || entry?.rejectionReason);
-    notifySafe(approved ? "REPORT_APPROVED" : "REPORT_REJECTED", {
+
+    return notifySafe(approved ? "REPORT_APPROVED" : "REPORT_REJECTED", {
       actor,
       fileName: displayName,
       targetUserId,
@@ -329,8 +386,9 @@ function notifyReportOwner(fileName, status, entry, actor) {
       reason,
       idempotencyKey: `${approved ? "REPORT_APPROVED" : "REPORT_REJECTED"}:${fileName}:${entry?.updatedAt || entry?.approvalDecision?.decidedAt || ""}`
     });
-  } catch {
-    // Notifications must not block report moderation.
+  } catch (error) {
+    console.warn("Report moderation notification failed:", error?.message || error);
+    return null;
   }
 }
 
@@ -736,8 +794,13 @@ router.post("/:name/approve", requireAuth, (req, res) => {
     reason: req.body?.reason || "Approved by reviewer.",
     source: "manual"
   });
-  notifyReportOwner(fileName, "APPROVED", entry, req.user);
-  return res.json({ ok: true, status: "APPROVED" });
+  const notification = notifyReportOwner(fileName, "APPROVED", entry, req.user);
+  return res.json({
+    ok: true,
+    status: "APPROVED",
+    notificationCreated: !!notification,
+    notificationId: notification?.id || null
+  });
 });
 
 /**
@@ -761,8 +824,13 @@ router.post("/:name/deny", requireAuth, (req, res) => {
     reason,
     source: "manual"
   });
-  notifyReportOwner(fileName, "DENIED", entry, req.user);
-  return res.json({ ok: true, status: "DENIED" });
+  const notification = notifyReportOwner(fileName, "DENIED", entry, req.user);
+  return res.json({
+    ok: true,
+    status: "DENIED",
+    notificationCreated: !!notification,
+    notificationId: notification?.id || null
+  });
 });
 
 /**

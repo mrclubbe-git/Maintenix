@@ -4,7 +4,8 @@ const path = require("path");
 const services = [
   ["api", "index.js"],
   ["servicing-worker", "servicingWorker.js"],
-  ["callout-worker", "calloutWorker.js"]
+  ["callout-worker", "calloutWorker.js"],
+  ["notification-worker", "notificationWorker.js"]
 ];
 
 let stopping = false;

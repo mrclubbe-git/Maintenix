@@ -1491,3 +1491,17 @@ Validation/deployment support:
 - GitHub Pages run: `38604770769`.
 - This entry supersedes the two earlier navigation-style refinement entries; do not reapply their navigation styling unless the user explicitly requests a new design.
 
+## Administration navigation containment final refinement — 2026-10-14
+
+- User confirmed the desired Administration navigation keeps the original tab sizing, positions, typography and active-tab styling.
+- Final containment requirement:
+  - the active highlight must remain fully inside the surrounding navigation card;
+  - the top of the active highlight aligns with the top edge of the card;
+  - bottom containment remains preserved;
+  - no tab resizing, equal-width conversion, centering redesign, pill styling or other navigation restyling.
+- Implementation keeps the original `Nav variant="tabs"` structure and changes only the surrounding `Card.Body` spacing to `className="pt-0"`.
+- Main commit: `cc297d7f8bbe3124249a47f7a4ffac83886c471c`.
+- Deploy commit: `b21f10707d7628ce1dc35f38e2a54f6f7f84371a`.
+- GitHub Pages run `38607644529` completed successfully; both build and deploy jobs passed.
+- The compact Area metadata table and React 16 form crash fix remain unchanged.
+

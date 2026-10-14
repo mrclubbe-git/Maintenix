@@ -1,0 +1,78 @@
+CRA SERVICING ASD OPTION - DEV DEPLOYMENT
+==========================================
+
+Purpose
+-------
+Add an explicit ASD-installed choice for Substation servicing sessions using NFPA 72.
+When the technician selects No, ASD-specific checklist questions are excluded from:
+- the active servicing checklist;
+- the saved servicing draft snapshot;
+- the queued generation payload; and
+- generated servicing report rows.
+
+Frontend
+--------
+The Web UI change is deployed separately through GitHub Pages.
+
+Backend files to copy from this package into:
+  /home/charl/projects/maintenix-dev-api/Server_API/CRA/
+
+Copy these exact paths:
+  lib/servicingFeatures.js
+  lib/servicingGenerator.js
+  data/templates/full_manual_checklist_questions.json
+
+Do not replace runtime data files, uploads, users, sessions, queues, statuses,
+drafts, notifications, area metadata or any other data/ runtime folder content.
+
+Restart
+-------
+Because lib/servicingGenerator.js loads the new servicingFeatures module,
+restart ONLY:
+  maintenix-dev-api.service
+
+Validation target
+-----------------
+We are checking four boundaries:
+
+1. Checklist source:
+   GET /CRA/api/servicing/checklist?type=substation
+   The six NFPA 72 ASD questions should carry:
+     "requiresFeature": "ASD"
+
+2. Web workflow:
+   Substation + NFPA 72 must ask "ASD installed?"
+   - Yes: ASD questions remain in the checklist.
+   - No: ASD questions are absent.
+
+3. Draft:
+   A session saved with ASD = No must have no ASD question rows in its
+   questionRowsSnapshot.
+
+4. Generation:
+   Generate the ASD = No draft and confirm the final servicing report has no
+   ASD checklist rows.
+   The server generator also filters ASD responses when asdInstalled is false.
+
+Backward compatibility
+----------------------
+Older servicing drafts that do not contain asdInstalled keep their historical
+question set. Older snapshots without requiresFeature metadata are recognized
+using the existing "ASD" question wording.
+
+Source commits
+--------------
+Checklist metadata:
+  ff8e6a90dca5e2dfeae3dc7caa2632561870a9bb
+
+Backend filtering:
+  449ca7ab808b19efa3f7a7df8be7cca0a8472ef9
+  81d8906c61065b150b29f6764de2bca122993bc6
+
+Frontend workflow:
+  23374302c04ccb386ea3c149ed9db17504c66dbf
+
+Backend regression suite:
+  0ab310ff63ff36d821397897feca6d966e796a79
+  bac88b22409f80dfed2c3036163118b7c7bc5d5f
+  ab19a15d3b68e421445b5d5bfae88a0151cf6334

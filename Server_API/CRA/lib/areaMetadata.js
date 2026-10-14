@@ -33,7 +33,7 @@ function emptyDb() {
 
 function actorFields(actor) {
   return {
-    userId: cleanText(actor?.id, 120),
+    userId: cleanText(actor?.userId || actor?.id, 120),
     email: cleanText(actor?.email, 200).toLowerCase(),
     name: cleanText(actor?.name || actor?.email || actor?.id, 200)
   };

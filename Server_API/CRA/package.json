@@ -11,7 +11,9 @@
     "seed:admin": "node seedAdmin.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "worker:notifications": "node notificationWorker.js",
-    "test:notifications": "node --test test/notifications.test.js"
+    "test:notifications": "node --test test/notifications.test.js",
+    "test:areas": "node --test test/area-metadata.test.js",
+    "test:backend": "npm run test:notifications && npm run test:areas"
   },
   "keywords": [],
   "author": "",

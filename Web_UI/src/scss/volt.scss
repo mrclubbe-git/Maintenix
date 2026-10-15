@@ -200,6 +200,15 @@
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
   }
+
+  .callout-draft-actions {
+    width: 100%;
+  }
+
+  .callout-draft-actions .btn {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: 0;
+  }
 }
 // Formal Reports uses the shared Volt/Bootstrap bundle. Only workflow-specific
 // layouts live here; cards, buttons, forms, typography and progress use Bootstrap.

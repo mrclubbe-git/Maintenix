@@ -405,6 +405,19 @@ export default function DailyPlanner() {
         .planner-description { font-size: 0.88rem; color: #394457; margin-bottom: 14px; }
         .planner-start-date { color: #49566b; font-size: 0.78rem; font-weight: 700; margin: -4px 0 10px; }
         .planner-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #596579; font-size: 0.78rem; }
+        @media (max-width: 575.98px) {
+          .planner-title,
+          .planner-description,
+          .planner-meta,
+          .planner-meta span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+          }
+          .planner-meta {
+            flex-wrap: wrap;
+          }
+        }
         .planner-yellow { background: linear-gradient(145deg, #fff7b8, #ffe98a); }
         .planner-blue { background: linear-gradient(145deg, #d8ecff, #a9d5ff); }
         .planner-green { background: linear-gradient(145deg, #d9f8dc, #aef0b7); }

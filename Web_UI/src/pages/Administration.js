@@ -525,7 +525,7 @@ export default function Administration() {
           {userMessage ? <Alert variant="success">{userMessage}</Alert> : null}
 
           <Row className="g-3 mb-4">
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">All users</div>
@@ -533,7 +533,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Pending</div>
@@ -541,7 +541,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Active</div>
@@ -549,7 +549,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Denied</div>
@@ -575,7 +575,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search users</Form.Label>
                   <Form.Control
@@ -589,7 +589,7 @@ export default function Administration() {
                   />
                 </Form.Group>
 
-                <div className="d-flex flex-wrap" style={{ gap: 8 }}>
+                <div className="d-flex flex-column flex-sm-row" style={{ gap: 8 }}>
                   <Button
                     type="button"
                     size="sm"
@@ -757,7 +757,7 @@ export default function Administration() {
           {notificationMessage ? <Alert variant="success">{notificationMessage}</Alert> : null}
 
           <Row className="g-3 mb-4">
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Registered events</div>
@@ -765,7 +765,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Mandatory</div>
@@ -773,7 +773,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Default acknowledgement</div>
@@ -781,7 +781,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Categories</div>
@@ -889,7 +889,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search events</Form.Label>
                   <Form.Control
@@ -1036,7 +1036,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search areas</Form.Label>
                   <Form.Control
@@ -1047,7 +1047,7 @@ export default function Administration() {
                   />
                 </Form.Group>
 
-                <div className="d-flex flex-wrap" style={{ gap: 8 }}>
+                <div className="d-flex flex-column flex-sm-row" style={{ gap: 8 }}>
                   <Button
                     type="button"
                     size="sm"

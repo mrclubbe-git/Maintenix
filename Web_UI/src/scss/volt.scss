@@ -186,6 +186,20 @@
       margin-top: 0.5rem;
     }
   }
+
+  // Release inline/fixed widths that are safe on desktop but can pressure
+  // narrow mobile cards and forms.
+  .mobile-min-width-0 {
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  // Keep dynamic IDs, filenames, names and error strings inside mobile cards.
+  .mobile-break-anywhere {
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
 }
 // Formal Reports uses the shared Volt/Bootstrap bundle. Only workflow-specific
 // layouts live here; cards, buttons, forms, typography and progress use Bootstrap.

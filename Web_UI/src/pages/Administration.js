@@ -1029,7 +1029,7 @@ export default function Administration() {
                   No notification events match the current filter.
                 </Alert>
               ) : (
-                <div className="table-responsive">
+                <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
                     size="sm"
@@ -1080,6 +1080,53 @@ export default function Administration() {
                     ))}
                   </tbody>
                 </Table>
+                </div>
+
+                <div className="d-md-none">
+                  {visibleNotificationEvents.map((event) => (
+                    <Card key={event.eventType} border="light" className="shadow-sm mb-3">
+                      <Card.Body>
+                        <div className="d-flex flex-column" style={{ gap: 12 }}>
+                          <div className="mobile-break-anywhere">
+                            <div className="fw-bold mobile-break-anywhere">{event.eventType}</div>
+                            <div className="text-muted small mobile-break-anywhere">{event.description || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Category</div>
+                            <Badge bg="secondary">{event.category || "GENERAL"}</Badge>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Channels</div>
+                            <div className="d-flex flex-wrap" style={{ gap: 4 }}>
+                              {(Array.isArray(event.deliveryChannels) ? event.deliveryChannels : []).map((channel) => (
+                                <Badge bg="info" text="dark" key={channel}>{channel}</Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Acknowledgement</div>
+                            {event.defaultRequiresAck ? (
+                              <Badge bg="warning" text="dark">Required by default</Badge>
+                            ) : (
+                              <Badge bg="light" text="dark">Not required</Badge>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Rule</div>
+                            {event.mandatory ? (
+                              <Badge bg="danger">Mandatory</Badge>
+                            ) : (
+                              <Badge bg="light" text="dark">Standard</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  ))}
                 </div>
               )}
             </Card.Body>

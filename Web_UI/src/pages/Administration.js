@@ -1223,7 +1223,7 @@ export default function Administration() {
                   No areas match the current filter.
                 </Alert>
               ) : (
-                <div className="table-responsive">
+                <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
                     size="sm"
@@ -1279,6 +1279,66 @@ export default function Administration() {
                     ))}
                   </tbody>
                 </Table>
+                </div>
+
+                <div className="d-md-none">
+                  {visibleAreas.map((area) => (
+                    <Card key={area.area} border="light" className="shadow-sm mb-3">
+                      <Card.Body>
+                        <div className="d-flex flex-column" style={{ gap: 12 }}>
+                          <div className="mobile-break-anywhere">
+                            <div className="fw-bold mobile-break-anywhere">{area.area}</div>
+                            {area.baseArea ? (
+                              <div className="text-muted small mobile-break-anywhere">{area.baseArea}</div>
+                            ) : null}
+                          </div>
+
+                          <div>
+                            <div className="text-muted small">Section</div>
+                            <div className="mobile-break-anywhere">{area.section || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small">F / First</div>
+                            <div>{area.first || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small">G / Second</div>
+                            <div>{area.second || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Status</div>
+                            {area.status === "CONFIGURED" ? (
+                              <Badge bg="success">Configured</Badge>
+                            ) : (
+                              <Badge bg="warning" text="dark">Metadata required</Badge>
+                            )}
+                            <div className="text-muted small mt-1">{sourceLabel(area)}</div>
+                          </div>
+
+                          <div className="mobile-break-anywhere">
+                            <div className="text-muted small">Added by</div>
+                            <div className="mobile-break-anywhere">{area.addedBy || "—"}</div>
+                            {area.updatedBy ? (
+                              <div className="text-muted small mobile-break-anywhere">Updated by {area.updatedBy}</div>
+                            ) : null}
+                          </div>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="w-100"
+                            variant={area.status === "PENDING" ? "primary" : "outline-primary"}
+                            onClick={() => openEditor(area)}
+                          >
+                            {area.status === "PENDING" ? "Configure" : "Edit"}
+                          </Button>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  ))}
                 </div>
               )}
             </Card.Body>

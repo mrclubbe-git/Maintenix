@@ -2043,13 +2043,25 @@ export default function CallOut() {
               <div className="text-muted small">No saved drafts.</div>
             ) : (
               drafts.slice(0, 8).map((d) => (
-                <div key={d.key} className="d-flex justify-content-between align-items-start flex-wrap mb-2" style={{ gap: 10 }}>
-                  <div>
-                    <div className="fw-bold">{d.name || d.key}</div>
-                    <div className="text-muted small">Updated: {formatDateTimeLocal(d.updatedAt || d.createdAt)}</div>
+                <div
+                  key={d.key}
+                  className="d-flex justify-content-between align-items-start flex-wrap mb-2"
+                  style={{ gap: 10, width: "100%", maxWidth: "100%" }}
+                >
+                  <div
+                    className="mobile-break-anywhere"
+                    style={{ minWidth: 0, flex: "1 1 220px", maxWidth: "100%" }}
+                  >
+                    <div className="fw-bold mobile-break-anywhere">{d.name || d.key}</div>
+                    <div className="text-muted small mobile-break-anywhere">
+                      Updated: {formatDateTimeLocal(d.updatedAt || d.createdAt)}
+                    </div>
                   </div>
 
-                  <div className="d-flex align-items-center" style={{ gap: 8, flexWrap: "wrap" }}>
+                  <div
+                    className="d-flex align-items-center flex-wrap callout-draft-actions"
+                    style={{ gap: 8, maxWidth: "100%" }}
+                  >
                     <CallOutButton variant="primary" onClick={() => loadDraft(d.key)} disabled={submitting}>
                       Load
                     </CallOutButton>

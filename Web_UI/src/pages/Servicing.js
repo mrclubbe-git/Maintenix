@@ -154,6 +154,83 @@ function filterRowsForAsdSelection(rows, asdChoice) {
   return list.filter((row) => !questionRequiresAsd(row));
 }
 
+function normalizeLinearHeatType(value) {
+  const normalized = String(value == null ? "" : value).trim().toLowerCase();
+  if (["fiber", "fibre", "fiber_linear_heat", "fibre_linear_heat"].includes(normalized)) return "fiber";
+  if (["standard", "standard_linear_heat"].includes(normalized)) return "standard";
+  return "";
+}
+
+function questionRequiresLinearHeatFeature(question, feature) {
+  const wanted = String(feature || "").trim().toUpperCase();
+  const single = String(question?.requiresFeature || question?.requires || "").trim().toUpperCase();
+  const multiple = Array.isArray(question?.requiresFeatures)
+    ? question.requiresFeatures.map((value) => String(value || "").trim().toUpperCase())
+    : [];
+
+  if (single === wanted || multiple.includes(wanted)) return true;
+
+  const text = String(question?.question || "");
+  if (wanted === "FIBER_LINEAR_HEAT") {
+    return /FiberSystem|\bfibre optic\b|\bfibre controller\b|\bfibre system\b/i.test(text);
+  }
+  if (wanted === "STANDARD_LINEAR_HEAT") {
+    return /\bstandard linear heat\b|\blinear heat interface unit\b|\bend-of-line unit\b/i.test(text);
+  }
+  return false;
+}
+
+function resolveLinearHeatQuestionVariant(row, linearHeatType) {
+  const type = normalizeLinearHeatType(linearHeatType);
+  if (type !== "standard") return row;
+
+  const variant = row?.variants?.STANDARD_LINEAR_HEAT;
+  if (!variant || !questionRequiresLinearHeatFeature(row, "FIBER_LINEAR_HEAT")) return row;
+
+  const question = String(variant?.question || "").trim();
+  if (!question) return row;
+
+  return {
+    ...row,
+    id: makeQid(row.std, question, Number(row.sourceIndex || 0)),
+    question,
+    extra: variant?.extra ?? "",
+    requiresFeature: "STANDARD_LINEAR_HEAT",
+    variants: undefined
+  };
+}
+
+function filterRowsForLinearHeatSelection(rows, linearHeatType) {
+  const type = normalizeLinearHeatType(linearHeatType);
+  const list = Array.isArray(rows) ? rows : [];
+  if (!type) return list;
+
+  return list.filter((row) => (
+    type === "fiber"
+      ? !questionRequiresLinearHeatFeature(row, "STANDARD_LINEAR_HEAT")
+      : !questionRequiresLinearHeatFeature(row, "FIBER_LINEAR_HEAT")
+  ));
+}
+
+function resolveRowsForLinearHeatType(rows, linearHeatType) {
+  const type = normalizeLinearHeatType(linearHeatType);
+  const list = Array.isArray(rows) ? rows : [];
+  if (!type) return list;
+
+  const resolved = list.map((row) => resolveLinearHeatQuestionVariant(row, type));
+  return filterRowsForLinearHeatSelection(resolved, type);
+}
+
+function linearHeatTypeFromDraftValue(value) {
+  const explicit = normalizeLinearHeatType(value?.linearHeatType);
+  if (explicit) return explicit;
+
+  // Conveyor drafts created before the selector used the fibre-based checklist.
+  const standards = standardsFromDraftValue(value);
+  if (value?.systemType === "conveyor" && standards.includes("NFPA 72")) return "fiber";
+  return "";
+}
+
 function makeQid(std, qText, idx) {
   const base = `${std}__${idx}__${String(qText || "").slice(0, 40)}`;
   return base.replace(/[^a-zA-Z0-9_]+/g, "_");
@@ -536,6 +613,7 @@ export default function Servicing() {
   const [systemType, setSystemType] = useState("substation");
   const [selectedStandardsState, setSelectedStandardsState] = useState([]);
   const [asdInstalled, setAsdInstalled] = useState("");
+  const [linearHeatType, setLinearHeatType] = useState("");
   // Legacy draft booleans are still read by standardsFromDraftValue().
 
   // Loaded lists
@@ -696,10 +774,12 @@ export default function Servicing() {
         if (!qText) return;
         rows.push({
           id: makeQid(std, qText, idx),
+          sourceIndex: idx,
           std,
           question: qText,
           extra: q?.extra ?? "",
-          requiresFeature: q?.requiresFeature || q?.requires || ""
+          requiresFeature: q?.requiresFeature || q?.requires || "",
+          variants: q?.variants && typeof q.variants === "object" ? q.variants : undefined
         });
       });
     });
@@ -712,10 +792,27 @@ export default function Servicing() {
     allQuestionRows.some((q) => questionRequiresAsd(q))
   ), [systemType, selectedStandards, allQuestionRows]);
 
-  const questionRows = useMemo(
-    () => filterRowsForAsdSelection(allQuestionRows, needsAsdSelection ? asdInstalled : ""),
-    [allQuestionRows, needsAsdSelection, asdInstalled]
-  );
+  const needsLinearHeatSelection = useMemo(() => (
+    systemType === "conveyor" &&
+    selectedStandards.includes("NFPA 72") &&
+    allQuestionRows.some((q) => (
+      questionRequiresLinearHeatFeature(q, "FIBER_LINEAR_HEAT") ||
+      Boolean(q?.variants?.STANDARD_LINEAR_HEAT)
+    ))
+  ), [systemType, selectedStandards, allQuestionRows]);
+
+  const questionRows = useMemo(() => {
+    let rows = filterRowsForAsdSelection(
+      allQuestionRows,
+      needsAsdSelection ? asdInstalled : ""
+    );
+
+    if (needsLinearHeatSelection) {
+      rows = resolveRowsForLinearHeatType(rows, linearHeatType);
+    }
+
+    return rows;
+  }, [allQuestionRows, needsAsdSelection, asdInstalled, needsLinearHeatSelection, linearHeatType]);
 
   const [answers, setAnswers] = useState({});
 
@@ -946,6 +1043,7 @@ export default function Servicing() {
     if (!serviceType) return "Please select a Service Type.";
     if (!selectedStandards.length) return "Please select at least one standard.";
     if (needsAsdSelection && !normalizeAsdChoice(asdInstalled)) return "Please select whether an ASD is installed.";
+    if (needsLinearHeatSelection && !normalizeLinearHeatType(linearHeatType)) return "Please select the linear heat type.";
     if (!checklist) return "Checklist is not loaded yet.";
     return "";
   }
@@ -1660,6 +1758,7 @@ export default function Servicing() {
       systemType,
       selectedStandards,
       asdInstalled: needsAsdSelection ? normalizeAsdChoice(asdInstalled) : "",
+      linearHeatType: needsLinearHeatSelection ? normalizeLinearHeatType(linearHeatType) : "",
       nfpa72: selectedStandards.includes("NFPA 72"),
       nfpa2001: selectedStandards.includes("NFPA 2001"),
       areaSearch,
@@ -1668,6 +1767,7 @@ export default function Servicing() {
       signatureTouched: false,
       questionRowsSnapshot: (questionRows || []).map((q) => ({
         id: q.id,
+        sourceIndex: Number(q.sourceIndex || 0),
         std: q.std,
         question: q.question,
         extra: q.extra || "",
@@ -1684,6 +1784,7 @@ export default function Servicing() {
     const draftStandards = standardsFromDraftValue(v);
     setSelectedStandardsState(draftStandards);
     setAsdInstalled(normalizeAsdChoice(v.asdInstalled));
+    setLinearHeatType(linearHeatTypeFromDraftValue(v));
     setAreaSearch(v.areaSearch || "");
     setAreaOpen(false);
 
@@ -1819,9 +1920,10 @@ export default function Servicing() {
   function buildQuestionRowsForDraftValue(v) {
     const snap = Array.isArray(v?.questionRowsSnapshot) ? v.questionRowsSnapshot : [];
     if (snap.length) {
-      return snap
+      let rows = snap
         .map((q, idx) => ({
           id: q?.id || makeQid(q?.std || "General", q?.question || `Question ${idx + 1}`, idx),
+          sourceIndex: Number(q?.sourceIndex ?? idx),
           std: q?.std || "General",
           question: String(q?.question || "").trim(),
           extra: q?.extra || "",
@@ -1829,6 +1931,8 @@ export default function Servicing() {
         }))
         .filter((q) => q.question)
         .filter((q) => normalizeAsdChoice(v?.asdInstalled) !== "no" || !questionRequiresAsd(q));
+
+      return filterRowsForLinearHeatSelection(rows, linearHeatTypeFromDraftValue(v));
     }
 
     const draftStandards = makeSelectedStandardsFromValue(v);
@@ -1844,14 +1948,19 @@ export default function Servicing() {
         if (!qText) return;
         rows.push({
           id: makeQid(std, qText, idx),
+          sourceIndex: idx,
           std,
           question: qText,
           extra: q?.extra ?? "",
-          requiresFeature: q?.requiresFeature || q?.requires || ""
+          requiresFeature: q?.requiresFeature || q?.requires || "",
+          variants: q?.variants && typeof q.variants === "object" ? q.variants : undefined
         });
       });
     });
-    return filterRowsForAsdSelection(rows, v?.asdInstalled);
+
+    let filteredRows = filterRowsForAsdSelection(rows, v?.asdInstalled);
+    filteredRows = resolveRowsForLinearHeatType(filteredRows, linearHeatTypeFromDraftValue(v));
+    return filteredRows;
   }
 
   function validateDraftValueForGeneration(v, draftQuestionRows) {
@@ -1927,6 +2036,7 @@ export default function Servicing() {
           : normalizeAsdChoice(v.asdInstalled) === "no"
             ? false
             : null,
+        linearHeatType: linearHeatTypeFromDraftValue(v) || null,
         createdAt,
         correctionOfReport: correctionContext?.correctionOf || "",
         correctionReason: correctionContext?.reason || "",
@@ -2129,6 +2239,7 @@ export default function Servicing() {
     setServiceType("");
     setSelectedStandardsState(defaultStandardsForChecklist(checklist));
     setAsdInstalled("");
+    setLinearHeatType("");
     setAnswers({});
     setHighlightMissing(false);
     setHighlightMissingPhotos(false);
@@ -2351,6 +2462,7 @@ export default function Servicing() {
                       setAnswers({});
                       setSelectedStandardsState([]);
                       setAsdInstalled("");
+                      setLinearHeatType("");
                       setStep(0);
                     }}
                     disabled={loadingChecklist}
@@ -2551,6 +2663,36 @@ export default function Servicing() {
                         onChange={(event) => {
                           const checked = event.currentTarget.checked;
                           setAsdInstalled(checked ? "no" : "");
+                        }}
+                      />
+                    </div>
+                  </Form.Group>
+                </Col>
+              ) : null}
+
+              {needsLinearHeatSelection ? (
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label>Linear heat type</Form.Label>
+                    <div className="d-flex flex-wrap" style={{ gap: 18 }}>
+                      <Form.Check
+                        type="checkbox"
+                        id="servicing-linear-heat-fiber"
+                        label="Fiber linear heat"
+                        checked={normalizeLinearHeatType(linearHeatType) === "fiber"}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          setLinearHeatType(checked ? "fiber" : "");
+                        }}
+                      />
+                      <Form.Check
+                        type="checkbox"
+                        id="servicing-linear-heat-standard"
+                        label="Standard linear heat"
+                        checked={normalizeLinearHeatType(linearHeatType) === "standard"}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          setLinearHeatType(checked ? "standard" : "");
                         }}
                       />
                     </div>
@@ -2837,6 +2979,12 @@ export default function Servicing() {
             <div className="mb-2"><strong>Service Type:</strong> {serviceType}</div>
             {needsAsdSelection ? (
               <div className="mb-2"><strong>ASD installed:</strong> {normalizeAsdChoice(asdInstalled) === "yes" ? "Yes" : "No"}</div>
+            ) : null}
+            {needsLinearHeatSelection ? (
+              <div className="mb-2">
+                <strong>Linear heat type:</strong>{" "}
+                {normalizeLinearHeatType(linearHeatType) === "standard" ? "Standard linear heat" : "Fiber linear heat"}
+              </div>
             ) : null}
             <div className="mb-3">
               <strong>Standards:</strong> {selectedStandards.length ? selectedStandards.join(", ") : "-"}

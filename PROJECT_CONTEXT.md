@@ -1608,3 +1608,42 @@ Validation/deployment support:
 - Main commit: `2f8a462c1ad418aaadbfbc1efd1499205776322b`.
 - Deploy commit: `ee78574ca3952cb5cf85b34144f24dae361669af`.
 
+## Conveyor NFPA 72 linear heat type branching — 2026-10-15
+
+- Implemented required Linear heat type selection for Conveyor + NFPA 72 Servicing.
+- Linear heat is assumed installed; technician must select exactly one option before entering the checklist:
+  - Fiber linear heat
+  - Standard linear heat
+- Selector uses the same square checkbox visual style as the NFPA and ASD selectors while remaining mutually exclusive through one `linearHeatType` state.
+- Existing fibre/FiberSystem NFPA 72 questions remain the Fiber baseline.
+- The ten existing fibre-specific questions are tagged `FIBER_LINEAR_HEAT` and each carries a `STANDARD_LINEAR_HEAT` alternative in `data/templates/conveyor_system_checklist_questions.json`.
+- Standard alternatives are deliberately brand-neutral and refer to standard linear heat cable, an interface unit and an end-of-line unit; they do not mention Thermocable, ProReact or DiMM.
+- Frequency distribution remains aligned with the existing fibre set: Weekly 1, Monthly 2, Quarterly 3, Annual 4.
+- Standard annual testing follows the supplied installation manual principles: visual inspection, end-of-line fault test, end-of-line alarm test and circuit resistance verification. Installed fixed-temperature cable itself is not heat-trigger tested because it is non-restorable.
+- Frontend workflow:
+  - the selected variant alone appears in Checklist and Review;
+  - selection is persisted in the servicing draft as `linearHeatType`;
+  - draft snapshots contain only the selected question wording;
+  - generation payload includes `linearHeatType` and per-response `requiresFeature`;
+  - Review shows the selected linear heat type.
+- Backward compatibility: older Conveyor + NFPA 72 drafts without `linearHeatType` are treated as Fiber linear heat because the pre-change conveyor checklist was fibre-based.
+- Server-side report generation now defensively filters wrong-variant responses using `linearHeatType`; legacy fibre wording is also recognized when feature metadata is absent.
+- Frontend main commit: `2718ad21a7b6a2376d810994526aff914d54f4a6`.
+- Frontend deploy commit: `db537d2f75244281e7c75cbc44373c9147364310`.
+- GitHub Pages run `38690473037` completed successfully; build and deploy both passed.
+- Backend source commits:
+  - conveyor checklist alternatives `3403c4df25ac04771769704913fcad5ad2b9a3f8`;
+  - feature filtering `b8e0288a361b90d5e74b8b270d249f35d3eaba3b`;
+  - generator filtering `3970e09cec4da1b27303cb83ba971d2eb2af39de`;
+  - regression tests `49d9611c8c5f25bc8c6ff7ad2cfac69f593888df`.
+- Backend regression run `38690495587` completed successfully.
+- Cumulative DEV backend handoff:
+  - `Server_API/CRA/SERVICING_DETECTION_OPTIONS_DEPLOY.txt`;
+  - packaging workflow `.github/workflows/package-cra-servicing-detection-options-backend.yml`;
+  - packaging run `38690507622` success;
+  - artifact `cra-servicing-detection-options-backend`, ID `11951428782`;
+  - SHA-256 `fbb7044ef5a680fc06ecd3852f524d0f7277e4d45745373b483841e21ad5ba8a`.
+- The cumulative package includes current ASD and Conveyor linear-heat backend files so DEV can be brought to one consistent servicing state.
+- Backend DEV installation is still manual and has not been confirmed in this conversation. Do not claim generator-side linear heat filtering is deployed/validated on CRA DEV until the package is installed and `maintenix-dev-api.service` is restarted/tested.
+- LIVE remains untouched; the LIVE migration checklist now includes Conveyor linear heat type acceptance.
+

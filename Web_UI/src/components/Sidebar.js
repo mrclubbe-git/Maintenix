@@ -93,8 +93,8 @@ export default function Sidebar(props = {}) {
           <div className="sidebar-inner px-4 pt-3">
             {/* Mobile user card */}
             <div className="user-card d-flex d-md-none align-items-center justify-content-between justify-content-md-center pb-4">
-              <div className="d-flex align-items-center">
-                <div className="user-avatar lg-avatar me-4">
+              <div className="d-flex align-items-center" style={{ minWidth: 0, flex: "1 1 auto" }}>
+                <div className="user-avatar lg-avatar me-4 flex-shrink-0">
                   <Image
                     src={avatarSrc}
                     className="card-img-top rounded-circle border-white"
@@ -103,8 +103,8 @@ export default function Sidebar(props = {}) {
                     }}
                   />
                 </div>
-                <div className="d-block">
-                  <h6>Hi, {displayName}</h6>
+                <div className="d-block mobile-break-anywhere" style={{ minWidth: 0 }}>
+                  <h6 className="mobile-break-anywhere">Hi, {displayName}</h6>
 
                   <Button variant="secondary" size="xs" className="text-dark" onClick={handleLogout}>
                     <FontAwesomeIcon icon={faSignOutAlt} className="me-2" /> Sign Out
@@ -112,7 +112,7 @@ export default function Sidebar(props = {}) {
                 </div>
               </div>
 
-              <Nav.Link className="collapse-close d-md-none" onClick={onCollapse}>
+              <Nav.Link className="collapse-close d-md-none flex-shrink-0" onClick={onCollapse}>
                 <FontAwesomeIcon icon={faTimes} />
               </Nav.Link>
             </div>

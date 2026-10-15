@@ -1647,3 +1647,30 @@ Validation/deployment support:
 - Backend DEV installation is still manual and has not been confirmed in this conversation. Do not claim generator-side linear heat filtering is deployed/validated on CRA DEV until the package is installed and `maintenix-dev-api.service` is restarted/tested.
 - LIVE remains untouched; the LIVE migration checklist now includes Conveyor linear heat type acceptance.
 
+## Cumulative Servicing question deduplication — 2026-10-15
+
+- User identified duplicate logical questions when higher Servicing frequencies include preceding frequency question sets (for example Monthly includes Weekly).
+- Servicing cumulative-frequency merge in `Web_UI/src/pages/Servicing.js` now deduplicates questions for both Substation and Conveyor workflows.
+- Deduplication rules:
+  - exact normalized duplicate wording is automatically collapsed;
+  - source questions may declare a `dedupeKey` for semantically equivalent recurring checks whose wording changes by frequency;
+  - when the same logical key appears at multiple included frequencies, the higher-frequency version supersedes the lower-frequency copy;
+  - unique lower-frequency checks continue to roll forward normally.
+- This preserves the cumulative inspection model without making the technician answer the same logical check twice.
+- Conveyor checklist now has explicit recurring-check groups across NFPA 72 and NFPA 25 for obvious repeated checks such as panel NORMAL, isolations, linear-heat controller health, flame detector visual condition, air-purge condition, field cabling, housekeeping, event history, mains supply, linear-heat cable inspection, pressure checks, valve position, nozzle condition, spray coverage, manual release inspection, defect recording and restoration.
+- Standard-vs-Fiber linear heat variants remain compatible because deduplication occurs before the selected variant wording is resolved.
+- Substation and Conveyor both use the same merge function; current Substation source has no exact repeated wording across its cumulative frequency lists, but the same exact/dedupeKey safeguards now apply there and protect future source updates.
+- Regression tests simulate cumulative Weekly/Monthly/Quarterly/Annual merging for both checklist sources and verify no duplicate effective keys remain. Additional Conveyor Monthly assertions verify the higher-frequency panel, linear-heat-controller and flame-visual wording supersedes Weekly equivalents.
+- Frontend main commit: `c41d7238be6909edf4b915be5ea235b8910d4292`.
+- Conveyor recurring-check metadata commit: `97c52d94a0337ad52587cf38018d95fe20b98997`.
+- Regression test commit: `0662ab8e63b593ded6b254e5f3f4c4bae5cdb404`.
+- Frontend deploy commit: `2b9dcdcb06f2af9dd6b3b3c4a1cef9b943384baf`.
+- GitHub Pages run `38692184244` completed successfully; build and deploy both passed.
+- Backend CI run `38692161824` completed successfully.
+- Updated cumulative DEV backend handoff:
+  - packaging run `38692161276` success;
+  - artifact `cra-servicing-detection-options-backend`, ID `11952436919`;
+  - SHA-256 `0b58f011e54300426c9de43a64492f2ad90c7c8fd76af0d67e46b25bc5c0863c`.
+- The updated package is required on CRA DEV for the new Conveyor `dedupeKey` metadata to be returned by the checklist endpoint. The frontend merge logic is already deployed.
+- Backend DEV installation/restart of this updated package has not yet been confirmed. LIVE remains untouched.
+

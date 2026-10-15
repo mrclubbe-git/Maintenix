@@ -1,0 +1,92 @@
+CRA SERVICING DETECTION OPTIONS - DEV DEPLOYMENT
+=================================================
+
+Purpose
+-------
+This is a cumulative CRA DEV backend handoff for the current Servicing detection
+options:
+
+1. Substation + NFPA 72:
+   technician selects whether an ASD is installed.
+
+2. Conveyor + NFPA 72:
+   linear heat is assumed installed and the technician selects:
+   - Fiber linear heat
+   - Standard linear heat
+
+The conveyor Fiber selection keeps the existing FiberSystem/fibre-based question
+set. The Standard selection substitutes brand-neutral standard linear heat
+questions based on a supervised linear heat cable, interface unit and end-of-line
+unit.
+
+Frontend
+--------
+The Web UI is deployed separately through GitHub Pages.
+
+Backend files to copy into:
+  /home/charl/projects/maintenix-dev-api/Server_API/CRA/
+
+Copy these exact paths:
+  lib/servicingFeatures.js
+  lib/servicingGenerator.js
+  data/templates/full_manual_checklist_questions.json
+  data/templates/conveyor_system_checklist_questions.json
+
+Do not replace any runtime data, users, sessions, drafts, queues, statuses,
+uploads, generated reports, notifications, area metadata, VAPID keys,
+subscriptions or any other runtime state.
+
+Restart
+-------
+Because servicingGenerator.js loads servicingFeatures.js, restart ONLY:
+  maintenix-dev-api.service
+
+What we are validating
+----------------------
+
+A. Substation ASD behaviour
+   - ASD = Yes keeps ASD questions.
+   - ASD = No removes ASD questions from session, saved draft and generated report.
+
+B. Conveyor linear heat type
+   - Fiber linear heat keeps the existing fibre/FiberSystem questions.
+   - Standard linear heat substitutes the standard linear heat questions.
+   - The selected type is stored in the draft and generation payload.
+   - Generated reports contain only the selected linear heat variant.
+
+C. Server-side defensive filtering
+   The generator filters responses using:
+   - asdInstalled
+   - linearHeatType
+
+   This prevents excluded ASD or wrong linear-heat variant rows from being
+   rendered even if an unexpected response reaches report generation.
+
+D. Backward compatibility
+   - Older Substation drafts without asdInstalled preserve historical content.
+   - Older Conveyor + NFPA 72 drafts without linearHeatType are treated as
+     Fiber linear heat because the previous conveyor checklist was fibre-based.
+
+Suggested DEV validation
+------------------------
+1. Restart maintenix-dev-api.service.
+2. Confirm:
+   GET /CRA/api/servicing/checklist?type=substation
+   returns ASD feature metadata.
+3. Confirm:
+   GET /CRA/api/servicing/checklist?type=conveyor
+   returns 10 NFPA 72 fibre rows tagged:
+     "requiresFeature": "FIBER_LINEAR_HEAT"
+   and each contains a STANDARD_LINEAR_HEAT variant.
+4. Run one Conveyor NFPA 72 session with Fiber linear heat.
+5. Run one Conveyor NFPA 72 session with Standard linear heat.
+6. Save both drafts and confirm each snapshot contains only its selected
+   linear heat question wording.
+7. Generate both reports and confirm the final DOCX contains only the selected
+   linear heat variant.
+8. Re-test one Substation ASD = No report to confirm the cumulative package has
+   not regressed ASD filtering.
+
+LIVE
+----
+Do not deploy to LIVE as part of this handoff.

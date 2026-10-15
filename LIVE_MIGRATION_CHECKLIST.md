@@ -361,6 +361,7 @@ Do not consider the migration complete until all applicable checks pass:
 - [ ] Configured runtime Area metadata overrides baseline/fuzzy resolution for future reports.
 - [ ] Substation NFPA 72 Servicing requires an ASD-installed choice; ASD = No excludes ASD questions from the session, draft payload and generated report.
 - [ ] Conveyor NFPA 72 Servicing requires a Linear heat type choice; Fiber keeps the existing fibre/FiberSystem questions, while Standard substitutes the approved interface-unit/end-of-line question set in the session, saved draft and generated report.
+- [ ] Cumulative Servicing frequencies do not duplicate recurring logical checks; higher-frequency wording supersedes the equivalent lower-frequency copy for both Substation and Conveyor questionnaires.
 - [ ] Servicing queue worker processes a test job.
 - [ ] Call Out queue worker processes a test job.
 - [ ] Formal Reporting worker health passes.

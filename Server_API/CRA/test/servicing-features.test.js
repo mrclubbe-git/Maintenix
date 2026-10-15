@@ -142,3 +142,93 @@ test("legacy fibre wording is defensively removed from standard linear heat payl
   const filtered = filterServicingResponses(responses, { linearHeatType: "standard" });
   assert.deepEqual(filtered.map((item) => item.question), ["Housekeeping satisfactory."]);
 });
+
+
+function normalizeChecklistKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function effectiveQuestionKey(standard, question) {
+  const explicit = normalizeChecklistKey(question?.dedupeKey);
+  const std = normalizeChecklistKey(standard) || "general";
+  if (explicit) return `${std}::group::${explicit}`;
+  return `${std}::text::${normalizeChecklistKey(question?.question)}`;
+}
+
+function mergeCumulativeForTest(source, targetFrequency, standard) {
+  const order = ["weekly", "monthly", "quarterly", "annual"];
+  const end = Math.max(0, order.indexOf(targetFrequency));
+  const merged = [];
+  const indexByKey = new Map();
+
+  for (const frequency of order.slice(0, end + 1)) {
+    const questions = Array.isArray(source?.[frequency]?.[standard])
+      ? source[frequency][standard]
+      : [];
+
+    for (const question of questions) {
+      const key = effectiveQuestionKey(standard, question);
+      const previousIndex = indexByKey.get(key);
+      if (previousIndex !== undefined) merged[previousIndex] = null;
+      indexByKey.set(key, merged.length);
+      merged.push(question);
+    }
+  }
+
+  return merged.filter(Boolean);
+}
+
+test("cumulative servicing merge contains no duplicate logical checks", () => {
+  const sources = [
+    { name: "substation", data: checklist },
+    { name: "conveyor", data: conveyorChecklist }
+  ];
+
+  for (const source of sources) {
+    for (const targetFrequency of ["weekly", "monthly", "quarterly", "annual"]) {
+      const standards = new Set();
+      for (const frequency of ["weekly", "monthly", "quarterly", "annual"]) {
+        Object.keys(source.data?.[frequency] || {}).forEach((standard) => standards.add(standard));
+      }
+
+      for (const standard of standards) {
+        const merged = mergeCumulativeForTest(source.data, targetFrequency, standard);
+        const keys = merged.map((question) => effectiveQuestionKey(standard, question));
+        assert.equal(
+          new Set(keys).size,
+          keys.length,
+          `${source.name} ${targetFrequency} ${standard} contains duplicate logical checks`
+        );
+      }
+    }
+  }
+});
+
+test("higher-frequency conveyor wording supersedes recurring lower-frequency checks", () => {
+  const monthly = mergeCumulativeForTest(conveyorChecklist, "monthly", "NFPA 72");
+  const panelRows = monthly.filter((question) => question.dedupeKey === "panel-normal");
+  const heatControllerRows = monthly.filter((question) => question.dedupeKey === "linear-heat-controller-health");
+  const flameVisualRows = monthly.filter((question) => question.dedupeKey === "flame-detector-visual");
+
+  assert.equal(panelRows.length, 1);
+  assert.equal(
+    panelRows[0].question,
+    "Fire alarm / releasing panel(s) show NORMAL; no unresolved fire, supervisory or trouble condition."
+  );
+
+  assert.equal(heatControllerRows.length, 1);
+  assert.equal(
+    heatControllerRows[0].question,
+    "FiberSystem 8000 controller healthy; no relay, communication or fibre channel fault."
+  );
+
+  assert.equal(flameVisualRows.length, 1);
+  assert.equal(
+    flameVisualRows[0].question,
+    "Flame detector windows clean; detectors unobstructed and aimed correctly."
+  );
+});

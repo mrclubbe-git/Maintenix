@@ -1674,3 +1674,16 @@ Validation/deployment support:
 - The updated package is required on CRA DEV for the new Conveyor `dedupeKey` metadata to be returned by the checklist endpoint. The frontend merge logic is already deployed.
 - Backend DEV installation/restart of this updated package has not yet been confirmed. LIVE remains untouched.
 
+## Servicing cumulative order fixed to Weekly-first — 2026-10-15
+
+- Cumulative Servicing frequencies now always retain first-frequency ordering: Weekly questions first, then Monthly additions, then Quarterly additions, then Annual additions.
+- Deduplication still uses higher-frequency wording when the same logical check recurs, but that updated wording replaces the earlier item in-place instead of moving the check down into the later frequency section.
+- This applies to both Substation and Conveyor questionnaires because both use the shared `mergeQuestions` / deduplication path in `Web_UI/src/pages/Servicing.js`.
+- Example: for Monthly, a recurring Weekly panel-normal check remains in the Weekly position but uses the Monthly wording; unique Monthly checks follow after the Weekly-origin block.
+- Frontend main commit: `3892b52726f7038535bd9a18d0eb70e57dfec176`.
+- Regression test commit: `8ebf3eedfae0368cf66be4d0f2c2d14c8df93a07`.
+- Frontend deploy commit: `5504abe7783d19c9a90f9d1c43cb062e73b0aed9`.
+- Backend regression run `38694986828` passed.
+- GitHub Pages run `38695006918` completed successfully.
+- No backend runtime files changed for this ordering fix; no CRA DEV service restart is required.
+

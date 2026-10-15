@@ -1745,3 +1745,32 @@ Validation/deployment support:
 - GitHub Pages run `38729041921` completed successfully.
 - Frontend-only change; no backend restart required.
 
+## Administration mobile stacking — 2026-10-15
+
+- Reworked Administration mobile layout so content stacks vertically instead of compressing multi-column/table content into narrow phone widths.
+- Desktop Administration layout remains table-based and unchanged from the accepted desktop design.
+- Mobile Users:
+  - summary cards are one per row on phones;
+  - search/filter controls stack;
+  - each user is rendered as a vertical card with name/email, status, role, created details and full-width actions.
+- Mobile Notifications:
+  - summary cards are one per row on phones;
+  - search/category filters stack;
+  - each notification event is rendered as a vertical card with category, channels, acknowledgement and rule sections.
+- Mobile Areas:
+  - search/filter controls stack;
+  - each area is rendered as a vertical card with section, F/First, G/Second, status, ownership metadata and a full-width Configure/Edit action.
+- Desktop tables remain visible from md breakpoint upward; stacked cards are mobile-only.
+- Pre-change rollback branches:
+  - `rollback/admin-mobile-stack-pre-fix-20261015` at `cb5c35ea33a82091434064d5d6ad42ff39822f94`;
+  - `rollback/admin-mobile-stack-pre-fix-deploy-20261015` at `5a3832e2b8a6f58c83ce565b3ae9d49f2751e088`.
+- Main commits:
+  - controls/summary stacking `50fe3a9495b7d6132d2c0c2217731ebc16c56aa5`;
+  - users mobile cards `a4766539d559ee28fe566e920151a0fdb258b543`;
+  - notification mobile cards `70c288f8f7f29fdeb021b54a9f7290f558f633fb`;
+  - areas mobile cards `c003caa64018ef92f02e1314092514294e5c1fda`;
+  - JSX wrapper correction `2089fffb5eb2eab40d2ec8595467517b42aeb591`.
+- Deploy commit: `fc527c7d23620b6e50365aef4ff917f74da96f81`.
+- GitHub Pages run `38730392554` completed successfully; build and deploy both passed.
+- Frontend-only change; no backend service restart required.
+

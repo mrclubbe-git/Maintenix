@@ -1727,3 +1727,21 @@ Validation/deployment support:
 - GitHub Pages run `38722702839` completed successfully; build and deploy both passed.
 - Frontend-only change: no CRA backend files changed and no DEV service restart is required.
 
+## Call Out saved draft mobile containment — 2026-10-15
+
+- The Saved Drafts row on Call Out could exceed the mobile viewport because generated draft names are long/unbroken and the text flex child retained its intrinsic width.
+- Fixed the Call Out draft tile so:
+  - draft name/date content can shrink and break anywhere;
+  - the draft row is explicitly capped at 100% width;
+  - mobile draft actions use a two-column responsive button layout rather than forcing the row wider than the viewport.
+- Desktop layout remains unchanged.
+- Pre-fix rollback branches:
+  - `rollback/callout-draft-mobile-pre-fix-20261015` at `a1f08c0f8d76f68f59b3be176fc4b4e317e13bfe`;
+  - `rollback/callout-draft-mobile-pre-fix-deploy-20261015` at `4c7875dfcd1d8969ccf92478313f488c7d0311a0`.
+- Main commits:
+  - `2cfd237cf09fedf38b178db63823b589576a98d1` (Call Out draft tile);
+  - `cadae81544626b84fa038a6153641f19e440c53d` (mobile draft action layout).
+- Final deploy head: `5a3832e2b8a6f58c83ce565b3ae9d49f2751e088`.
+- GitHub Pages run `38729041921` completed successfully.
+- Frontend-only change; no backend restart required.
+

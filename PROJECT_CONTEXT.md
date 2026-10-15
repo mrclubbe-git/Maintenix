@@ -1687,3 +1687,15 @@ Validation/deployment support:
 - GitHub Pages run `38695006918` completed successfully.
 - No backend runtime files changed for this ordering fix; no CRA DEV service restart is required.
 
+## Call Out camera-only evidence control — 2026-10-15
+
+- Simplified Call Out evidence capture to one visible control: `Add picture`.
+- Removed the separate `Open camera` button and removed the generic picture/file picker path.
+- `Add picture` now uses the camera-capture input with `capture="environment"`, aligning Call Out with the no-upload policy.
+- The button is available for both defect evidence (Q1 = Yes) and resolved-repair evidence (Q2 = Yes).
+- Existing Call Out evidence requirements, comments, photo count, removal, draft persistence and report-generation behaviour are unchanged.
+- Frontend main commit: `25b6af97de269e575a24b1202c63be3f3749102c`.
+- Frontend deploy commit: `3eb1ae6487ce00910e4241c98d0fb174b0a8d184`.
+- GitHub Pages run `38700067709` completed successfully; build and deploy both passed.
+- No backend change or CRA DEV service restart is required.
+

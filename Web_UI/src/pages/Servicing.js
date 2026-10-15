@@ -76,6 +76,49 @@ function normalizeServiceToFreqKey(serviceLabel) {
   return "monthly";
 }
 
+function normalizeQuestionTextKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function checklistQuestionDedupeKey(std, question) {
+  const standard = normalizeQuestionTextKey(std) || "general";
+  const explicit = normalizeQuestionTextKey(question?.dedupeKey);
+  if (explicit) return `${standard}::group::${explicit}`;
+
+  const text = normalizeQuestionTextKey(question?.question);
+  return text ? `${standard}::text::${text}` : "";
+}
+
+function dedupeChecklistQuestions(std, questions) {
+  const merged = [];
+  const indexByKey = new Map();
+
+  (Array.isArray(questions) ? questions : []).forEach((question) => {
+    const key = checklistQuestionDedupeKey(std, question);
+    if (!key) {
+      merged.push(question);
+      return;
+    }
+
+    const previousIndex = indexByKey.get(key);
+    if (previousIndex !== undefined) {
+      // Higher-frequency wording supersedes the equivalent lower-frequency
+      // check, so the technician sees the requirement once at its most
+      // appropriate service depth.
+      merged[previousIndex] = null;
+    }
+
+    indexByKey.set(key, merged.length);
+    merged.push(question);
+  });
+
+  return merged.filter(Boolean);
+}
+
 function mergeQuestions(checklist, frequencyKey, standards) {
   const freqOrder = ["weekly", "monthly", "quarterly", "annual"];
   const idx = Math.max(0, freqOrder.indexOf(frequencyKey));
@@ -83,15 +126,16 @@ function mergeQuestions(checklist, frequencyKey, standards) {
 
   const out = {};
   (standards || []).forEach((std) => {
-    out[std] = [];
+    const cumulative = [];
     selectedFreqs.forEach((fk) => {
       const chunk = checklist?.[fk]?.[std];
-      if (Array.isArray(chunk)) out[std].push(...chunk);
+      if (Array.isArray(chunk)) cumulative.push(...chunk);
     });
+    out[std] = dedupeChecklistQuestions(std, cumulative);
   });
 
   const general = checklist?.general?.general;
-  out.General = Array.isArray(general) ? general : [];
+  out.General = dedupeChecklistQuestions("General", general);
   return out;
 }
 

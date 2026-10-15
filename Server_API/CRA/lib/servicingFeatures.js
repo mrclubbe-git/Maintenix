@@ -8,6 +8,13 @@ function normalizeYesNoChoice(value) {
   return "";
 }
 
+function normalizeLinearHeatType(value) {
+  const normalized = String(value == null ? "" : value).trim().toLowerCase();
+  if (["fiber", "fibre", "fiber_linear_heat", "fibre_linear_heat"].includes(normalized)) return "fiber";
+  if (["standard", "standard_linear_heat"].includes(normalized)) return "standard";
+  return "";
+}
+
 function featureRequirements(record) {
   const out = [];
 
@@ -32,27 +39,49 @@ function requiresFeature(record, feature) {
   const requirements = featureRequirements(record);
   if (requirements.includes(wanted)) return true;
 
+  const question = String(record?.question || "");
+
   // Backward compatibility for older servicing drafts created before
   // checklist feature metadata was introduced.
   if (wanted === "ASD") {
-    return /\bASD\b/i.test(String(record?.question || ""));
+    return /\bASD\b/i.test(question);
+  }
+
+  if (wanted === "FIBER_LINEAR_HEAT") {
+    return /FiberSystem|\bfibre optic\b|\bfibre controller\b|\bfibre system\b/i.test(question);
+  }
+
+  if (wanted === "STANDARD_LINEAR_HEAT") {
+    return /\bstandard linear heat\b|\blinear heat interface unit\b|\bend-of-line unit\b/i.test(question);
   }
 
   return false;
 }
 
 function filterServicingResponses(responses, options = {}) {
-  const list = Array.isArray(responses) ? responses : [];
+  let list = Array.isArray(responses) ? responses : [];
   const asdInstalled = normalizeYesNoChoice(options?.asdInstalled);
 
-  // Older drafts have no feature selection; preserve their historical content.
-  if (asdInstalled !== "no") return list;
+  if (asdInstalled === "no") {
+    list = list.filter((response) => !requiresFeature(response, "ASD"));
+  }
 
-  return list.filter((response) => !requiresFeature(response, "ASD"));
+  const linearHeatType = normalizeLinearHeatType(options?.linearHeatType);
+
+  // Older conveyor drafts have no linearHeatType; preserve their historical
+  // fibre-based content. New payloads explicitly select one variant.
+  if (linearHeatType === "fiber") {
+    list = list.filter((response) => !requiresFeature(response, "STANDARD_LINEAR_HEAT"));
+  } else if (linearHeatType === "standard") {
+    list = list.filter((response) => !requiresFeature(response, "FIBER_LINEAR_HEAT"));
+  }
+
+  return list;
 }
 
 module.exports = {
   normalizeYesNoChoice,
+  normalizeLinearHeatType,
   featureRequirements,
   requiresFeature,
   filterServicingResponses

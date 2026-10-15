@@ -315,12 +315,6 @@ function defectsAsComment(defects) {
     .join("\n");
 }
 
-function isMobileDevice() {
-  if (typeof navigator === "undefined") return false;
-  const ua = String(navigator.userAgent || "").toLowerCase();
-  return /android|iphone|ipad|ipod|mobile/.test(ua);
-}
-
 // ---- Signature helpers (no external libs) ----
 function getCanvasPoint(e, canvas) {
   const rect = canvas.getBoundingClientRect();
@@ -548,9 +542,8 @@ export default function CallOut() {
   const [highlightMissing, setHighlightMissing] = useState(false);
   const [highlightMissingPhotos, setHighlightMissingPhotos] = useState(false);
 
-  // Shared Call Out photo inputs.
+  // Shared Call Out camera input. Call Out evidence is camera-capture only.
   const callOutCameraInputRef = useRef(null);
-  const callOutPictureInputRef = useRef(null);
   const callOutPhotoTargetRef = useRef({ qid: "" });
 
   // Steps: 0=PreStart, 1=Questionnaire, 2=Review, 3=Draft creation progress
@@ -991,28 +984,20 @@ export default function CallOut() {
     });
   }
 
-  const isMobile = useMemo(() => isMobileDevice(), []);
-
   function openCallOutCamera(qid) {
     callOutPhotoTargetRef.current = { qid };
     const input = callOutCameraInputRef.current;
     if (input && typeof input.click === "function") input.click();
   }
 
-  function openCallOutPicturePicker(qid) {
-    callOutPhotoTargetRef.current = { qid };
-    const input = callOutPictureInputRef.current;
-    if (input && typeof input.click === "function") input.click();
-  }
-
   const onCallOutPhotoSelected = async (qid, file) => {
     if (!qid || !file) return;
     if (!String(file.type || "").startsWith("image/")) {
-      setErr("Please select an image file.");
+      setErr("The camera did not return a valid image.");
       return;
     }
     if (file.size > CLIENT_MAX_PHOTO_BYTES) {
-      setErr(`Photo is too large (${bytesToMb(file.size)}MB). Please choose a smaller image.`);
+      setErr(`Photo is too large (${bytesToMb(file.size)}MB). Please retake the picture at a lower image size.`);
       return;
     }
 
@@ -1914,19 +1899,7 @@ export default function CallOut() {
         ref={callOutCameraInputRef}
         type="file"
         accept="image/*"
-        {...(isMobile ? { capture: "environment" } : {})}
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const file = e.target.files && e.target.files[0];
-          const target = callOutPhotoTargetRef.current || {};
-          if (file && target.qid) onCallOutPhotoSelected(target.qid, file);
-          try { e.target.value = ""; } catch {}
-        }}
-      />
-      <input
-        ref={callOutPictureInputRef}
-        type="file"
-        accept="image/*"
+        capture="environment"
         style={{ display: "none" }}
         onChange={(e) => {
           const file = e.target.files && e.target.files[0];
@@ -2337,13 +2310,8 @@ export default function CallOut() {
 
                     <div className="d-flex flex-wrap align-items-center mb-3" style={{ gap: 8 }}>
                       <CallOutButton type="button" variant="primary" onClick={() => openCallOutCamera(q.id)}>
-                        Open camera
+                        Add picture
                       </CallOutButton>
-                      {isFirstQuestion ? (
-                        <CallOutButton type="button" variant="outline-primary" onClick={() => openCallOutPicturePicker(q.id)}>
-                          Add picture
-                        </CallOutButton>
-                      ) : null}
                       <Badge bg={photos.length ? "success" : "secondary"}>
                         {photos.length} picture{photos.length === 1 ? "" : "s"}
                       </Badge>

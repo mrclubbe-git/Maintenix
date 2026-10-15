@@ -635,6 +635,7 @@ export default function Administration() {
                   No users match the current filter.
                 </Alert>
               ) : (
+                <>
                 <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
@@ -844,6 +845,7 @@ export default function Administration() {
                     );
                   })}
                 </div>
+                </>
               )}
             </Card.Body>
           </Card>
@@ -1029,6 +1031,7 @@ export default function Administration() {
                   No notification events match the current filter.
                 </Alert>
               ) : (
+                <>
                 <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
@@ -1128,6 +1131,7 @@ export default function Administration() {
                     </Card>
                   ))}
                 </div>
+                </>
               )}
             </Card.Body>
           </Card>
@@ -1223,6 +1227,7 @@ export default function Administration() {
                   No areas match the current filter.
                 </Alert>
               ) : (
+                <>
                 <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
@@ -1340,6 +1345,7 @@ export default function Administration() {
                     </Card>
                   ))}
                 </div>
+                </>
               )}
             </Card.Body>
           </Card>

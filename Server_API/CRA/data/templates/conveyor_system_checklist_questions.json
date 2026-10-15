@@ -11,7 +11,14 @@
             },
             {
                 "question": "FiberSystem 8000 linear heat detection controller healthy; no channel / fibre fault indication.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Standard linear heat interface unit healthy; no alarm, fault or open-circuit indication.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Flame detectors clean, unobstructed and correctly aimed at the protected belt / structure.",
@@ -97,11 +104,25 @@
             },
             {
                 "question": "FiberSystem 8000 controller healthy; no relay, communication or fibre channel fault.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Standard linear heat interface unit and end-of-line supervision healthy; no circuit fault indication.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Accessible fibre optic sensor cable route, supports and protection intact.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Accessible linear heat detection cable route, supports and physical protection intact; no visible cable damage, crushing or excessive sagging.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Flame detector windows clean; detectors unobstructed and aimed correctly.",
@@ -239,15 +260,36 @@
             },
             {
                 "question": "FiberSystem 8000 controller healthy; review channel readings / trend information.",
-                "extra": "text"
+                "extra": "text",
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Standard linear heat interface unit healthy; inspect cable terminations and verify circuit supervision is normal.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Accessible fibre optic sensor cable, junctions and supports show no damage.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Accessible linear heat cable, joints, junction boxes, glands and supports show no damage, loose connections or loss of environmental sealing.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Verify fibre controller zone mapping and alarm / trouble relay outputs.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Verify correct linear heat zone identification and alarm / fault signalling at the fire alarm system.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Flame detectors clean, unobstructed and aimed correctly.",
@@ -417,19 +459,47 @@
             },
             {
                 "question": "Carry out FiberSystem 8000 annual functional checks in accordance with OEM guidance.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Inspect the accessible standard linear heat cable route, supports, joints, junction boxes and physical protection along the conveyor system.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Review fibre system event history, temperature trends and recorded faults.",
-                "extra": "text"
+                "extra": "text",
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Test the linear heat circuit fault supervision by disconnecting one leg at the end-of-line unit and confirm a fault is received.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Inspect accessible fibre optic cable route, supports and physical protection along the conveyor system.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Test the linear heat alarm circuit using the approved end-of-line test method and confirm the correct alarm is received at the fire alarm system.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Test fibre controller alarm, pre-alarm and trouble outputs.",
-                "extra": null
+                "extra": null,
+                "requiresFeature": "FIBER_LINEAR_HEAT",
+                "variants": {
+                    "STANDARD_LINEAR_HEAT": {
+                        "question": "Measure the linear heat circuit resistance and verify it is consistent with the end-of-line resistance plus the expected cable resistance.",
+                        "extra": null
+                    }
+                }
             },
             {
                 "question": "Test 100% of installed flame detectors by approved annual method / OEM self-test.",

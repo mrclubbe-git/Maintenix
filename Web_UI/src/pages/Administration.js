@@ -576,7 +576,7 @@ export default function Administration() {
 
             <Card.Body>
               <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
-                <Form.Group style={{ minWidth: 240, flex: "1 1 320px" }}>
+                <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search users</Form.Label>
                   <Form.Control
                     type="search"
@@ -635,12 +635,13 @@ export default function Administration() {
                   No users match the current filter.
                 </Alert>
               ) : (
-                <Table
-                  hover
-                  size="sm"
-                  className="align-middle mb-0"
-                  style={{ fontSize: "0.875rem", width: "100%" }}
-                >
+                <div className="table-responsive">
+                  <Table
+                    hover
+                    size="sm"
+                    className="align-middle mb-0 mobile-wrap-table"
+                    style={{ fontSize: "0.875rem", width: "100%" }}
+                  >
                   <thead>
                     <tr>
                       <th className="px-2 py-2" style={{ width: "22%" }}>User</th>
@@ -743,6 +744,7 @@ export default function Administration() {
                     })}
                   </tbody>
                 </Table>
+                </div>
               )}
             </Card.Body>
           </Card>
@@ -888,7 +890,7 @@ export default function Administration() {
 
             <Card.Body>
               <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
-                <Form.Group style={{ minWidth: 240, flex: "1 1 320px" }}>
+                <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search events</Form.Label>
                   <Form.Control
                     type="search"
@@ -901,7 +903,7 @@ export default function Administration() {
                   />
                 </Form.Group>
 
-                <Form.Group style={{ minWidth: 190 }}>
+                <Form.Group className="mobile-min-width-0" style={{ minWidth: 190 }}>
                   <Form.Label>Category</Form.Label>
                   <Form.Select
                     value={eventCategory}
@@ -928,12 +930,13 @@ export default function Administration() {
                   No notification events match the current filter.
                 </Alert>
               ) : (
-                <Table
-                  hover
-                  size="sm"
-                  className="align-middle mb-0"
-                  style={{ fontSize: "0.875rem", width: "100%" }}
-                >
+                <div className="table-responsive">
+                  <Table
+                    hover
+                    size="sm"
+                    className="align-middle mb-0 mobile-wrap-table"
+                    style={{ fontSize: "0.875rem", width: "100%" }}
+                  >
                   <thead>
                     <tr>
                       <th className="px-2 py-2" style={{ width: "34%" }}>Event</th>
@@ -978,6 +981,7 @@ export default function Administration() {
                     ))}
                   </tbody>
                 </Table>
+                </div>
               )}
             </Card.Body>
           </Card>
@@ -1033,7 +1037,7 @@ export default function Administration() {
 
             <Card.Body>
               <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
-                <Form.Group style={{ minWidth: 240, flex: "1 1 320px" }}>
+                <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search areas</Form.Label>
                   <Form.Control
                     type="search"
@@ -1073,12 +1077,13 @@ export default function Administration() {
                   No areas match the current filter.
                 </Alert>
               ) : (
-                <Table
-                  hover
-                  size="sm"
-                  className="align-middle mb-0"
-                  style={{ fontSize: "0.875rem", width: "100%" }}
-                >
+                <div className="table-responsive">
+                  <Table
+                    hover
+                    size="sm"
+                    className="align-middle mb-0 mobile-wrap-table"
+                    style={{ fontSize: "0.875rem", width: "100%" }}
+                  >
                   <thead>
                     <tr>
                       <th className="px-2 py-2" style={{ width: "31%" }}>Area</th>
@@ -1128,6 +1133,7 @@ export default function Administration() {
                     ))}
                   </tbody>
                 </Table>
+                </div>
               )}
             </Card.Body>
           </Card>

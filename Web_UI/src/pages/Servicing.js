@@ -2327,7 +2327,7 @@ export default function Servicing() {
           ) : null}
         </div>
 
-        <div className="d-flex align-items-center" style={{ gap: 8 }}>
+        <div className="d-flex align-items-center flex-wrap" style={{ gap: 8 }}>
           <Badge bg="info">{step === 3 ? "Saving Draft" : `Step ${step + 1} / 3`}</Badge>
 
           <ServicingButton
@@ -2371,7 +2371,7 @@ export default function Servicing() {
           {err ? <Alert variant="danger" className="mb-2">{err}</Alert> : null}
           {correctionContext ? (
             <Alert variant="warning" className="mb-2">
-              Creating corrected follow-up for <strong>{correctionContext.correctionOf}</strong>
+              Creating corrected follow-up for <strong className="mobile-break-anywhere">{correctionContext.correctionOf}</strong>
               {correctionContext.reason ? <div className="mt-1">Reject reason: {correctionContext.reason}</div> : null}
             </Alert>
           ) : null}
@@ -2392,11 +2392,11 @@ export default function Servicing() {
             ) : (
               jobs.slice(0, 10).map((j) => (
                 <div key={j.id} className="d-flex justify-content-between align-items-center flex-wrap mb-2" style={{ gap: 10 }}>
-                  <div>
-                    <div className="fw-bold">
+                  <div className="mobile-break-anywhere" style={{ minWidth: 0, flex: "1 1 220px" }}>
+                    <div className="fw-bold mobile-break-anywhere">
                       {j.summary?.area || "-"} • {j.summary?.serviceType || "-"}
                     </div>
-                    <div className="text-muted small">
+                    <div className="text-muted small mobile-break-anywhere">
                       {j.createdAt ? new Date(j.createdAt).toLocaleString() : ""} • {j.status}
                       {j.reportId ? ` • ${j.reportId}` : ""}
                       {j.error ? ` • ${j.error}` : ""}
@@ -2404,7 +2404,7 @@ export default function Servicing() {
                     </div>
                   </div>
 
-                  <div className="d-flex align-items-center" style={{ gap: 8 }}>
+                  <div className="d-flex align-items-center flex-wrap" style={{ gap: 8 }}>
                     {j.status === "done" && j.result?.url ? (
                       <ServicingButton
                         variant="outline-primary"
@@ -3012,7 +3012,7 @@ export default function Servicing() {
       {/* STEP 3: REVIEW */}
       {step === 2 ? (
         <Card border="light" className="shadow-sm">
-          <Card.Header className="d-flex justify-content-between align-items-center">
+          <Card.Header className="d-flex justify-content-between align-items-center flex-wrap" style={{ gap: 8 }}>
             <h5 className="mb-0">Review</h5>
             <small className="text-muted">Incomplete: {unansweredCount} • Defects found: {defectsFoundCount}</small>
           </Card.Header>

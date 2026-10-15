@@ -954,9 +954,9 @@ function openMove(i, type) {
       {/* Movement History (Admin/L2/L3) */}
       {canViewAudit ? (
         <Card border="light" className="shadow-sm mt-4">
-          <Card.Header className="d-flex justify-content-between align-items-center">
+          <Card.Header className="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center" style={{ gap: 10 }}>
             <h5 className="mb-0">Recent stock movements</h5>
-            <div className="d-flex align-items-center" style={{ gap: 10 }}>
+            <div className="d-flex align-items-center mobile-stack-btn-group" style={{ gap: 10 }}>
               <>
                 {canDownloadCsv ? (
                   <Button

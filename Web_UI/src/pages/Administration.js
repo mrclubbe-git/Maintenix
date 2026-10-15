@@ -525,7 +525,7 @@ export default function Administration() {
           {userMessage ? <Alert variant="success">{userMessage}</Alert> : null}
 
           <Row className="g-3 mb-4">
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">All users</div>
@@ -533,7 +533,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Pending</div>
@@ -541,7 +541,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Active</div>
@@ -549,7 +549,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Denied</div>
@@ -575,7 +575,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search users</Form.Label>
                   <Form.Control
@@ -589,7 +589,7 @@ export default function Administration() {
                   />
                 </Form.Group>
 
-                <div className="d-flex flex-wrap" style={{ gap: 8 }}>
+                <div className="d-flex flex-column flex-sm-row" style={{ gap: 8 }}>
                   <Button
                     type="button"
                     size="sm"
@@ -635,7 +635,8 @@ export default function Administration() {
                   No users match the current filter.
                 </Alert>
               ) : (
-                <div className="table-responsive">
+                <>
+                <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
                     size="sm"
@@ -745,6 +746,106 @@ export default function Administration() {
                   </tbody>
                 </Table>
                 </div>
+
+                <div className="d-md-none">
+                  {visibleUsers.map((user) => {
+                    const status = normalizeUserStatus(user.status);
+                    const isSelf = String(user.id || "") === String(authUser?.id || "");
+                    const busy = userActionId === String(user.id || "");
+
+                    return (
+                      <Card key={user.id} border="light" className="shadow-sm mb-3">
+                        <Card.Body>
+                          <div className="d-flex flex-column" style={{ gap: 12 }}>
+                            <div className="mobile-break-anywhere">
+                              <div className="fw-bold">{user.name || "Unnamed user"}</div>
+                              {isSelf ? <div className="text-muted small">Current account</div> : null}
+                              <div className="text-muted small mobile-break-anywhere">{user.email || "—"}</div>
+                            </div>
+
+                            <div>
+                              <div className="text-muted small mb-1">Status</div>
+                              <Badge
+                                bg={userStatusVariant(user.status)}
+                                text={status === "PENDING" ? "dark" : undefined}
+                              >
+                                {userStatusLabel(user.status)}
+                              </Badge>
+                            </div>
+
+                            <Form.Group>
+                              <Form.Label className="text-muted small mb-1">Role</Form.Label>
+                              <Form.Select
+                                size="sm"
+                                value={String(user.role || "L1").toUpperCase()}
+                                disabled={busy || isSelf}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.value;
+                                  changeUserRole(user, value);
+                                }}
+                                aria-label={`Role for ${user.name || user.email || "user"}`}
+                              >
+                                <option value="L1">L1</option>
+                                <option value="L2">L2</option>
+                                <option value="L3">L3</option>
+                                <option value="ADMIN">ADMIN</option>
+                              </Form.Select>
+                            </Form.Group>
+
+                            <div>
+                              <div className="text-muted small">Created</div>
+                              <div>{formatAdminDate(user.createdAt)}</div>
+                              {user.approvedBy ? <div className="text-muted small">By {user.approvedBy}</div> : null}
+                            </div>
+
+                            <div className="d-grid" style={{ gap: 8 }}>
+                              {status !== "APPROVED" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="success"
+                                  disabled={busy}
+                                  onClick={() => approveUser(user)}
+                                >
+                                  {busy ? <Spinner size="sm" /> : "Approve"}
+                                </Button>
+                              ) : null}
+
+                              {status === "PENDING" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline-danger"
+                                  disabled={busy}
+                                  onClick={() => denyUser(user)}
+                                >
+                                  Deny
+                                </Button>
+                              ) : null}
+
+                              {!isSelf ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline-danger"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setUserError("");
+                                    setUserMessage("");
+                                    setUserToDelete(user);
+                                  }}
+                                >
+                                  Remove
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    );
+                  })}
+                </div>
+                </>
               )}
             </Card.Body>
           </Card>
@@ -757,7 +858,7 @@ export default function Administration() {
           {notificationMessage ? <Alert variant="success">{notificationMessage}</Alert> : null}
 
           <Row className="g-3 mb-4">
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Registered events</div>
@@ -765,7 +866,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Mandatory</div>
@@ -773,7 +874,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Default acknowledgement</div>
@@ -781,7 +882,7 @@ export default function Administration() {
                 </Card.Body>
               </Card>
             </Col>
-            <Col xs={6} md={3}>
+            <Col xs={12} sm={6} md={3}>
               <Card border="light" className="shadow-sm h-100">
                 <Card.Body>
                   <div className="text-muted small">Categories</div>
@@ -889,7 +990,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search events</Form.Label>
                   <Form.Control
@@ -930,7 +1031,8 @@ export default function Administration() {
                   No notification events match the current filter.
                 </Alert>
               ) : (
-                <div className="table-responsive">
+                <>
+                <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
                     size="sm"
@@ -982,6 +1084,54 @@ export default function Administration() {
                   </tbody>
                 </Table>
                 </div>
+
+                <div className="d-md-none">
+                  {visibleNotificationEvents.map((event) => (
+                    <Card key={event.eventType} border="light" className="shadow-sm mb-3">
+                      <Card.Body>
+                        <div className="d-flex flex-column" style={{ gap: 12 }}>
+                          <div className="mobile-break-anywhere">
+                            <div className="fw-bold mobile-break-anywhere">{event.eventType}</div>
+                            <div className="text-muted small mobile-break-anywhere">{event.description || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Category</div>
+                            <Badge bg="secondary">{event.category || "GENERAL"}</Badge>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Channels</div>
+                            <div className="d-flex flex-wrap" style={{ gap: 4 }}>
+                              {(Array.isArray(event.deliveryChannels) ? event.deliveryChannels : []).map((channel) => (
+                                <Badge bg="info" text="dark" key={channel}>{channel}</Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Acknowledgement</div>
+                            {event.defaultRequiresAck ? (
+                              <Badge bg="warning" text="dark">Required by default</Badge>
+                            ) : (
+                              <Badge bg="light" text="dark">Not required</Badge>
+                            )}
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Rule</div>
+                            {event.mandatory ? (
+                              <Badge bg="danger">Mandatory</Badge>
+                            ) : (
+                              <Badge bg="light" text="dark">Standard</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </div>
+                </>
               )}
             </Card.Body>
           </Card>
@@ -1036,7 +1186,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-wrap align-items-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search areas</Form.Label>
                   <Form.Control
@@ -1047,7 +1197,7 @@ export default function Administration() {
                   />
                 </Form.Group>
 
-                <div className="d-flex flex-wrap" style={{ gap: 8 }}>
+                <div className="d-flex flex-column flex-sm-row" style={{ gap: 8 }}>
                   <Button
                     type="button"
                     size="sm"
@@ -1077,7 +1227,8 @@ export default function Administration() {
                   No areas match the current filter.
                 </Alert>
               ) : (
-                <div className="table-responsive">
+                <>
+                <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
                     size="sm"
@@ -1134,6 +1285,67 @@ export default function Administration() {
                   </tbody>
                 </Table>
                 </div>
+
+                <div className="d-md-none">
+                  {visibleAreas.map((area) => (
+                    <Card key={area.area} border="light" className="shadow-sm mb-3">
+                      <Card.Body>
+                        <div className="d-flex flex-column" style={{ gap: 12 }}>
+                          <div className="mobile-break-anywhere">
+                            <div className="fw-bold mobile-break-anywhere">{area.area}</div>
+                            {area.baseArea ? (
+                              <div className="text-muted small mobile-break-anywhere">{area.baseArea}</div>
+                            ) : null}
+                          </div>
+
+                          <div>
+                            <div className="text-muted small">Section</div>
+                            <div className="mobile-break-anywhere">{area.section || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small">F / First</div>
+                            <div>{area.first || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small">G / Second</div>
+                            <div>{area.second || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-muted small mb-1">Status</div>
+                            {area.status === "CONFIGURED" ? (
+                              <Badge bg="success">Configured</Badge>
+                            ) : (
+                              <Badge bg="warning" text="dark">Metadata required</Badge>
+                            )}
+                            <div className="text-muted small mt-1">{sourceLabel(area)}</div>
+                          </div>
+
+                          <div className="mobile-break-anywhere">
+                            <div className="text-muted small">Added by</div>
+                            <div className="mobile-break-anywhere">{area.addedBy || "—"}</div>
+                            {area.updatedBy ? (
+                              <div className="text-muted small mobile-break-anywhere">Updated by {area.updatedBy}</div>
+                            ) : null}
+                          </div>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="w-100"
+                            variant={area.status === "PENDING" ? "primary" : "outline-primary"}
+                            onClick={() => openEditor(area)}
+                          >
+                            {area.status === "PENDING" ? "Configure" : "Edit"}
+                          </Button>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </div>
+                </>
               )}
             </Card.Body>
           </Card>

@@ -1699,3 +1699,31 @@ Validation/deployment support:
 - GitHub Pages run `38700067709` completed successfully; build and deploy both passed.
 - No backend change or CRA DEV service restart is required.
 
+## Mobile overflow safeguards + rollback point — 2026-10-15
+
+- Created explicit pre-change rollback branches before the mobile overflow corrections:
+  - source rollback: `rollback/mobile-overflow-pre-fix-20261015` at `cd047b7026adbc69ce6e8792abb8c77ea77d9bd1`;
+  - deployed-UI rollback: `rollback/mobile-overflow-pre-fix-deploy-20261015` at `3eb1ae6487ce00910e4241c98d0fb174b0a8d184`.
+- Mobile-only overflow safeguards were implemented without changing the accepted desktop layout intent:
+  - Administration Users, Notifications and Areas tables now sit inside responsive containers and use the existing mobile wrapping table utility;
+  - Administration search/filter controls can release desktop minimum widths on narrow phones;
+  - Stock Control Recent stock movements header/actions stack safely on mobile;
+  - Daily Planner titles/descriptions/assignee metadata can break long content and wrap on mobile;
+  - mobile Sidebar user greeting/display name can shrink and wrap between avatar and close control;
+  - Servicing and Call Out correction IDs, queue identifiers/errors and queue actions can wrap safely inside cards;
+  - Servicing and Call Out top action rows and Review headers can wrap when mobile width requires it.
+- Added reusable mobile helpers in `Web_UI/src/scss/volt.scss`:
+  - `.mobile-min-width-0`;
+  - `.mobile-break-anywhere`.
+- Main commits:
+  - mobile utilities `62ac55eb4904615cbe13c89c0d189dde8cc86893`;
+  - Administration tables/filters `957005b694182dafeb595f1064fcdb9a678dc99b`;
+  - Stock Control header/actions `e16898389b86e6d8c976b3981cbef1c69b52ac5b`;
+  - Daily Planner wrapping `03e23f502eb612f38cd679d41c5be0dba47bb493`;
+  - Sidebar user details `952ae269c31affb7a4f1b7c4f808243ec8fe4828`;
+  - Call Out dynamic content `bae5cfc0a193fcf9b24a978df43817807fa2ae98`;
+  - Servicing dynamic content `5827f22e4a527e8344841c43bfbe470e55a37915`.
+- Final deploy head: `4c7875dfcd1d8969ccf92478313f488c7d0311a0`.
+- GitHub Pages run `38722702839` completed successfully; build and deploy both passed.
+- Frontend-only change: no CRA backend files changed and no DEV service restart is required.
+

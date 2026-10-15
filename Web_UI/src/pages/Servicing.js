@@ -106,17 +106,19 @@ function dedupeChecklistQuestions(std, questions) {
 
     const previousIndex = indexByKey.get(key);
     if (previousIndex !== undefined) {
-      // Higher-frequency wording supersedes the equivalent lower-frequency
-      // check, so the technician sees the requirement once at its most
-      // appropriate service depth.
-      merged[previousIndex] = null;
+      // Keep the earliest cumulative position (Weekly before Monthly before
+      // Quarterly before Annual), but use the latest applicable wording.
+      // This prevents duplicates without moving recurring Weekly checks down
+      // into the selected frequency section.
+      merged[previousIndex] = question;
+      return;
     }
 
     indexByKey.set(key, merged.length);
     merged.push(question);
   });
 
-  return merged.filter(Boolean);
+  return merged;
 }
 
 function mergeQuestions(checklist, frequencyKey, standards) {

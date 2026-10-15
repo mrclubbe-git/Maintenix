@@ -173,13 +173,16 @@ function mergeCumulativeForTest(source, targetFrequency, standard) {
     for (const question of questions) {
       const key = effectiveQuestionKey(standard, question);
       const previousIndex = indexByKey.get(key);
-      if (previousIndex !== undefined) merged[previousIndex] = null;
+      if (previousIndex !== undefined) {
+        merged[previousIndex] = question;
+        continue;
+      }
       indexByKey.set(key, merged.length);
       merged.push(question);
     }
   }
 
-  return merged.filter(Boolean);
+  return merged;
 }
 
 test("cumulative servicing merge contains no duplicate logical checks", () => {
@@ -231,4 +234,50 @@ test("higher-frequency conveyor wording supersedes recurring lower-frequency che
     flameVisualRows[0].question,
     "Flame detector windows clean; detectors unobstructed and aimed correctly."
   );
+});
+
+
+test("cumulative servicing order stays Weekly-first while later wording supersedes duplicates", () => {
+  const order = ["weekly", "monthly", "quarterly", "annual"];
+  const sources = [
+    { name: "substation", data: checklist },
+    { name: "conveyor", data: conveyorChecklist }
+  ];
+
+  for (const source of sources) {
+    for (const targetFrequency of order) {
+      const targetIndex = order.indexOf(targetFrequency);
+      const standards = new Set();
+      for (const frequency of order.slice(0, targetIndex + 1)) {
+        Object.keys(source.data?.[frequency] || {}).forEach((standard) => standards.add(standard));
+      }
+
+      for (const standard of standards) {
+        const firstOccurrenceKeys = [];
+        const seen = new Set();
+
+        for (const frequency of order.slice(0, targetIndex + 1)) {
+          const questions = Array.isArray(source.data?.[frequency]?.[standard])
+            ? source.data[frequency][standard]
+            : [];
+
+          for (const question of questions) {
+            const key = effectiveQuestionKey(standard, question);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            firstOccurrenceKeys.push(key);
+          }
+        }
+
+        const mergedKeys = mergeCumulativeForTest(source.data, targetFrequency, standard)
+          .map((question) => effectiveQuestionKey(standard, question));
+
+        assert.deepEqual(
+          mergedKeys,
+          firstOccurrenceKeys,
+          `${source.name} ${targetFrequency} ${standard} must keep first-frequency ordering`
+        );
+      }
+    }
+  }
 });

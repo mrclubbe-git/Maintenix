@@ -7,7 +7,11 @@ const {
   resolveUnder,
   ensureDir: ensureReportDir
 } = require("./reportStorage");
-const { filterServicingResponses, normalizeYesNoChoice } = require("./servicingFeatures");
+const {
+  filterServicingResponses,
+  normalizeYesNoChoice,
+  normalizeLinearHeatType
+} = require("./servicingFeatures");
 
 // DOCX templating
 let PizZip = null;
@@ -179,7 +183,8 @@ async function generateServicingDocx(opts) {
 
   const rawResponses = Array.isArray(payload?.responses) ? payload.responses : [];
   const responses = filterServicingResponses(rawResponses, {
-    asdInstalled: payload?.asdInstalled
+    asdInstalled: payload?.asdInstalled,
+    linearHeatType: payload?.linearHeatType
   });
 
   // Build table rows and enforce required photos.
@@ -470,6 +475,11 @@ async function generateServicingDocx(opts) {
       ? "Yes"
       : normalizeYesNoChoice(payload?.asdInstalled) === "no"
         ? "No"
+        : "",
+    linearHeatType: normalizeLinearHeatType(payload?.linearHeatType) === "standard"
+      ? "Standard linear heat"
+      : normalizeLinearHeatType(payload?.linearHeatType) === "fiber"
+        ? "Fiber linear heat"
         : "",
     technician: payload?.technician || resolvedOwner?.name || resolvedOwner?.email || "",
     createdAt: createdDateOnly,

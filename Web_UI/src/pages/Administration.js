@@ -635,7 +635,7 @@ export default function Administration() {
                   No users match the current filter.
                 </Alert>
               ) : (
-                <div className="table-responsive">
+                <div className="table-responsive d-none d-md-block">
                   <Table
                     hover
                     size="sm"
@@ -744,6 +744,105 @@ export default function Administration() {
                     })}
                   </tbody>
                 </Table>
+                </div>
+
+                <div className="d-md-none">
+                  {visibleUsers.map((user) => {
+                    const status = normalizeUserStatus(user.status);
+                    const isSelf = String(user.id || "") === String(authUser?.id || "");
+                    const busy = userActionId === String(user.id || "");
+
+                    return (
+                      <Card key={user.id} border="light" className="shadow-sm mb-3">
+                        <Card.Body>
+                          <div className="d-flex flex-column" style={{ gap: 12 }}>
+                            <div className="mobile-break-anywhere">
+                              <div className="fw-bold">{user.name || "Unnamed user"}</div>
+                              {isSelf ? <div className="text-muted small">Current account</div> : null}
+                              <div className="text-muted small mobile-break-anywhere">{user.email || "—"}</div>
+                            </div>
+
+                            <div>
+                              <div className="text-muted small mb-1">Status</div>
+                              <Badge
+                                bg={userStatusVariant(user.status)}
+                                text={status === "PENDING" ? "dark" : undefined}
+                              >
+                                {userStatusLabel(user.status)}
+                              </Badge>
+                            </div>
+
+                            <Form.Group>
+                              <Form.Label className="text-muted small mb-1">Role</Form.Label>
+                              <Form.Select
+                                size="sm"
+                                value={String(user.role || "L1").toUpperCase()}
+                                disabled={busy || isSelf}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.value;
+                                  changeUserRole(user, value);
+                                }}
+                                aria-label={`Role for ${user.name || user.email || "user"}`}
+                              >
+                                <option value="L1">L1</option>
+                                <option value="L2">L2</option>
+                                <option value="L3">L3</option>
+                                <option value="ADMIN">ADMIN</option>
+                              </Form.Select>
+                            </Form.Group>
+
+                            <div>
+                              <div className="text-muted small">Created</div>
+                              <div>{formatAdminDate(user.createdAt)}</div>
+                              {user.approvedBy ? <div className="text-muted small">By {user.approvedBy}</div> : null}
+                            </div>
+
+                            <div className="d-grid" style={{ gap: 8 }}>
+                              {status !== "APPROVED" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="success"
+                                  disabled={busy}
+                                  onClick={() => approveUser(user)}
+                                >
+                                  {busy ? <Spinner size="sm" /> : "Approve"}
+                                </Button>
+                              ) : null}
+
+                              {status === "PENDING" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline-danger"
+                                  disabled={busy}
+                                  onClick={() => denyUser(user)}
+                                >
+                                  Deny
+                                </Button>
+                              ) : null}
+
+                              {!isSelf ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline-danger"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setUserError("");
+                                    setUserMessage("");
+                                    setUserToDelete(user);
+                                  }}
+                                >
+                                  Remove
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </Card.Body>

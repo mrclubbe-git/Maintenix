@@ -360,6 +360,7 @@ Do not consider the migration complete until all applicable checks pass:
 - [ ] Adding a genuinely new Area creates a PENDING runtime metadata record and Admin notification without blocking Servicing.
 - [ ] Configured runtime Area metadata overrides baseline/fuzzy resolution for future reports.
 - [ ] Substation NFPA 72 Servicing requires an ASD-installed choice; ASD = No excludes ASD questions from the session, draft payload and generated report.
+- [ ] Conveyor NFPA 72 Servicing requires a Linear heat type choice; Fiber keeps the existing fibre/FiberSystem questions, while Standard substitutes the approved interface-unit/end-of-line question set in the session, saved draft and generated report.
 - [ ] Servicing queue worker processes a test job.
 - [ ] Call Out queue worker processes a test job.
 - [ ] Formal Reporting worker health passes.

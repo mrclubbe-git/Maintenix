@@ -67,6 +67,15 @@ D. Backward compatibility
    - Older Conveyor + NFPA 72 drafts without linearHeatType are treated as
      Fiber linear heat because the previous conveyor checklist was fibre-based.
 
+E. Cumulative frequency question deduplication
+   Weekly questions still roll into Monthly, Monthly into Quarterly, and so on.
+   When a higher-frequency checklist contains the same logical check again,
+   dedupeKey metadata makes the higher-frequency wording supersede the lower-
+   frequency copy instead of presenting both to the technician.
+   Exact duplicate question wording is also automatically deduplicated by the
+   shared Servicing merge logic.
+   This merge rule is shared by both Substation and Conveyor workflows.
+
 Suggested DEV validation
 ------------------------
 1. Restart maintenix-dev-api.service.
@@ -78,14 +87,19 @@ Suggested DEV validation
    returns 10 NFPA 72 fibre rows tagged:
      "requiresFeature": "FIBER_LINEAR_HEAT"
    and each contains a STANDARD_LINEAR_HEAT variant.
-4. Run one Conveyor NFPA 72 session with Fiber linear heat.
-5. Run one Conveyor NFPA 72 session with Standard linear heat.
-6. Save both drafts and confirm each snapshot contains only its selected
+4. Select Monthly on both a Substation and Conveyor session and confirm a
+   recurring lower-frequency logical check is shown only once.
+5. On Conveyor Monthly confirm examples such as panel NORMAL, linear heat
+   controller health and flame detector visual condition are not duplicated by
+   their Weekly equivalents.
+6. Run one Conveyor NFPA 72 session with Fiber linear heat.
+7. Run one Conveyor NFPA 72 session with Standard linear heat.
+8. Save both drafts and confirm each snapshot contains only its selected
    linear heat question wording.
-7. Generate both reports and confirm the final DOCX contains only the selected
-   linear heat variant.
-8. Re-test one Substation ASD = No report to confirm the cumulative package has
-   not regressed ASD filtering.
+9. Generate both reports and confirm the final DOCX contains only the selected
+   linear heat variant and contains no duplicate logical checklist rows.
+10. Re-test one Substation ASD = No report to confirm the cumulative package has
+    not regressed ASD filtering.
 
 LIVE
 ----

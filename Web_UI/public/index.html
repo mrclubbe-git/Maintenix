@@ -16,10 +16,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="description" content="Maintenix for Collaborative Risk Applications" />
+  <meta name="maintenix-api-base" content="%REACT_APP_API_BASE_URL%" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://dev-api.main-tenix.com; connect-src 'self' https://dev-api.main-tenix.com http://localhost:* http://127.0.0.1:*; font-src 'self' data:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
 
-  <script>
-    window.__MAINTENIX_API_BASE_URL__ = "%REACT_APP_API_BASE_URL%";
-  </script>
   <script src="%PUBLIC_URL%/api-bootstrap.js"></script>
 
   <title>Maintenix - Collaborative Risk Applications</title>

@@ -30,8 +30,8 @@ const pageMarkup = `
         <label class="field field-wide"><span>Reporting section / area</span><select id="section" required><option value="">Select area</option></select><small id="system-count">Select an area to view its systems.</small></label>
         <label class="field"><span>Month</span><input id="month" type="month" required></label>
         <label class="field"><span>Calendar week number</span><select id="week" required><option value="">Select week</option></select><small id="week-range">Monday–Sunday date range will appear here.</small></label>
-        <label class="field"><span>Compiled by</span><input id="compiled-name" type="text" autocomplete="name" placeholder="Name and surname" required></label>
-        <label class="field"><span>Designation / position</span><input id="compiled-designation" type="text" placeholder="Designation or position" required></label>
+        <label class="field"><span>Compiled by</span><input id="compiled-name" type="text" autocomplete="name" placeholder="Name and surname" maxlength="120" required></label>
+        <label class="field"><span>Designation / position</span><input id="compiled-designation" type="text" placeholder="Designation or position" maxlength="160" required></label>
         <div class="actions field-wide"><button class="btn btn-primary" type="submit">Start questionnaire</button></div>
       </form>
     </section>

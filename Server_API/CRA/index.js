@@ -2,7 +2,11 @@ const express = require("express");
 const os = require("os");
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
+
+const { allowedOrigins, csrfProtection } = require("./lib/requestSecurity");
+const { extractSessionToken, getSession } = require("./lib/sessions");
+const { getUsers } = require("./lib/userStore");
 
 // routes
 const authRoutes = require("./routes/auth");
@@ -23,30 +27,27 @@ const dailyPlannerRoutes = require("./routes/dailyPlanner");
 const formalReportsRoutes = require("./routes/formalReports");
 
 const app = express();
+const allowedCorsOrigins = allowedOrigins();
+const ORGANIZATION_CODE = String(process.env.ORGANIZATION_CODE || "CRA").trim().toUpperCase() || "CRA";
 
-const DEFAULT_CORS_ORIGINS = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "https://mrclubbe-git.github.io"
-];
-
-const allowedCorsOrigins = new Set(
-  String(process.env.CORS_ORIGINS || DEFAULT_CORS_ORIGINS.join(","))
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean)
-);
+app.disable("x-powered-by");
 
 app.use((req, res, next) => {
   const origin = String(req.headers.origin || "").trim();
 
   if (origin && allowedCorsOrigins.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Vary", "Origin");
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,X-CSRF-Token");
+  res.setHeader("Access-Control-Max-Age", "600");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+  res.setHeader("X-Frame-Options", "DENY");
 
   if (String(req.headers["access-control-request-private-network"] || "").toLowerCase() === "true") {
     res.setHeader("Access-Control-Allow-Private-Network", "true");
@@ -60,15 +61,21 @@ app.use((req, res, next) => {
   next();
 });
 
-/**
- * ✅ Increase request body limits for base64 uploads (profile photos, etc.)
- * Base64 inflates size, so default limits can cause 500 errors.
- */
-app.use(express.json({ limit: "75mb" }));
-app.use(express.urlencoded({ extended: true, limit: "75mb" }));
+// JSON data URLs remain supported for profile images, but individual upload
+// routes apply much tighter byte/type limits before anything is persisted.
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Session-bound CSRF protection is applied centrally to authenticated writes.
+app.use(csrfProtection);
 
 // Serve uploaded files (profile pics, report photos, reports, etc.)
-app.use("/uploads", express.static(path.join(__dirname, "data", "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "data", "uploads"), {
+  fallthrough: true,
+  setHeaders(res) {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+  }
+}));
 
 // mount API routes
 app.use("/api/auth", authRoutes);
@@ -88,21 +95,27 @@ app.use("/api/push", pushRoutes);
 app.use("/api/daily-planner", dailyPlannerRoutes);
 app.use("/api/formal-reports", formalReportsRoutes);
 
-app.get("/api/health", (req, res) => res.json({ ok: true }));
+app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-/**
- * ✅ Cleanly handle payload-too-large errors (prevents confusing 500s)
- * This catches body-parser errors like entity.too.large and returns 413.
- */
-app.use((err, req, res, next) => {
-  if (err && (err.type === "entity.too.large" || err.status === 413)) {
-    return res.status(413).json({
-      ok: false,
-      message: "Image too large. Please upload a smaller photo."
-    });
+function requireAdminMetrics(req, res, next) {
+  const token = extractSessionToken(req);
+  const session = token ? getSession(token) : null;
+  if (!session?.userId) return res.status(401).json({ ok: false, message: "Not logged in." });
+
+  const user = getUsers().find((entry) => String(entry.id) === String(session.userId)) || null;
+  if (!user) return res.status(401).json({ ok: false, message: "Not logged in." });
+
+  const userOrg = String(user.organization || session.organization || ORGANIZATION_CODE).trim().toUpperCase();
+  if (userOrg !== ORGANIZATION_CODE) {
+    return res.status(403).json({ ok: false, message: "Not authorised for this organisation." });
   }
-  next(err);
-});
+
+  const role = String(user.role || "").trim().toUpperCase();
+  if (role !== "ADMIN") return res.status(403).json({ ok: false, message: "Admin only." });
+
+  req.user = user;
+  next();
+}
 
 // ---- CPU usage from /proc/stat (Linux) ----
 function readProcStat() {
@@ -142,14 +155,11 @@ function cpuUsagePercent() {
   return Math.max(0, Math.min(100, Number(usage.toFixed(1))));
 }
 
-// ---- Disk usage (Linux via df -P) ----
 function diskUsage(mountPath = "/") {
-  const out = execSync(`df -P ${mountPath}`, { encoding: "utf8" })
-    .trim()
-    .split("\n");
-  if (out.length < 2) return null;
+  const output = execFileSync("df", ["-P", mountPath], { encoding: "utf8" }).trim().split("\n");
+  if (output.length < 2) return null;
 
-  const cols = out[1].split(/\s+/);
+  const cols = output[1].split(/\s+/);
   const totalKB = parseInt(cols[1], 10);
   const usedKB = parseInt(cols[2], 10);
   const availKB = parseInt(cols[3], 10);
@@ -157,36 +167,47 @@ function diskUsage(mountPath = "/") {
   const total = totalKB * 1024;
   const used = usedKB * 1024;
   const free = availKB * 1024;
-
   const usedPercent = total > 0 ? (used / total) * 100 : 0;
 
   return {
     mountPath,
     storageUsedPercent: Math.max(0, Math.min(100, Number(usedPercent.toFixed(1)))),
-    storageFreeGB: Math.max(0, Math.round(free / (1024 ** 3))),
+    storageFreeGB: Math.max(0, Math.round(free / (1024 ** 3)))
   };
 }
 
-// This endpoint discloses host details. It is disabled unless deliberately
-// enabled for a trusted, non-public environment.
-if (String(process.env.SERVER_STATUS_ENABLED || "").toLowerCase() === "true") {
-  app.get("/api/server/status", (_req, res) => {
-    try {
-      const host = os.hostname();
-      const cpu = cpuUsagePercent();
-      const disk = diskUsage("/") || { storageUsedPercent: 0, storageFreeGB: 0 };
+// Detailed telemetry is deliberately ADMIN-only. It remains on the historical
+// endpoint because Administration -> System consumes it.
+app.get("/api/server/status", requireAdminMetrics, (_req, res) => {
+  try {
+    const disk = diskUsage("/") || { storageUsedPercent: 0, storageFreeGB: 0 };
+    res.setHeader("Cache-Control", "no-store, private");
+    return res.json({
+      ok: true,
+      service: "Maintenix CRA API",
+      host: os.hostname(),
+      cpuUsagePercent: cpuUsagePercent(),
+      storageUsedPercent: disk.storageUsedPercent,
+      storageFreeGB: disk.storageFreeGB,
+      processUptimeSeconds: Math.round(process.uptime())
+    });
+  } catch {
+    return res.status(500).json({ ok: false, message: "Failed to read server metrics." });
+  }
+});
 
-      res.json({
-        host,
-        cpuUsagePercent: cpu,
-        storageUsedPercent: disk.storageUsedPercent,
-        storageFreeGB: disk.storageFreeGB,
-      });
-    } catch (e) {
-      res.status(500).json({ error: "Failed to read server metrics" });
-    }
-  });
-}
+/**
+ * Cleanly handle payload-too-large errors (prevents confusing 500s).
+ */
+app.use((err, _req, res, next) => {
+  if (err && (err.type === "entity.too.large" || err.status === 413 || err.code === "LIMIT_FILE_SIZE")) {
+    return res.status(413).json({
+      ok: false,
+      message: "Upload is too large. Please choose a smaller image."
+    });
+  }
+  next(err);
+});
 
 const PORT = process.env.PORT || 5055;
 const HOST = process.env.HOST || "127.0.0.1";

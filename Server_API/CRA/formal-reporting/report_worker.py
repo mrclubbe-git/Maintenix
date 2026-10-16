@@ -165,7 +165,7 @@ def replace_paragraph_tokens(document, replacements: dict[str, str]) -> None:
             paragraph.text = updated
 
 
-def build_report(payload: dict, model: str, systems: list[dict]) -> dict:
+def build_report(payload: dict, model: str, systems: list[dict], docx_dir: Path, pdf_dir: Path) -> dict:
     config = MODEL_CONFIG[model]
     document = Document(TEMPLATES_DIR / config["template"])
     for doc_section in document.sections:
@@ -227,10 +227,12 @@ def build_report(payload: dict, model: str, systems: list[dict]) -> dict:
     generation_id = safe_slug(str(payload.get("generationId", "")))
     suffix = f"-{generation_id}" if generation_id else ""
     base = f"{safe_slug(section)}-{safe_slug(model)}-{month}-week-{week}{suffix}"
-    docx_path, pdf_path = DOCX_DIR / f"{base}.docx", PDF_DIR / f"{base}.pdf"
-    DOCX_DIR.mkdir(parents=True, exist_ok=True); PDF_DIR.mkdir(parents=True, exist_ok=True)
+    docx_dir.mkdir(parents=True, exist_ok=True)
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    docx_path, pdf_path = docx_dir / f"{base}.docx", pdf_dir / f"{base}.pdf"
     document.save(docx_path)
-    with tempfile.TemporaryDirectory(prefix="service-report-") as temp_dir:
+
+    with tempfile.TemporaryDirectory(prefix="service-report-convert-", dir=str(pdf_dir)) as temp_dir:
         profile_dir = Path(temp_dir) / "libreoffice-profile"
         profile_dir.mkdir()
         process = subprocess.run(["libreoffice", f"-env:UserInstallation={profile_dir.as_uri()}", "--headless",
@@ -240,23 +242,38 @@ def build_report(payload: dict, model: str, systems: list[dict]) -> dict:
         if process.returncode != 0 or not converted.exists():
             raise RuntimeError(process.stderr.strip() or process.stdout.strip() or "PDF conversion failed")
         shutil.copy2(converted, pdf_path)
+
     text_result = subprocess.run(["pdftotext", "-layout", str(pdf_path), "-"], capture_output=True, text=True, timeout=30)
     if text_result.returncode != 0:
         raise RuntimeError("Generated PDF could not be verified")
+
     pdf_text = text_result.stdout
     forbidden = ("[ADDITIONAL FINDING", "[DETAILED FINDING]", "[PROTECTED AREA / SYSTEM]")
     if any(token in pdf_text for token in forbidden):
         raise RuntimeError("Generated PDF contains an unresolved template placeholder")
-    pages = pdf_text.split("\f")
-    heading_page = next((index for index, page in enumerate(pages) if "5. Compiled By" in page), None)
-    values_page = next((index for index, page in enumerate(pages) if payload["compiledName"].strip() in page), None)
-    if heading_page is None or values_page is None or heading_page != values_page:
-        raise RuntimeError("Compiled By section split across pages")
+
+    normalized_pdf_text = re.sub(r"\s+", " ", pdf_text)
+    required_text = [
+        "5. Compiled By",
+        payload["compiledName"].strip(),
+        payload["compiledDesignation"].strip(),
+    ]
+    if any(re.sub(r"\s+", " ", value) not in normalized_pdf_text for value in required_text):
+        raise RuntimeError("Generated PDF is missing required Compiled By content")
+
     return {"model": model, "systems": len(systems), "docx": docx_path.name, "pdf": pdf_path.name}
 
 
 def generate() -> int:
     payload = json.load(sys.stdin)
+
+    compiled_name = str(payload.get("compiledName", "")).strip()
+    compiled_designation = str(payload.get("compiledDesignation", "")).strip()
+    if not compiled_name or len(compiled_name) > 120:
+        raise ValueError("Compiled By name must be between 1 and 120 characters")
+    if not compiled_designation or len(compiled_designation) > 160:
+        raise ValueError("Compiled By designation must be between 1 and 160 characters")
+
     responses = {str(item["systemId"]): item for item in payload["responses"]}
     groups: dict[str, list] = {}
     for system in payload["systems"]:
@@ -265,7 +282,44 @@ def generate() -> int:
             raise ValueError(f"Missing response for system {system['id']}")
         model = report_model(payload["section"], system["name"])
         groups.setdefault(model, []).append({"system": system, "response": response})
-    outputs = [build_report(payload, model, systems) for model, systems in groups.items()]
+
+    staging_parent = MAINTENIX_ROOT / "data" / "formal-reporting" / "staging"
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    DOCX_DIR.mkdir(parents=True, exist_ok=True)
+    PDF_DIR.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="generation-", dir=str(staging_parent)) as temp_root:
+        temp_root_path = Path(temp_root)
+        staged_docx = temp_root_path / "docx"
+        staged_pdf = temp_root_path / "pdf"
+        outputs = [
+            build_report(payload, model, systems, staged_docx, staged_pdf)
+            for model, systems in groups.items()
+        ]
+
+        published: list[Path] = []
+        try:
+            for output in outputs:
+                source_docx = staged_docx / output["docx"]
+                source_pdf = staged_pdf / output["pdf"]
+                destination_docx = DOCX_DIR / output["docx"]
+                destination_pdf = PDF_DIR / output["pdf"]
+
+                if not source_docx.is_file() or not source_pdf.is_file():
+                    raise RuntimeError("Formal report staging output is incomplete")
+
+                source_docx.replace(destination_docx)
+                published.append(destination_docx)
+                source_pdf.replace(destination_pdf)
+                published.append(destination_pdf)
+        except Exception:
+            for output_path in published:
+                try:
+                    output_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            raise
+
     print(json.dumps({"ok": True, "outputs": outputs}))
     return 0
 

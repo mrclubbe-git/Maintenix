@@ -9,6 +9,8 @@ export const ORGANIZATION = Object.freeze({
 });
 
 const STORAGE_PREFIX = `maintenix:${ORGANIZATION.code}:`;
+const SESSION_MARKER_KEY = STORAGE_PREFIX + "authSessionActive";
+const LEGACY_TOKEN_KEY = STORAGE_PREFIX + "authToken";
 
 export const AUTH_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
@@ -46,7 +48,6 @@ export function setNotificationPreferences(userId, patch = {}) {
     sound: patch.sound === undefined ? current.sound : patch.sound === true
   };
 
-  // Sound is only meaningful when notification alerts are enabled.
   if (!next.enabled) next.sound = false;
 
   orgLocalStorage.setItem(
@@ -65,13 +66,35 @@ export function setNotificationPreferences(userId, patch = {}) {
 
 export const orgLocalStorage = {
   getItem(key) {
-    return window.localStorage.getItem(STORAGE_PREFIX + String(key));
+    const wanted = String(key);
+    if (wanted === "authToken") {
+      // Compatibility shim for existing components: this is only a boolean
+      // session marker, never the server credential. The real credential is
+      // held exclusively in a Secure, HttpOnly cookie.
+      return window.localStorage.getItem(SESSION_MARKER_KEY) === "1" ? "cookie-session" : null;
+    }
+    return window.localStorage.getItem(STORAGE_PREFIX + wanted);
   },
   setItem(key, value) {
-    return window.localStorage.setItem(STORAGE_PREFIX + String(key), value);
+    const wanted = String(key);
+    if (wanted === "authToken") {
+      window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+      if (String(value || "").trim()) {
+        window.localStorage.setItem(SESSION_MARKER_KEY, "1");
+      } else {
+        window.localStorage.removeItem(SESSION_MARKER_KEY);
+      }
+      return;
+    }
+    return window.localStorage.setItem(STORAGE_PREFIX + wanted, value);
   },
   removeItem(key) {
-    return window.localStorage.removeItem(STORAGE_PREFIX + String(key));
+    const wanted = String(key);
+    if (wanted === "authToken") {
+      window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+      return window.localStorage.removeItem(SESSION_MARKER_KEY);
+    }
+    return window.localStorage.removeItem(STORAGE_PREFIX + wanted);
   }
 };
 
@@ -87,30 +110,44 @@ export const orgSessionStorage = {
   }
 };
 
+export function setOrgCsrfToken(value) {
+  try {
+    window.__maintenixSetCsrfToken?.(String(value || ""));
+  } catch {}
+}
+
+export function clearOrgCsrfToken() {
+  try {
+    window.__maintenixClearCsrfToken?.();
+  } catch {}
+}
+
+export function hasOrgAuthSession() {
+  return window.localStorage.getItem(SESSION_MARKER_KEY) === "1";
+}
+
 export function clearOrgAuth() {
-  orgLocalStorage.removeItem("authToken");
+  window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+  window.localStorage.removeItem(SESSION_MARKER_KEY);
   orgLocalStorage.removeItem("authUser");
   orgLocalStorage.removeItem("authExpiresAt");
+  clearOrgCsrfToken();
   try {
     window.dispatchEvent(new Event("authUserUpdated"));
   } catch {}
 }
 
-export function setOrgAuth(token, user, expiresAt) {
-  const cleanToken = String(token || "").trim();
-  if (!cleanToken) {
-    clearOrgAuth();
-    return 0;
-  }
-
+export function setOrgAuth(user, expiresAt, csrfToken = "") {
   const suppliedExpiry = Number(expiresAt || 0);
   const expiry = Number.isFinite(suppliedExpiry) && suppliedExpiry > Date.now()
     ? suppliedExpiry
     : Date.now() + AUTH_SESSION_TTL_MS;
 
-  orgLocalStorage.setItem("authToken", cleanToken);
+  window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+  window.localStorage.setItem(SESSION_MARKER_KEY, "1");
   orgLocalStorage.setItem("authUser", JSON.stringify(user || null));
   orgLocalStorage.setItem("authExpiresAt", String(expiry));
+  setOrgCsrfToken(csrfToken);
 
   try {
     window.dispatchEvent(new Event("authUserUpdated"));
@@ -125,8 +162,7 @@ export function getOrgAuthExpiresAt() {
 }
 
 export function ensureOrgAuthExpiresAt() {
-  const token = String(orgLocalStorage.getItem("authToken") || "").trim();
-  if (!token) return 0;
+  if (!hasOrgAuthSession()) return 0;
 
   const existing = getOrgAuthExpiresAt();
   if (existing > 0) return existing;
@@ -137,21 +173,46 @@ export function ensureOrgAuthExpiresAt() {
 }
 
 export function isOrgAuthExpired(now = Date.now()) {
-  const token = String(orgLocalStorage.getItem("authToken") || "").trim();
-  if (!token) return false;
-
+  if (!hasOrgAuthSession()) return false;
   const expiry = ensureOrgAuthExpiresAt();
   return expiry > 0 && Number(now) >= expiry;
 }
 
+export async function logoutOrgSession() {
+  try {
+    let response = await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+
+    // A newly opened tab can have the HttpOnly session cookie before the
+    // in-memory CSRF value is hydrated. Fetch it once and retry logout.
+    if (response.status === 403) {
+      const csrfResponse = await fetch("/api/auth/csrf", { cache: "no-store" });
+      const csrfBody = await csrfResponse.json().catch(() => ({}));
+      if (csrfResponse.ok && csrfBody?.csrfToken) {
+        setOrgCsrfToken(csrfBody.csrfToken);
+        response = await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+      }
+    }
+
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearOrgAuth();
+  }
+}
+
 // CRA predates organization-scoped browser storage. Migrate its known
-// localStorage values once so existing users remain signed in after the move
-// from /Maintenix/ to /Maintenix/CRA/.
+// non-secret localStorage values once. Any historical bearer token is
+// intentionally discarded and never copied into the organization namespace.
 export function migrateLegacyCraLocalStorage() {
   if (ORGANIZATION.code !== "CRA") return;
 
+  try {
+    window.localStorage.removeItem("authToken");
+    window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+  } catch {}
+
   const legacyKeys = [
-    "authToken",
     "authUser",
     "authExpiresAt",
     "settingsVisible",
@@ -173,10 +234,14 @@ export function migrateLegacyCraLocalStorage() {
       }
     } catch {}
   });
+
+  // Existing pre-cookie sessions must sign in once after this migration.
+  if (!window.localStorage.getItem(SESSION_MARKER_KEY)) {
+    orgLocalStorage.removeItem("authUser");
+    orgLocalStorage.removeItem("authExpiresAt");
+  }
 }
 
-// CRA keeps its historical IndexedDB names so queued jobs and browser caches
-// survive this migration. Any future organization receives a distinct DB name.
 export function organizationDbName(baseName) {
   const base = String(baseName || "maintenix");
   if (ORGANIZATION.code === "CRA") return base;

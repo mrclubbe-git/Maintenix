@@ -2,14 +2,15 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 
-const { extractBearer, getSession } = require("./sessions");
+const { extractBearer, getSession, getSessionExpiresAt } = require("./sessions");
+const { decodeImageDataUrl, safeGeneratedImageName } = require("./imageValidation");
 const { getUsers, updateUserById } = require("./userStore");
 const { getUserPreferences, updateUserPreferences } = require("./userPreferences");
 
 const router = express.Router();
 
 function requireAuth(req, res, next) {
-  const token = extractBearer(req.headers.authorization || "");
+  const token = extractBearer(req);
   const session = getSession(token);
   if (!session?.userId) {
     return res.status(401).json({ ok: false, message: "Unauthorized" });
@@ -18,7 +19,15 @@ function requireAuth(req, res, next) {
   const user = getUsers().find((u) => u.id === session.userId);
   if (!user) return res.status(401).json({ ok: false, message: "Unauthorized" });
 
+  const role = String(user.role || "").trim().toUpperCase();
+  const status = String(user.status || "").trim().toUpperCase();
+  if (role !== "ADMIN" && status !== "APPROVED") {
+    return res.status(401).json({ ok: false, message: "Session is no longer authorised." });
+  }
+
   req.user = user;
+  req.authSession = session;
+  req.authSessionToken = token;
   next();
 }
 
@@ -34,13 +43,19 @@ router.get("/me", requireAuth, (req, res) => {
       role: u.role,
       status: u.status,
       photoUrl: u.photoUrl || ""
-    }
+    },
+    expiresAt: getSessionExpiresAt(req.authSessionToken),
+    csrfToken: req.authSession?.csrfToken || ""
   });
 });
 
 // PATCH /api/profile/me  (basic fields)
 router.patch("/me", requireAuth, (req, res) => {
   const name = String(req.body?.name || "").trim();
+
+  if (name.length > 120) {
+    return res.status(400).json({ ok: false, message: "Name must be 120 characters or fewer." });
+  }
 
   const patch = {};
   if (name) patch.name = name;
@@ -121,50 +136,48 @@ router.patch("/preferences", requireAuth, (req, res) => {
 
 // PUT /api/profile/photo  { dataUrl: "data:image/png;base64,..." }
 router.put("/photo", requireAuth, (req, res) => {
-  const s = String(req.body?.dataUrl || "");
-
-  if (!s.startsWith("data:image/")) {
-    return res.status(400).json({ ok: false, message: "Expected dataUrl starting with data:image/..." });
-  }
-
-  const match = s.match(/^data:(image\/(png|jpeg|jpg|webp));base64,(.+)$/i);
-  if (!match) {
-    return res.status(400).json({ ok: false, message: "Unsupported image type (use png/jpeg/webp)" });
-  }
-
-  const extRaw = match[2].toLowerCase();
-  const ext = extRaw === "jpg" ? "jpg" : extRaw; // keep jpg as jpg
-  const b64 = match[3];
-
-  // ~2MB-ish limit (base64 overhead)
-  if (b64.length > 3_000_000) {
-    return res.status(413).json({ ok: false, message: "Image too large (max ~2MB)" });
-  }
-
-  let buf;
+  let decoded;
   try {
-    buf = Buffer.from(b64, "base64");
-  } catch {
-    return res.status(400).json({ ok: false, message: "Invalid base64 data." });
+    decoded = decodeImageDataUrl(req.body?.dataUrl, {
+      allowed: ["png", "jpeg", "webp"],
+      maxBytes: 2 * 1024 * 1024
+    });
+  } catch (error) {
+    const message = String(error?.message || "Invalid profile image.");
+    const status = /too large/i.test(message) ? 413 : 400;
+    return res.status(status).json({ ok: false, message });
   }
 
   const uploadsDir = path.join(__dirname, "..", "data", "uploads", "profilepics");
   fs.mkdirSync(uploadsDir, { recursive: true });
 
-  const filename = `${req.user.id}_${Date.now()}.${ext}`;
+  const filename = safeGeneratedImageName("profile", req.user.id, decoded.ext);
   const filepath = path.join(uploadsDir, filename);
-  fs.writeFileSync(filepath, buf);
+  const previousUrl = String(req.user.photoUrl || "").trim();
 
-  const publicUrl = `/uploads/profilepics/${filename}`;
-  const updated = updateUserById(req.user.id, { photoUrl: publicUrl });
+  try {
+    fs.writeFileSync(filepath, decoded.buffer, { mode: 0o600 });
+    const publicUrl = `/uploads/profilepics/${filename}`;
+    const updated = updateUserById(req.user.id, { photoUrl: publicUrl });
 
-  if (!updated) {
-    // clean up file if user not found
+    if (!updated) {
+      try { fs.unlinkSync(filepath); } catch {}
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    if (previousUrl.startsWith("/uploads/profilepics/")) {
+      const previousName = path.basename(previousUrl);
+      const previousPath = path.join(uploadsDir, previousName);
+      if (previousPath !== filepath) {
+        try { fs.unlinkSync(previousPath); } catch {}
+      }
+    }
+
+    return res.json({ ok: true, photoUrl: publicUrl });
+  } catch {
     try { fs.unlinkSync(filepath); } catch {}
-    return res.status(404).json({ ok: false, message: "User not found" });
+    return res.status(500).json({ ok: false, message: "Profile image could not be saved." });
   }
-
-  res.json({ ok: true, photoUrl: publicUrl });
 });
 
 module.exports = router;

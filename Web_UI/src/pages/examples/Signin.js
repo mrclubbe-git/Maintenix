@@ -1,4 +1,4 @@
-import { clearOrgAuth, isOrgAuthExpired, orgLocalStorage, setOrgAuth } from "../../config/organization";
+import { clearOrgAuth, isOrgAuthExpired, orgLocalStorage, setOrgAuth, setOrgCsrfToken } from "../../config/organization";
 import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
@@ -42,6 +42,8 @@ export default function Signin() {
         const data = await res.json().catch(() => ({}));
 
         if (res.ok && data?.user) {
+          setOrgCsrfToken(data?.csrfToken || "");
+          if (data?.expiresAt) orgLocalStorage.setItem("authExpiresAt", String(data.expiresAt));
           orgLocalStorage.setItem("authUser", JSON.stringify(data.user));
           window.dispatchEvent(new Event("authUserUpdated"));
           if (mounted) window.location.hash = Routes.DashboardOverview.path;
@@ -97,7 +99,7 @@ export default function Signin() {
         return;
       }
 
-      setOrgAuth(data.token, data.user, data.expiresAt);
+      setOrgAuth(data.user, data.expiresAt, data.csrfToken);
 
       setSuccessMsg(`Logged in as ${data.user.email} (${data.user.role}).`);
       setLoading(false);

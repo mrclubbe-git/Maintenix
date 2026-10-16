@@ -30,12 +30,10 @@ function readAuthUser() {
 }
 
 async function apiRequest(path, options = {}) {
-  const token = orgLocalStorage.getItem("authToken") || "";
   const res = await fetch(path, {
     ...options,
     headers: {
       ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     }
   });
@@ -54,7 +52,7 @@ function queryState(search) {
   const tab = String(params.get("tab") || "areas").toLowerCase();
   const status = String(params.get("status") || "").toLowerCase();
   return {
-    tab: ["users", "areas"].includes(tab) ? tab : "areas",
+    tab: ["users", "areas", "system"].includes(tab) ? tab : "areas",
     pendingOnly: status === "pending"
   };
 }
@@ -125,6 +123,10 @@ export default function Administration() {
   const [form, setForm] = useState({ section: "", baseArea: "", first: "", second: "" });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  const [systemStatus, setSystemStatus] = useState(null);
+  const [loadingSystem, setLoadingSystem] = useState(false);
+  const [systemError, setSystemError] = useState("");
 
   useEffect(() => {
     const next = queryState(location.search);
@@ -234,6 +236,20 @@ export default function Administration() {
     }
   }, [isAdmin]);
 
+  const loadSystem = useCallback(async () => {
+    if (!isAdmin) return;
+    setLoadingSystem(true);
+    setSystemError("");
+    try {
+      const data = await apiRequest("/api/server/status");
+      setSystemStatus(data);
+    } catch (error) {
+      setSystemError(String(error?.message || "Unable to load system status."));
+    } finally {
+      setLoadingSystem(false);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     if (activeTab === "users") loadUsers();
   }, [activeTab, loadUsers]);
@@ -241,6 +257,10 @@ export default function Administration() {
   useEffect(() => {
     if (activeTab === "areas") loadAreas();
   }, [activeTab, loadAreas]);
+
+  useEffect(() => {
+    if (activeTab === "system") loadSystem();
+  }, [activeTab, loadSystem]);
 
   const userSummary = useMemo(() => ({
     total: users.length,
@@ -368,7 +388,7 @@ export default function Administration() {
         <div>
           <h4 className="mb-1">Administration</h4>
           <div className="text-muted">
-            Manage organisation users and area metadata.
+            Manage organisation users, area metadata and system status.
           </div>
         </div>
       </div>
@@ -393,6 +413,9 @@ export default function Administration() {
                   <Badge bg="warning" text="dark" className="ms-2">{summary.pending}</Badge>
                 ) : null}
               </Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link eventKey="system">System</Nav.Link>
             </Nav.Item>
           </Nav>
         </Card.Body>
@@ -939,6 +962,74 @@ export default function Administration() {
                   ))}
                 </div>
                 </>
+              )}
+            </Card.Body>
+          </Card>
+        </>
+      ) : null}
+
+      {activeTab === "system" ? (
+        <>
+          {systemError ? <Alert variant="danger">{systemError}</Alert> : null}
+          <Card border="light" className="shadow-sm">
+            <Card.Header>
+              <div className="d-flex flex-wrap justify-content-between align-items-center" style={{ gap: 12 }}>
+                <div>
+                  <h5 className="mb-1">System status</h5>
+                  <div className="text-muted small">Read-only service, host, CPU and storage information.</div>
+                </div>
+                <Button type="button" variant="outline-primary" size="sm" onClick={loadSystem} disabled={loadingSystem}>
+                  {loadingSystem ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Refresh"}
+                </Button>
+              </div>
+            </Card.Header>
+            <Card.Body>
+              {loadingSystem && !systemStatus ? (
+                <div className="text-center py-4">
+                  <Spinner animation="border" role="status" />
+                  <div className="text-muted mt-2">Loading system status…</div>
+                </div>
+              ) : systemStatus ? (
+                <Row className="g-3">
+                  <Col xs={12} md={6} xl={3}>
+                    <Card border="light" className="h-100">
+                      <Card.Body>
+                        <div className="text-muted small">Service</div>
+                        <div className="fw-bold mobile-break-anywhere">{systemStatus.service || "Maintenix CRA API"}</div>
+                        <div className="text-muted small mt-2">Host</div>
+                        <div className="mobile-break-anywhere">{systemStatus.host || "—"}</div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col xs={12} md={6} xl={3}>
+                    <Card border="light" className="h-100">
+                      <Card.Body>
+                        <div className="text-muted small">CPU usage</div>
+                        <div className="h4 mb-0">{Number(systemStatus.cpuUsagePercent || 0).toFixed(1)}%</div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col xs={12} md={6} xl={3}>
+                    <Card border="light" className="h-100">
+                      <Card.Body>
+                        <div className="text-muted small">Storage used</div>
+                        <div className="h4 mb-0">{Number(systemStatus.storageUsedPercent || 0).toFixed(1)}%</div>
+                        <div className="text-muted small">{Number(systemStatus.storageFreeGB || 0)} GB free</div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col xs={12} md={6} xl={3}>
+                    <Card border="light" className="h-100">
+                      <Card.Body>
+                        <div className="text-muted small">API process uptime</div>
+                        <div className="h4 mb-0">{Math.floor(Number(systemStatus.processUptimeSeconds || 0) / 3600)}h</div>
+                        <div className="text-muted small">Read-only telemetry</div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                </Row>
+              ) : (
+                <Alert variant="info" className="mb-0">System status has not been loaded yet.</Alert>
               )}
             </Card.Body>
           </Card>

@@ -1,6 +1,6 @@
 // /opt/maintenix-ui/server-api/routes/profilePassword.js
 const express = require("express");
-const { extractBearer, getSession } = require("../lib/sessions");
+const { extractBearer, getSession, deleteSessionsForUser, clearSessionCookie } = require("../lib/sessions");
 const { getUsers, updateUserById } = require("../lib/userStore");
 const { hashPassword, verifyPassword } = require("../lib/passwords");
 
@@ -56,7 +56,9 @@ router.post("/change-password", requireAuth, (req, res) => {
     return res.status(404).json({ ok: false, message: "User not found." });
   }
 
-  return res.json({ ok: true });
+  deleteSessionsForUser(req.user.id);
+  clearSessionCookie(res);
+  return res.json({ ok: true, sessionInvalidated: true });
 });
 
 module.exports = router;

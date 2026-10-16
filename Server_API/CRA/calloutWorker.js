@@ -1,4 +1,4 @@
-const fs = require("fs");
+const fs = require("fs");\nconst { decodeImageDataUrl } = require("./lib/imageValidation");
 const fsp = fs.promises;
 const path = require("path");
 const { writeJsonAtomicSync: atomicWriteJsonSync, updateJsonWithLockSync } = require("./lib/lockedJson");
@@ -234,16 +234,19 @@ function writeSignatureImage(reportId, payload) {
   const reportDir = photosDirFor(reportId);
   fs.mkdirSync(reportDir, { recursive: true });
 
-  const parsed = parseImageDataUrl(payload?.signatureDataUrl || payload?.signature || "");
-  const ext = parsed?.ext || ".png";
-  const filename = `signature_${safeBasename(reportId)}${ext}`;
+  let decoded;
+  try {
+    decoded = decodeImageDataUrl(payload?.signatureDataUrl || payload?.signature || "", {
+      allowed: ["png"],
+      maxBytes: 2 * 1024 * 1024
+    });
+  } catch (error) {
+    throw new Error(`A valid technician signature is required. ${String(error?.message || "")}`.trim());
+  }
+
+  const filename = `signature_${safeBasename(reportId)}.png`;
   const filePath = path.join(reportDir, filename);
-
-  fs.writeFileSync(
-    filePath,
-    parsed?.buffer || Buffer.from(TRANSPARENT_PNG_B64, "base64")
-  );
-
+  fs.writeFileSync(filePath, decoded.buffer, { mode: 0o600 });
   return filePath;
 }
 
@@ -430,10 +433,12 @@ function makeImageModule() {
 
       try {
         if (!fs.existsSync(p)) {
+          if (/signature_.*\.(png|jpe?g)$/i.test(p)) throw new Error("Signature image file is missing.");
           return Buffer.from(TRANSPARENT_PNG_B64, "base64");
         }
         return fs.readFileSync(p);
-      } catch {
+      } catch (error) {
+        if (/signature_.*\.(png|jpe?g)$/i.test(p)) throw error;
         return Buffer.from(TRANSPARENT_PNG_B64, "base64");
       }
     },

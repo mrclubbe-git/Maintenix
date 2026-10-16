@@ -119,20 +119,19 @@ export default function StockControl() {
 
   // ----------------------
   // Role capabilities (UI gating)
-  // Admin = full
-  // L1 = add item, issue, receive
-  // L2 = same as L1 + CSV download
-  // L3 = all stock functions excluding delete
+  // Approved Stock Control capability matrix:
+  // create: L1/L2/L3/Admin; receive: L3/Admin; issue: L2/L3/Admin;
+  // metadata edit + quantity adjustment: Admin; audit: L2/L3/Admin.
   // ----------------------
   const canAddItem = isAdmin || isL1 || isL2 || isL3;
-  const canIssue = isAdmin || isL1 || isL2 || isL3;        // Delivery Note issue builder
-  const canReceive = isAdmin || isL1 || isL2 || isL3;
+  const canIssue = isAdmin || isL2 || isL3;
+  const canReceive = isAdmin || isL3;
 
-  const canEditItem = isAdmin || isL3;                     // edit metadata
-  const canAdjust = isAdmin || isL3;                       // adjust qty
-  const canDelete = isAdmin;                               // delete item
-  const canDownloadCsv = isAdmin || isL2 || isL3;           // CSV exports
-  const canViewAudit = isAdmin || isL2 || isL3;             // view movements
+  const canEditItem = isAdmin;
+  const canAdjust = isAdmin;
+  const canDelete = isAdmin;
+  const canDownloadCsv = isAdmin || isL2 || isL3;
+  const canViewAudit = isAdmin || isL2 || isL3;
 
   const [items, setItems] = useState([]);
   const [movements, setMovements] = useState([]);

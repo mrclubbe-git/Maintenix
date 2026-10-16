@@ -1,6 +1,6 @@
 const express = require("express");
 const { getUsers, saveUsers } = require("../lib/userStore");
-const { getSession, extractBearer } = require("../lib/sessions");
+const { getSession, extractBearer, deleteSessionsForUser } = require("../lib/sessions");
 const sharedAreas = require("./areas");
 const {
   cleanSpaces,
@@ -365,7 +365,8 @@ router.post("/users/:id/deny", requireAdmin, (req, res) => {
   u.approvedBy = req.admin.email;
 
   saveUsers(users);
-  res.json({ ok: true });
+  deleteSessionsForUser(u.id);
+  res.json({ ok: true, sessionsInvalidated: true });
 });
 
 // PATCH /api/admin/users/:id/role
@@ -385,8 +386,10 @@ router.patch("/users/:id/role", requireAdmin, (req, res) => {
     return res.status(400).json({ ok: false, message: "You cannot downgrade your own ADMIN role." });
   }
 
+  const previousRole = safeRole(u.role);
   u.role = nextRole;
   saveUsers(users);
+  if (previousRole !== nextRole) deleteSessionsForUser(u.id);
 
   res.json({
     ok: true,
@@ -412,10 +415,11 @@ router.delete("/users/:id", requireAdmin, (req, res) => {
   const exists = users.some((u) => String(u.id) === id);
   if (!exists) return res.status(404).json({ ok: false, message: "User not found." });
 
+  deleteSessionsForUser(id);
   const updated = users.filter((u) => String(u.id) !== id);
   saveUsers(updated);
 
-  res.json({ ok: true });
+  res.json({ ok: true, sessionsInvalidated: true });
 });
 
 module.exports = router;

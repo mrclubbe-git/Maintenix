@@ -1,4 +1,4 @@
-import { clearOrgAuth, ensureOrgAuthExpiresAt, isOrgAuthExpired, orgLocalStorage } from "../config/organization";
+import { clearOrgAuth, ensureOrgAuthExpiresAt, isOrgAuthExpired, orgLocalStorage, setOrgCsrfToken } from "../config/organization";
 import React, { useState, useEffect } from "react";
 import { Route, Switch, Redirect } from "react-router-dom";
 import { Routes } from "../routes";
@@ -38,6 +38,17 @@ const RouteWithLoader = ({ component: Component, ...rest }) => {
   useEffect(() => {
     const timer = setTimeout(() => setLoaded(true), 1000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleInvalidSession = () => {
+      clearOrgAuth();
+      setVerifiedUser(null);
+      setAuthOk(false);
+      setAuthChecked(true);
+    };
+    window.addEventListener("maintenixSessionInvalid", handleInvalidSession);
+    return () => window.removeEventListener("maintenixSessionInvalid", handleInvalidSession);
   }, []);
 
   return (
@@ -118,6 +129,8 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json().catch(() => ({}));
+        setOrgCsrfToken(data?.csrfToken || "");
+        if (data?.expiresAt) orgLocalStorage.setItem("authExpiresAt", String(data.expiresAt));
         const user = data?.user && typeof data.user === "object" ? data.user : null;
         if (!user) throw new Error("Profile response did not include a user.");
 

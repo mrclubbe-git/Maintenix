@@ -1774,3 +1774,31 @@ Validation/deployment support:
 - GitHub Pages run `38730392554` completed successfully; build and deploy both passed.
 - Frontend-only change; no backend service restart required.
 
+## Admin mobile gap cleanup + notification tab removal + draft mobile parity — 2026-10-16
+
+- Fixed the large empty gap on Administration mobile view caused by the desktop `flex: 1 1 320px` search control basis being interpreted vertically after the row switched to `flex-column`.
+- Remaining Administration mobile filter rows now use `admin-mobile-stack-row`; phone CSS releases the desktop flex-basis and keeps search controls/buttons at natural stacked height.
+- Removed the Administration Notifications tab and its page UI/state/actions because it is not currently needed.
+  - Administration now exposes Users and Areas only.
+  - Legacy `?tab=notifications` URLs fall back to Areas.
+  - Notification backend architecture and normal user notification functionality were not removed.
+- Servicing Saved Drafts now mirrors the accepted Call Out mobile draft treatment:
+  - long generated draft names can wrap safely;
+  - draft rows are capped to the viewport;
+  - Load / Generate / Rename / Delete actions use a two-column mobile layout.
+- Section Reports Saved Drafts now use the same mobile containment pattern:
+  - long draft names wrap safely;
+  - draft copy can shrink within the viewport;
+  - draft actions fill the mobile width in a two-column responsive layout.
+- Pre-change rollback branches:
+  - `rollback/admin-notifications-drafts-pre-fix-20261016` at `ea650a4465084ce0a3f4f2aafff6177463951d1b`;
+  - `rollback/admin-notifications-drafts-pre-fix-deploy-20261016` at `fc527c7d23620b6e50365aef4ff917f74da96f81`.
+- Main commits:
+  - Administration cleanup `c12ffd62177fd0cd937127647dcefc6767bc17a4`;
+  - Servicing draft containment `0fb125ba9d1be7765871bb54da04653c33a68acf`;
+  - Section Reports draft containment `a23178e3cde9fb54be8fe16823249ca999677e1b`;
+  - shared mobile CSS `3b92102e84c11c945c2fd97af427dc90d28c846e`.
+- Final deploy head: `5d7e18e451a2f0a4b5f6b12d69a9ff01f77824e1`.
+- GitHub Pages run `38869784141` completed successfully; build and deploy both passed.
+- Frontend-only changes; no CRA backend files changed and no DEV service restart is required.
+

@@ -7,6 +7,7 @@ const {
   resolveUnder,
   ensureDir: ensureReportDir
 } = require("./reportStorage");
+const { decodeImageDataUrl } = require("./imageValidation");
 const {
   filterServicingResponses,
   normalizeYesNoChoice,
@@ -441,14 +442,20 @@ async function generateServicingDocx(opts) {
   const createdIso = rawCreated.includes("T") ? rawCreated : new Date().toISOString();
   const createdDateOnly = createdIso.slice(0, 10);
 
-  // Signature handling (PNG only)
-  const signatureDataUrlRaw = String(payload?.signatureDataUrl || payload?.signature || "").trim();
-  const sigInfo = parseDataUrlInfo(signatureDataUrlRaw);
-  const sigBuf = sigInfo?.mime === "png" ? parseDataUrlToBuffer(signatureDataUrlRaw) : null;
+  // Signature is mandatory and must decode as a real PNG.
+  let signatureImage;
+  try {
+    signatureImage = decodeImageDataUrl(payload?.signatureDataUrl || payload?.signature || "", {
+      allowed: ["png"],
+      maxBytes: 2 * 1024 * 1024
+    });
+  } catch (error) {
+    throw new Error(`A valid technician signature is required. ${String(error?.message || "")}`.trim());
+  }
 
   const signatureFileName = `signature_${safeFilename(reportId)}.png`;
   const signaturePath = path.join(signaturesDir, signatureFileName);
-  fs.writeFileSync(signaturePath, sigBuf || Buffer.from(TRANSPARENT_PNG_B64, "base64"));
+  fs.writeFileSync(signaturePath, signatureImage.buffer, { mode: 0o600 });
 
   const resolvedOwner =
     normalizeOwner(payload?.owner) ||
@@ -509,11 +516,22 @@ async function generateServicingDocx(opts) {
       centered: false,
       getImage: (tagValue) => {
         const p = String(tagValue || "").trim();
-        if (!p) return Buffer.from(TRANSPARENT_PNG_B64, "base64");
+        const isSignature =
+          p.includes("/signatures/") ||
+          p.includes("\\signatures\\") ||
+          /signature_.*\.(png|jpe?g)$/i.test(p);
+        if (!p) {
+          if (isSignature) throw new Error("Signature image path is missing.");
+          return Buffer.from(TRANSPARENT_PNG_B64, "base64");
+        }
         try {
-          if (!fs.existsSync(p)) return Buffer.from(TRANSPARENT_PNG_B64, "base64");
+          if (!fs.existsSync(p)) {
+            if (isSignature) throw new Error("Signature image file is missing.");
+            return Buffer.from(TRANSPARENT_PNG_B64, "base64");
+          }
           return fs.readFileSync(p);
-        } catch {
+        } catch (error) {
+          if (isSignature) throw error;
           return Buffer.from(TRANSPARENT_PNG_B64, "base64");
         }
       },

@@ -66,9 +66,13 @@ function requireAuth(req, res, next) {
   next();
 }
 
-function canEditStock(role) {
+function roleIs(role, names) {
   const r = safeRole(role);
-  return r === "ADMIN" || r === "L2" || r === "LEVEL2" || r === "LEVEL_2";
+  return names.includes(r);
+}
+
+function canViewAudit(role) {
+  return roleIs(role, ["ADMIN", "L2", "L3", "LEVEL2", "LEVEL3", "LEVEL_2", "LEVEL_3"]);
 }
 
 function canAdmin(role) {
@@ -96,14 +100,20 @@ function canAddItem(role) {
   );
 }
 
-function canChangeQty(role) { // receive / issue
-  const r = safeRole(role);
-  return r === "ADMIN" || r === "L1" || r === "L2" || r === "L3";
+function canReceive(role) {
+  return roleIs(role, ["ADMIN", "L3", "LEVEL3", "LEVEL_3"]);
 }
 
-function canEditMetadata(role) { // name, unit, location, minQty
-  const r = safeRole(role);
-  return r === "ADMIN" || r === "L3";   // (since L3 “all stock functions” except delete)
+function canIssue(role) {
+  return roleIs(role, ["ADMIN", "L2", "L3", "LEVEL2", "LEVEL3", "LEVEL_2", "LEVEL_3"]);
+}
+
+function canAdjust(role) {
+  return safeRole(role) === "ADMIN";
+}
+
+function canEditMetadata(role) {
+  return safeRole(role) === "ADMIN";
 }
 
 function canDownloadCsv(role) {
@@ -204,7 +214,7 @@ router.post("/items", requireAuth, (req, res) => {
  *  - name, unit, location, minQty (metadata edits)
  */
 router.patch("/items/:id", requireAuth, (req, res) => {
-  if (!canEditStock(req.user?.role)) return res.status(403).json({ ok: false, message: "Admin/L2 only." });
+  if (!canEditMetadata(req.user?.role)) return res.status(403).json({ ok: false, message: "Admin only." });
 
   const id = String(req.params.id || "");
   const db = readDb();
@@ -315,7 +325,7 @@ router.delete("/items/:id", requireAuth, (req, res) => {
  * Admin/L2 only
  */
 router.get("/movements", requireAuth, (req, res) => {
-  if (!canEditStock(req.user?.role)) return res.status(403).json({ ok: false, message: "Admin/L2 only." });
+  if (!canViewAudit(req.user?.role)) return res.status(403).json({ ok: false, message: "L2/L3/Admin only." });
 
   const itemId = String(req.query.itemId || "").trim();
   const db = readDb();
@@ -350,11 +360,18 @@ router.delete("/movements", requireAuth, (req, res) => {
  * - ADJUST: sets qty to exact qty
  */
 router.post("/move", requireAuth, (req, res) => {
-  if (!canEditStock(req.user?.role)) return res.status(403).json({ ok: false, message: "Admin/L2 only." });
-
   const itemId = String(req.body?.itemId || "").trim();
   const type = String(req.body?.type || "").trim().toUpperCase();
   const qty = Number(req.body?.qty);
+
+  const permitted =
+    (type === "RECEIVE" && canReceive(req.user?.role)) ||
+    (type === "ISSUE" && canIssue(req.user?.role)) ||
+    (type === "ADJUST" && canAdjust(req.user?.role));
+
+  if (!permitted) {
+    return res.status(403).json({ ok: false, message: "Not allowed for this stock action." });
+  }
 
   if (!itemId) return res.status(400).json({ ok: false, message: "itemId is required." });
   if (!["RECEIVE", "ISSUE", "ADJUST"].includes(type)) {
@@ -423,18 +440,12 @@ function fmtTime(d = new Date()) {
   return `${hh}-${mm}-${ss}`;
 }
 
-function canIssue(role) {
-  const r = String(role || "").toUpperCase().trim();
-  return r === "ADMIN" || r === "L2";
-}
-
-
 /**
  * GET /api/stock/delivery-note/:filename
  * Authenticated delivery note download. Replaces direct /uploads/delivery_notes access.
  */
 router.get("/delivery-note/:filename", requireAuth, (req, res) => {
-  if (!canIssue(req.user?.role)) return res.status(403).json({ ok: false, message: "Admin/L2 only." });
+  if (!canIssue(req.user?.role)) return res.status(403).json({ ok: false, message: "L2/L3/Admin only." });
 
   const filename = path.basename(String(req.params.filename || ""));
   if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
@@ -468,7 +479,7 @@ router.get("/delivery-note/:filename", requireAuth, (req, res) => {
  * - saves to /data/uploads/delivery_notes
  */
 router.post("/issue-note", requireAuth, (req, res) => {
-  if (!canIssue(req.user?.role)) return res.status(403).json({ ok: false, message: "Admin/L2 only." });
+  if (!canIssue(req.user?.role)) return res.status(403).json({ ok: false, message: "L2/L3/Admin only." });
 
   const collectedBy = String(req.body?.collectedBy || "").trim();
   const releasedBy = String(req.body?.releasedBy || "").trim();

@@ -23,6 +23,9 @@ const REPORTS_DIR = path.join(DATA_DIR, "uploads", "reports");
 const DOCX_DIR = REPORTS_DIR;
 const PDF_DIR = path.join(DATA_DIR, "uploads", "reports_pdf");
 const REPORTS_META = path.join(DATA_DIR, "reports.meta.json");
+const MAX_COMPILED_NAME = 120;
+const MAX_COMPILED_DESIGNATION = 160;
+const MAX_DEFECT_TEXT = 2000;
 
 function ensureDirs() {
   for (const dir of [DRAFTS_DIR, DOCX_DIR, PDF_DIR]) fs.mkdirSync(dir, { recursive: true });
@@ -151,6 +154,10 @@ function validateDraft(payload) {
   if (!/^\d{4}-\d{2}$/.test(String(payload?.month || ""))) return "Month must use YYYY-MM";
   if (!Number.isInteger(payload?.week) || payload.week < 1 || payload.week > 53) return "Week must be 1–53";
   if (!Array.isArray(payload?.responses)) return "Responses must be an array";
+  const compiledName = String(payload?.compiledName || "").trim();
+  const compiledDesignation = String(payload?.compiledDesignation || "").trim();
+  if (compiledName.length > MAX_COMPILED_NAME) return `Compiled By name must be ${MAX_COMPILED_NAME} characters or fewer`;
+  if (compiledDesignation.length > MAX_COMPILED_DESIGNATION) return `Compiled By designation must be ${MAX_COMPILED_DESIGNATION} characters or fewer`;
   const validIds = new Set(section.systems.map((system) => system.id));
   for (const response of payload.responses) {
     if (!validIds.has(String(response.systemId))) return `Unknown system ${response.systemId}`;
@@ -158,7 +165,12 @@ function validateDraft(payload) {
     if (response.defectsFound === "yes") {
       if (!Array.isArray(response.defects) || response.defects.length === 0) return "A Yes response requires a defect";
       for (const defect of response.defects) {
-        if (!String(defect.finding || "").trim() || !String(defect.action || "").trim()) return "Each defect requires a finding and required action";
+        const finding = String(defect.finding || "").trim();
+        const action = String(defect.action || "").trim();
+        if (!finding || !action) return "Each defect requires a finding and required action";
+        if (finding.length > MAX_DEFECT_TEXT || action.length > MAX_DEFECT_TEXT) {
+          return `Defect findings and actions must be ${MAX_DEFECT_TEXT} characters or fewer`;
+        }
       }
     }
   }
@@ -352,6 +364,12 @@ router.post("/generate", async (req, res) => {
   if (!String(payload.compiledName || "").trim() || !String(payload.compiledDesignation || "").trim()) {
     return res.status(400).json({ ok: false, error: "Compiled By name and designation are required" });
   }
+  if (String(payload.compiledName).trim().length > MAX_COMPILED_NAME) {
+    return res.status(400).json({ ok: false, error: `Compiled By name must be ${MAX_COMPILED_NAME} characters or fewer` });
+  }
+  if (String(payload.compiledDesignation).trim().length > MAX_COMPILED_DESIGNATION) {
+    return res.status(400).json({ ok: false, error: `Compiled By designation must be ${MAX_COMPILED_DESIGNATION} characters or fewer` });
+  }
   if (payload.finalConfirmed !== true) return res.status(400).json({ ok: false, error: "Final report confirmation is required" });
   const section = sectionInventory().find((candidate) => candidate.name === payload.section);
   if (payload.responses.length !== section.systems.length || payload.responses.some((item) => !["yes", "no"].includes(item.defectsFound))) {
@@ -362,6 +380,9 @@ router.post("/generate", async (req, res) => {
     currentGenerationId = generationId();
     const generatedAt = new Date().toISOString();
     const result = await runWorker("generate", { ...payload, systems: section.systems, generationId: currentGenerationId });
+    if (!Array.isArray(result?.outputs) || result.outputs.length === 0) {
+      throw new Error("Formal report worker returned no completed outputs.");
+    }
     updateJsonWithLockSync(REPORTS_META, { reports: {} }, (meta) => {
       if (!meta || typeof meta !== "object" || Array.isArray(meta)) meta = { reports: {} };
       if (!meta.reports || typeof meta.reports !== "object" || Array.isArray(meta.reports)) meta.reports = {};

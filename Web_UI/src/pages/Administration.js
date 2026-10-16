@@ -54,7 +54,7 @@ function queryState(search) {
   const tab = String(params.get("tab") || "areas").toLowerCase();
   const status = String(params.get("status") || "").toLowerCase();
   return {
-    tab: ["users", "areas", "notifications"].includes(tab) ? tab : "areas",
+    tab: ["users", "areas"].includes(tab) ? tab : "areas",
     pendingOnly: status === "pending"
   };
 }
@@ -112,19 +112,6 @@ export default function Administration() {
   const [userFilter, setUserFilter] = useState("ALL");
   const [userActionId, setUserActionId] = useState("");
   const [userToDelete, setUserToDelete] = useState(null);
-
-  const [notificationEvents, setNotificationEvents] = useState([]);
-  const [loadingNotificationEvents, setLoadingNotificationEvents] = useState(false);
-  const [notificationError, setNotificationError] = useState("");
-  const [notificationMessage, setNotificationMessage] = useState("");
-  const [eventSearch, setEventSearch] = useState("");
-  const [eventCategory, setEventCategory] = useState("ALL");
-  const [broadcastForm, setBroadcastForm] = useState({
-    title: "",
-    message: "",
-    requiresAck: false
-  });
-  const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
   const [areas, setAreas] = useState([]);
   const [sections, setSections] = useState([]);
@@ -225,66 +212,6 @@ export default function Administration() {
     setUserToDelete(null);
   }
 
-  const loadNotificationEvents = useCallback(async () => {
-    if (!isAdmin) return;
-    setLoadingNotificationEvents(true);
-    setNotificationError("");
-
-    try {
-      const data = await apiRequest("/api/notifications/events");
-      setNotificationEvents(Array.isArray(data?.events) ? data.events : []);
-    } catch (error) {
-      setNotificationError(String(error?.message || "Unable to load notification events."));
-    } finally {
-      setLoadingNotificationEvents(false);
-    }
-  }, [isAdmin]);
-
-  function updateBroadcastField(field, value) {
-    setBroadcastForm((current) => ({ ...current, [field]: value }));
-  }
-
-  async function sendBroadcast(event) {
-    event.preventDefault();
-
-    const title = String(broadcastForm.title || "").trim();
-    const message = String(broadcastForm.message || "").trim();
-    if (!title) {
-      setNotificationError("Broadcast title is required.");
-      return;
-    }
-    if (!message) {
-      setNotificationError("Broadcast message is required.");
-      return;
-    }
-
-    setSendingBroadcast(true);
-    setNotificationError("");
-    setNotificationMessage("");
-
-    try {
-      await apiRequest("/api/notifications/broadcast", {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          message,
-          requiresAck: !!broadcastForm.requiresAck
-        })
-      });
-
-      setNotificationMessage(
-        broadcastForm.requiresAck
-          ? "Broadcast sent to all users with acknowledgement required."
-          : "Broadcast sent to all users."
-      );
-      setBroadcastForm({ title: "", message: "", requiresAck: false });
-    } catch (error) {
-      setNotificationError(String(error?.message || "Unable to send broadcast."));
-    } finally {
-      setSendingBroadcast(false);
-    }
-  }
-
   const loadAreas = useCallback(async () => {
     if (!isAdmin) return;
     setLoadingAreas(true);
@@ -310,10 +237,6 @@ export default function Administration() {
   useEffect(() => {
     if (activeTab === "users") loadUsers();
   }, [activeTab, loadUsers]);
-
-  useEffect(() => {
-    if (activeTab === "notifications") loadNotificationEvents();
-  }, [activeTab, loadNotificationEvents]);
 
   useEffect(() => {
     if (activeTab === "areas") loadAreas();
@@ -349,47 +272,6 @@ export default function Administration() {
         return String(a.name || a.email || "").localeCompare(String(b.name || b.email || ""));
       });
   }, [users, userFilter, userSearch]);
-
-  const notificationCategories = useMemo(() => {
-    const categories = new Set(
-      notificationEvents
-        .map((event) => String(event?.category || "").trim().toUpperCase())
-        .filter(Boolean)
-    );
-    return Array.from(categories).sort((a, b) => a.localeCompare(b));
-  }, [notificationEvents]);
-
-  const notificationSummary = useMemo(() => ({
-    total: notificationEvents.length,
-    mandatory: notificationEvents.filter((event) => !!event.mandatory).length,
-    acknowledgement: notificationEvents.filter((event) => !!event.defaultRequiresAck).length,
-    categories: notificationCategories.length
-  }), [notificationEvents, notificationCategories]);
-
-  const visibleNotificationEvents = useMemo(() => {
-    const needle = String(eventSearch || "").trim().toLowerCase();
-    const wantedCategory = String(eventCategory || "ALL").toUpperCase();
-
-    return notificationEvents
-      .filter((event) => {
-        const category = String(event?.category || "").trim().toUpperCase();
-        if (wantedCategory !== "ALL" && category !== wantedCategory) return false;
-        if (!needle) return true;
-
-        return [
-          event?.eventType,
-          event?.type,
-          event?.category,
-          event?.description,
-          ...(Array.isArray(event?.deliveryChannels) ? event.deliveryChannels : [])
-        ].some((value) => String(value || "").toLowerCase().includes(needle));
-      })
-      .sort((a, b) => {
-        const categoryDiff = String(a?.category || "").localeCompare(String(b?.category || ""));
-        if (categoryDiff !== 0) return categoryDiff;
-        return String(a?.eventType || "").localeCompare(String(b?.eventType || ""));
-      });
-  }, [notificationEvents, eventSearch, eventCategory]);
 
   const visibleAreas = useMemo(() => {
     const needle = String(search || "").trim().toLowerCase();
@@ -486,7 +368,7 @@ export default function Administration() {
         <div>
           <h4 className="mb-1">Administration</h4>
           <div className="text-muted">
-            Manage organisation users, area metadata and future notification configuration.
+            Manage organisation users and area metadata.
           </div>
         </div>
       </div>
@@ -511,9 +393,6 @@ export default function Administration() {
                   <Badge bg="warning" text="dark" className="ms-2">{summary.pending}</Badge>
                 ) : null}
               </Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="notifications">Notifications</Nav.Link>
             </Nav.Item>
           </Nav>
         </Card.Body>
@@ -575,7 +454,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3 admin-mobile-stack-row" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search users</Form.Label>
                   <Form.Control
@@ -852,292 +731,6 @@ export default function Administration() {
         </>
       ) : null}
 
-      {activeTab === "notifications" ? (
-        <>
-          {notificationError ? <Alert variant="danger">{notificationError}</Alert> : null}
-          {notificationMessage ? <Alert variant="success">{notificationMessage}</Alert> : null}
-
-          <Row className="g-3 mb-4">
-            <Col xs={12} sm={6} md={3}>
-              <Card border="light" className="shadow-sm h-100">
-                <Card.Body>
-                  <div className="text-muted small">Registered events</div>
-                  <div className="h4 mb-0">{notificationSummary.total}</div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={12} sm={6} md={3}>
-              <Card border="light" className="shadow-sm h-100">
-                <Card.Body>
-                  <div className="text-muted small">Mandatory</div>
-                  <div className="h4 mb-0">{notificationSummary.mandatory}</div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={12} sm={6} md={3}>
-              <Card border="light" className="shadow-sm h-100">
-                <Card.Body>
-                  <div className="text-muted small">Default acknowledgement</div>
-                  <div className="h4 mb-0">{notificationSummary.acknowledgement}</div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={12} sm={6} md={3}>
-              <Card border="light" className="shadow-sm h-100">
-                <Card.Body>
-                  <div className="text-muted small">Categories</div>
-                  <div className="h4 mb-0">{notificationSummary.categories}</div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-
-          <Card border="light" className="shadow-sm mb-4">
-            <Card.Header>
-              <h5 className="mb-1">Send broadcast</h5>
-              <div className="text-muted small">
-                Send a CRA notification to all users. In-app notification storage is created first; device push delivery remains asynchronous.
-              </div>
-            </Card.Header>
-            <Card.Body>
-              <Form onSubmit={sendBroadcast}>
-                <Row className="g-3">
-                  <Col xs={12} lg={4}>
-                    <Form.Group>
-                      <Form.Label>Title</Form.Label>
-                      <Form.Control
-                        value={broadcastForm.title}
-                        maxLength={120}
-                        disabled={sendingBroadcast}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          updateBroadcastField("title", value);
-                        }}
-                        placeholder="Broadcast title"
-                      />
-                      <Form.Text className="text-muted">
-                        {String(broadcastForm.title || "").length}/120
-                      </Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col xs={12} lg={8}>
-                    <Form.Group>
-                      <Form.Label>Message</Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={3}
-                        value={broadcastForm.message}
-                        maxLength={1000}
-                        disabled={sendingBroadcast}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          updateBroadcastField("message", value);
-                        }}
-                        placeholder="Message to all CRA users"
-                      />
-                      <Form.Text className="text-muted">
-                        {String(broadcastForm.message || "").length}/1000
-                      </Form.Text>
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <div className="d-flex flex-wrap justify-content-between align-items-center mt-3" style={{ gap: 12 }}>
-                  <Form.Check
-                    type="switch"
-                    id="admin-broadcast-requires-ack"
-                    checked={!!broadcastForm.requiresAck}
-                    disabled={sendingBroadcast}
-                    onChange={(event) => {
-                      const checked = event.currentTarget.checked;
-                      updateBroadcastField("requiresAck", checked);
-                    }}
-                    label="Require acknowledgement"
-                  />
-                  <Button type="submit" variant="primary" size="sm" disabled={sendingBroadcast}>
-                    {sendingBroadcast ? <><Spinner size="sm" className="me-2" /> Sending…</> : "Send broadcast"}
-                  </Button>
-                </div>
-
-                {broadcastForm.requiresAck ? (
-                  <Alert variant="warning" className="mt-3 mb-0">
-                    This notification will remain an attention item for each user until that user acknowledges it.
-                  </Alert>
-                ) : null}
-              </Form>
-            </Card.Body>
-          </Card>
-
-          <Card border="light" className="shadow-sm">
-            <Card.Header>
-              <div className="d-flex flex-wrap justify-content-between align-items-center" style={{ gap: 12 }}>
-                <div>
-                  <h5 className="mb-1">Notification events</h5>
-                  <div className="text-muted small">
-                    Central registry definitions currently used by CRA. Mandatory system events are shown as locked architecture rules rather than editable switches.
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={loadNotificationEvents}
-                  disabled={loadingNotificationEvents}
-                >
-                  {loadingNotificationEvents ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Refresh"}
-                </Button>
-              </div>
-            </Card.Header>
-
-            <Card.Body>
-              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
-                <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
-                  <Form.Label>Search events</Form.Label>
-                  <Form.Control
-                    type="search"
-                    value={eventSearch}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value;
-                      setEventSearch(value);
-                    }}
-                    placeholder="Event, category, channel or description"
-                  />
-                </Form.Group>
-
-                <Form.Group className="mobile-min-width-0" style={{ minWidth: 190 }}>
-                  <Form.Label>Category</Form.Label>
-                  <Form.Select
-                    value={eventCategory}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value;
-                      setEventCategory(value);
-                    }}
-                  >
-                    <option value="ALL">All categories</option>
-                    {notificationCategories.map((category) => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-
-              {loadingNotificationEvents && notificationEvents.length === 0 ? (
-                <div className="text-center py-5">
-                  <Spinner animation="border" role="status" />
-                  <div className="text-muted mt-2">Loading notification events…</div>
-                </div>
-              ) : visibleNotificationEvents.length === 0 ? (
-                <Alert variant="info" className="mb-0">
-                  No notification events match the current filter.
-                </Alert>
-              ) : (
-                <>
-                <div className="table-responsive d-none d-md-block">
-                  <Table
-                    hover
-                    size="sm"
-                    className="align-middle mb-0 mobile-wrap-table"
-                    style={{ fontSize: "0.875rem", width: "100%" }}
-                  >
-                  <thead>
-                    <tr>
-                      <th className="px-2 py-2" style={{ width: "34%" }}>Event</th>
-                      <th className="px-2 py-2" style={{ width: "14%" }}>Category</th>
-                      <th className="px-2 py-2" style={{ width: "20%" }}>Channels</th>
-                      <th className="px-2 py-2" style={{ width: "16%" }}>Acknowledgement</th>
-                      <th className="px-2 py-2" style={{ width: "16%" }}>Rule</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleNotificationEvents.map((event) => (
-                      <tr key={event.eventType}>
-                        <td className="px-2 py-2" style={{ overflowWrap: "anywhere" }}>
-                          <div className="fw-bold">{event.eventType}</div>
-                          <div className="text-muted small">{event.description || "—"}</div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <Badge bg="secondary">{event.category || "GENERAL"}</Badge>
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="d-flex flex-wrap" style={{ gap: 4 }}>
-                            {(Array.isArray(event.deliveryChannels) ? event.deliveryChannels : []).map((channel) => (
-                              <Badge bg="info" text="dark" key={channel}>{channel}</Badge>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2">
-                          {event.defaultRequiresAck ? (
-                            <Badge bg="warning" text="dark">Required by default</Badge>
-                          ) : (
-                            <Badge bg="light" text="dark">Not required</Badge>
-                          )}
-                        </td>
-                        <td className="px-2 py-2">
-                          {event.mandatory ? (
-                            <Badge bg="danger">Mandatory</Badge>
-                          ) : (
-                            <Badge bg="light" text="dark">Standard</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-                </div>
-
-                <div className="d-md-none">
-                  {visibleNotificationEvents.map((event) => (
-                    <Card key={event.eventType} border="light" className="shadow-sm mb-3">
-                      <Card.Body>
-                        <div className="d-flex flex-column" style={{ gap: 12 }}>
-                          <div className="mobile-break-anywhere">
-                            <div className="fw-bold mobile-break-anywhere">{event.eventType}</div>
-                            <div className="text-muted small mobile-break-anywhere">{event.description || "—"}</div>
-                          </div>
-
-                          <div>
-                            <div className="text-muted small mb-1">Category</div>
-                            <Badge bg="secondary">{event.category || "GENERAL"}</Badge>
-                          </div>
-
-                          <div>
-                            <div className="text-muted small mb-1">Channels</div>
-                            <div className="d-flex flex-wrap" style={{ gap: 4 }}>
-                              {(Array.isArray(event.deliveryChannels) ? event.deliveryChannels : []).map((channel) => (
-                                <Badge bg="info" text="dark" key={channel}>{channel}</Badge>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-muted small mb-1">Acknowledgement</div>
-                            {event.defaultRequiresAck ? (
-                              <Badge bg="warning" text="dark">Required by default</Badge>
-                            ) : (
-                              <Badge bg="light" text="dark">Not required</Badge>
-                            )}
-                          </div>
-
-                          <div>
-                            <div className="text-muted small mb-1">Rule</div>
-                            {event.mandatory ? (
-                              <Badge bg="danger">Mandatory</Badge>
-                            ) : (
-                              <Badge bg="light" text="dark">Standard</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-                </>
-              )}
-            </Card.Body>
-          </Card>
-        </>
-      ) : null}
-
       {activeTab === "areas" ? (
         <>
           {areaError ? <Alert variant="danger">{areaError}</Alert> : null}
@@ -1186,7 +779,7 @@ export default function Administration() {
             </Card.Header>
 
             <Card.Body>
-              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3" style={{ gap: 12 }}>
+              <div className="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end mb-3 admin-mobile-stack-row" style={{ gap: 12 }}>
                 <Form.Group className="mobile-min-width-0" style={{ minWidth: 240, flex: "1 1 320px" }}>
                   <Form.Label>Search areas</Form.Label>
                   <Form.Control

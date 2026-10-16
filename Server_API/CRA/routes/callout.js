@@ -8,6 +8,7 @@ const multer = require("multer");
 // ✅ Match Servicing auth pattern
 const { getSession, extractBearer } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
+const { validateImageBuffer, decodeImageDataUrl, safeGeneratedImageName } = require("../lib/imageValidation");
 
 const router = express.Router();
 
@@ -30,6 +31,30 @@ const MAX_TOTAL_UPLOAD_BYTES = 45 * 1024 * 1024;
 
 function totalUploadBytes(files) {
   return (Array.isArray(files) ? files : []).reduce((sum, f) => sum + Number(f?.size || f?.buffer?.length || 0), 0);
+}
+
+function validateRequiredSignature(payload) {
+  try {
+    return decodeImageDataUrl(payload?.signatureDataUrl || payload?.signature || "", {
+      allowed: ["png"],
+      maxBytes: 2 * 1024 * 1024
+    });
+  } catch (error) {
+    const wrapped = new Error(`A valid technician signature is required. ${String(error?.message || "")}`.trim());
+    wrapped.status = /too large/i.test(String(error?.message || "")) ? 413 : 400;
+    throw wrapped;
+  }
+}
+
+function validateEvidenceFiles(files) {
+  return (Array.isArray(files) ? files : []).map((file) => ({
+    file,
+    info: validateImageBuffer(file?.buffer, {
+      allowed: ["png", "jpeg"],
+      maxBytes: 15 * 1024 * 1024,
+      declaredMime: file?.mimetype || ""
+    })
+  }));
 }
 
 function safeBasename(name) {
@@ -217,9 +242,11 @@ router.post("/drafts", requireAuth, async (req, res) => {
     const key = validDraftId(body.key || body.draftId);
     if (!key) return res.status(400).json({ ok: false, message: "Invalid Call Out draft id." });
 
-    if (body.value !== undefined && !isPlainObject(body.value)) {
+    if (!isPlainObject(body.value)) {
       return res.status(400).json({ ok: false, message: "Draft value must be an object." });
     }
+    try { validateRequiredSignature(body.value); }
+    catch (error) { return res.status(error.status || 400).json({ ok: false, message: error.message }); }
 
     const filePath = draftFilePath(userKey, key);
     await ensureDir(path.dirname(filePath));
@@ -235,7 +262,7 @@ router.post("/drafts", requireAuth, async (req, res) => {
       owner,
       ownerEmail: owner.email || "",
       userKey,
-      value: isPlainObject(body.value) ? body.value : isPlainObject(existing?.value) ? existing.value : {}
+      value: body.value
     };
 
     await writeDraftFileAtomic(filePath, record);
@@ -314,6 +341,20 @@ router.post("/submit-payload", requireAuth, upload.array("photo", 50), async (re
       return res.status(400).json({ ok: false, message: "Invalid payload JSON." });
     }
 
+    try {
+      validateRequiredSignature(payload);
+    } catch (error) {
+      return res.status(error.status || 400).json({ ok: false, message: error.message });
+    }
+
+    let validatedFiles = [];
+    try {
+      validatedFiles = validateEvidenceFiles(req.files);
+    } catch (error) {
+      const status = /too large/i.test(String(error?.message || "")) ? 413 : 400;
+      return res.status(status).json({ ok: false, message: String(error?.message || "Invalid evidence image.") });
+    }
+
     const reportId = String(payload?.reportId || "").trim();
     if (!reportId) {
       return res.status(400).json({ ok: false, message: "Missing payload.reportId." });
@@ -327,27 +368,23 @@ router.post("/submit-payload", requireAuth, upload.array("photo", 50), async (re
     await ensureDir(reportPhotosDir);
 
     const savedPhotos = [];
-    const files = Array.isArray(req.files) ? req.files : [];
 
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      if (!f || !f.buffer) continue;
-
-      const origName = safeBasename(f.originalname || `photo_${i}.jpg`);
-      const ext = path.extname(origName) || ".jpg";
-      const base = path.basename(origName, ext);
-
-      // Ensure unique filename
-      const outName = `${base}_${Date.now()}_${i}${ext}`;
-      const outPath = path.join(reportPhotosDir, outName);
-
-      await fsp.writeFile(outPath, f.buffer);
-      savedPhotos.push({
-        filename: outName,
-        originalname: f.originalname || outName,
-        mimetype: f.mimetype || "",
-        size: f.size || 0
-      });
+    try {
+      for (let i = 0; i < validatedFiles.length; i += 1) {
+        const { file, info } = validatedFiles[i];
+        const outName = safeGeneratedImageName("evidence", `${reportId}_${i + 1}`, info.ext);
+        const outPath = path.join(reportPhotosDir, outName);
+        await fsp.writeFile(outPath, file.buffer, { mode: 0o600 });
+        savedPhotos.push({
+          filename: outName,
+          originalname: file.originalname || outName,
+          mimetype: info.mime,
+          size: info.bytes
+        });
+      }
+    } catch (error) {
+      await fsp.rm(reportPhotosDir, { recursive: true, force: true }).catch(() => {});
+      return res.status(500).json({ ok: false, message: "Evidence images could not be saved." });
     }
 
     // Attach saved photo filenames to payload so generator can embed them later

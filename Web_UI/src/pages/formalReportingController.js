@@ -236,7 +236,7 @@ async function loadDrafts() {
     $('draft-count').textContent = `${drafts.length} draft(s)`;
     list.innerHTML = drafts.length ? drafts.map((draft) => `
       <div class="draft-row">
-        <div><div class="fw-bold">${escapeHtml(draft.name || `${draft.section} · ${draft.month} · Week ${draft.week}`)}</div><div class="text-muted small">Updated: ${new Date(draft.savedAt).toLocaleString('en-ZA')}</div></div>
+        <div class="draft-copy"><div class="fw-bold draft-name">${escapeHtml(draft.name || `${draft.section} · ${draft.month} · Week ${draft.week}`)}</div><div class="text-muted small">Updated: ${new Date(draft.savedAt).toLocaleString('en-ZA')}</div></div>
         <div class="draft-actions"><button class="btn btn-primary btn-sm" type="button" data-load-draft="${escapeHtml(draft.id)}">Load</button><button class="btn btn-outline-secondary btn-sm" type="button" data-rename-draft="${escapeHtml(draft.id)}">Rename</button><button class="btn btn-outline-danger btn-sm" type="button" data-delete-draft="${escapeHtml(draft.id)}">Delete</button></div>
       </div>`).join('') : '<div class="text-muted small">No saved drafts.</div>';
     list.querySelectorAll('[data-load-draft]').forEach((button) => button.addEventListener('click', () => loadDraft(button.dataset.loadDraft)));

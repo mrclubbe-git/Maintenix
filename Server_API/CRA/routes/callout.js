@@ -75,14 +75,7 @@ function ownerFromReq(req) {
 }
 
 // ✅ Same as routes/servicing.js
-function requireAuth(req, res, next) {
-  let token = "";
-  try {
-    token = extractBearer(req);
-  } catch {
-    const auth = (req.headers && req.headers.authorization) || "";
-    token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  }
+function requireAuth(req, res, next) {\n  const token = extractBearer(req);
 
   const session = token ? getSession(token) : null;
   if (!session?.userId) return res.status(401).json({ ok: false, message: "Not logged in." });

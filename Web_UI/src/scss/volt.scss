@@ -209,6 +209,30 @@
     flex: 1 1 calc(50% - 0.5rem);
     min-width: 0;
   }
+
+  .servicing-draft-actions {
+    width: 100%;
+  }
+
+  .servicing-draft-actions .btn {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: 0;
+  }
+
+  // Administration filter rows use a desktop flex-basis. When the row stacks
+  // vertically on phones, release that basis so it does not become height.
+  .admin-mobile-stack-row > .mobile-min-width-0 {
+    flex: 0 0 auto !important;
+    width: 100%;
+  }
+
+  .admin-mobile-stack-row > .d-flex {
+    width: 100%;
+  }
+
+  .admin-mobile-stack-row > .d-flex .btn {
+    width: 100%;
+  }
 }
 // Formal Reports uses the shared Volt/Bootstrap bundle. Only workflow-specific
 // layouts live here; cards, buttons, forms, typography and progress use Bootstrap.
@@ -289,6 +313,32 @@
     .question-nav, .review-actions { flex-direction: column; }
     .question-nav .btn, .review-actions .btn, .actions .btn { width: 100%; }
     .note { text-align: left; }
+
+    .draft-row {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .draft-copy,
+    .draft-name {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .draft-copy {
+      flex: 1 1 100%;
+    }
+
+    .draft-actions {
+      width: 100%;
+    }
+
+    .draft-actions .btn {
+      flex: 1 1 calc(50% - 0.5rem);
+      min-width: 0;
+    }
   }
 }
 

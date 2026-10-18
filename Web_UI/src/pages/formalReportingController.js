@@ -703,7 +703,7 @@ return () => {
   stopped = true;
   window.removeEventListener('online', onOnline);
   window.clearInterval(syncTimer);
-  try { draftDb?.close(); } catch {}
+  try { if (draftDb) draftDb.close(); } catch {}
   draftDb = null;
 };
 }

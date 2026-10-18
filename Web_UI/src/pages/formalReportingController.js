@@ -396,7 +396,7 @@ async function saveDraft() {
     };
 
     await idbPut(record);
-    await loadDrafts();
+    await loadDrafts({ includeServer: false });
 
     if (navigator.onLine) {
       syncDraftRecord(record)
@@ -409,7 +409,7 @@ async function saveDraft() {
   } catch (error) { showNotice(error.message, 'error'); }
 }
 
-async function loadDrafts() {
+async function loadDrafts({ includeServer = true } = {}) {
   const list = $('drafts-list');
   list.innerHTML = '<div class="text-muted small">Loading drafts…</div>';
 
@@ -421,7 +421,7 @@ async function loadDrafts() {
 
     const byId = new Map(localDrafts.map((draft) => [draft.id, draft]));
 
-    if (navigator.onLine) {
+    if (includeServer && navigator.onLine) {
       try {
         const data = await api('/drafts');
         const serverDrafts = Array.isArray(data.drafts) ? data.drafts : [];
@@ -523,7 +523,7 @@ async function renameDraft(id) {
       syncError: ''
     };
     await idbPut(updated);
-    await loadDrafts();
+    await loadDrafts({ includeServer: false });
 
     if (navigator.onLine) {
       syncDraftRecord(updated)
@@ -559,7 +559,7 @@ async function deleteDraft(id) {
       });
     }
 
-    await loadDrafts();
+    await loadDrafts({ includeServer: false });
 
     if (navigator.onLine) {
       const tombstone = await idbGet(id);

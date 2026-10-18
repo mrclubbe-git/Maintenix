@@ -400,3 +400,24 @@ Whenever development adds any of the following, update this table and the releva
 - a new secret/key that must survive redeployment.
 
 This prevents DEV-only infrastructure from being forgotten when CRA is promoted to LIVE.
+
+## Cloudflare / edge-managed security controls
+
+The final Maintenix site is expected to run behind Cloudflare. Security controls that are naturally delivered by the final Cloudflare/edge hosting layer must be recorded here and implemented during final hosting/migration rather than recreated as temporary DEV services.
+
+Rules:
+
+- Do **not** create a separate systemd service, local proxy daemon, header-injection process, scheduled task, or other persistent host service solely to imitate a control that Cloudflare will provide in the final architecture.
+- Do **not** add such temporary infrastructure to `startAll.js`.
+- Application-owned runtime processes remain limited to processes the Maintenix application itself needs.
+- The current GitHub Pages test frontend may use application-compatible fallbacks where necessary, but these do not replace final edge enforcement.
+
+Final edge requirements include, at minimum:
+
+- HTTP `Content-Security-Policy` response headers appropriate to the final origin, including `frame-ancestors 'none'`;
+- `X-Frame-Options: DENY`;
+- final TLS/HSTS policy;
+- final reverse-proxy/origin routing and security headers;
+- any additional Cloudflare edge controls approved during migration.
+
+These controls must be validated on the final Cloudflare-hosted candidate before LIVE acceptance. They are migration configuration, not additional Maintenix application services.

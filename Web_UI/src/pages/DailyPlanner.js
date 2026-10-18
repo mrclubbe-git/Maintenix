@@ -39,8 +39,7 @@ function hashQueryDate() {
 function authHeaders(json = true) {
   const token = orgLocalStorage.getItem("authToken") || "";
   return {
-    ...(json ? { "Content-Type": "application/json" } : {}),
-    Authorization: `Bearer ${token}`
+    ...(json ? { "Content-Type": "application/json" } : {})
   };
 }
 

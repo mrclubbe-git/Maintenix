@@ -7,6 +7,7 @@ const { execFileSync } = require("child_process");
 const { allowedOrigins, csrfProtection } = require("./lib/requestSecurity");
 const { extractSessionToken, getSession } = require("./lib/sessions");
 const { getUsers } = require("./lib/userStore");
+const { PROFILE_PICS_DIR } = require("./lib/profilePhotoStorage");
 
 // routes
 const authRoutes = require("./routes/auth");
@@ -69,7 +70,17 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Session-bound CSRF protection is applied centrally to authenticated writes.
 app.use(csrfProtection);
 
-// Serve uploaded files (profile pics, report photos, reports, etc.)
+// New profile photos are stored in data/profilepics so avatar writes use the same
+// writable runtime data root as users.json. Keep the historical public URL and
+// fall through to data/uploads/profilepics for existing legacy avatar references.
+app.use("/uploads/profilepics", express.static(PROFILE_PICS_DIR, {
+  fallthrough: true,
+  setHeaders(res) {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+  }
+}));
+
+// Serve uploaded files (legacy profile pics, report photos, reports, etc.)
 app.use("/uploads", express.static(path.join(__dirname, "data", "uploads"), {
   fallthrough: true,
   setHeaders(res) {

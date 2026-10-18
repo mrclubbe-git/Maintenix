@@ -76,3 +76,9 @@ jobs:
           REACT_APP_ORGANIZATION_CODE: CRA
           REACT_APP_ORGANIZATION_NAME: Collaborative Risk Applications
         run: npm run build:github
+
+      - name: Verify security build output
+        run: |
+          test -z "$(find build -type f -name '*.map' -print -quit)"
+          grep -q "Content-Security-Policy" build/index.html
+          ! grep -R "Authorization:.*Bearer" src public --include='*.js' --include='*.jsx'

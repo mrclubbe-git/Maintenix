@@ -149,7 +149,7 @@ function validateSignatureDataUrl(dataUrl, options = {}) {
 
   const minWidth = Number(options.minWidth || 120);
   const minHeight = Number(options.minHeight || 50);
-  const minBytes = Number(options.minBytes || 800);
+  const minBytes = Number(options.minBytes || 100);
 
   if (decoded.width < minWidth || decoded.height < minHeight || decoded.bytes < minBytes) {
     throw new Error("Signature image is missing or too small to be valid.");

@@ -1,8 +1,86 @@
-import { orgLocalStorage } from "../config/organization";
+import { orgLocalStorage, organizationDbName } from "../config/organization";
 export default function initializeFormalReporting(root) {
 if (!root) return () => {};
 
 const state = { sections: [], section: null, month: '', week: null, weekRange: '', compiledName: '', compiledDesignation: '', systems: [], responses: {}, index: 0 };
+
+const FORMAL_DRAFT_STORE = 'formalReportDrafts';
+let draftDb = null;
+let stopped = false;
+const draftSyncInFlight = new Set();
+
+function openDraftDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(organizationDbName('maintenix_formal_reports'), 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(FORMAL_DRAFT_STORE)) {
+        db.createObjectStore(FORMAL_DRAFT_STORE, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function idbPut(value) {
+  if (!draftDb) return Promise.reject(new Error('Browser draft storage is not available.'));
+  return new Promise((resolve, reject) => {
+    const tx = draftDb.transaction(FORMAL_DRAFT_STORE, 'readwrite');
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(FORMAL_DRAFT_STORE).put(value);
+  });
+}
+
+function idbGet(id) {
+  if (!draftDb) return Promise.resolve(null);
+  return new Promise((resolve, reject) => {
+    const tx = draftDb.transaction(FORMAL_DRAFT_STORE, 'readonly');
+    const request = tx.objectStore(FORMAL_DRAFT_STORE).get(id);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function idbGetAll() {
+  if (!draftDb) return Promise.resolve([]);
+  return new Promise((resolve, reject) => {
+    const tx = draftDb.transaction(FORMAL_DRAFT_STORE, 'readonly');
+    const request = tx.objectStore(FORMAL_DRAFT_STORE).getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function idbDelete(id) {
+  if (!draftDb) return Promise.resolve(true);
+  return new Promise((resolve, reject) => {
+    const tx = draftDb.transaction(FORMAL_DRAFT_STORE, 'readwrite');
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(FORMAL_DRAFT_STORE).delete(id);
+  });
+}
+
+function defaultDraftName(value) {
+  return `${value.section} · ${value.month} · Week ${value.week}`;
+}
+
+function localDraftSummary(record) {
+  const value = record?.value || {};
+  return {
+    id: record.id,
+    name: record.name || defaultDraftName(value),
+    section: value.section,
+    month: value.month,
+    week: value.week,
+    compiledName: value.compiledName,
+    savedAt: record.savedAt || '',
+    syncStatus: record.syncStatus || 'pending',
+    syncError: record.syncError || ''
+  };
+}
 
 const doc = root.ownerDocument || root.host?.ownerDocument || document;
 const $ = (id) => root.querySelector(`#${CSS.escape(id)}`);
@@ -217,56 +295,283 @@ function draftPayload() {
   };
 }
 
+async function saveDraftToServer(record) {
+  const value = { ...(record.value || {}), name: record.name || defaultDraftName(record.value || {}) };
+  return api('/drafts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(value)
+  });
+}
+
+async function syncDraftRecord(record) {
+  if (!draftDb || !record?.id || !record?.value || record.deleted) return record || null;
+  if (!navigator.onLine || draftSyncInFlight.has(record.id)) return record;
+
+  draftSyncInFlight.add(record.id);
+  const syncing = {
+    ...record,
+    syncStatus: 'syncing',
+    syncError: '',
+    lastSyncAttemptAt: new Date().toISOString()
+  };
+
+  try {
+    await idbPut(syncing);
+    const result = await saveDraftToServer(syncing);
+    const latest = await idbGet(record.id);
+    if (!latest) return null;
+
+    if (String(latest.savedAt || '') !== String(syncing.savedAt || '') || latest.deleted) {
+      const pending = { ...latest, syncStatus: 'pending' };
+      await idbPut(pending);
+      return pending;
+    }
+
+    const synced = {
+      ...latest,
+      syncStatus: 'synced',
+      syncError: '',
+      syncedAt: new Date().toISOString(),
+      serverSavedAt: String(result?.draft?.savedAt || '')
+    };
+    await idbPut(synced);
+    return synced;
+  } catch (error) {
+    const latest = await idbGet(record.id);
+    if (!latest) return null;
+    const failed = {
+      ...latest,
+      syncStatus: 'pending',
+      syncError: String(error?.message || 'Draft sync failed.'),
+      lastSyncAttemptAt: new Date().toISOString()
+    };
+    await idbPut(failed);
+    return failed;
+  } finally {
+    draftSyncInFlight.delete(record.id);
+  }
+}
+
+async function syncDeletedDraft(record) {
+  if (!record?.id || !record.deleted || !navigator.onLine) return false;
+  try {
+    await api(`/drafts/${encodeURIComponent(record.id)}`, { method: 'DELETE' });
+  } catch (error) {
+    // A missing server draft is already equivalent to the requested state.
+    if (!/404/.test(String(error?.message || ''))) throw error;
+  }
+  await idbDelete(record.id);
+  return true;
+}
+
+async function syncPendingDrafts() {
+  if (!draftDb || !navigator.onLine || stopped) return;
+  const all = await idbGetAll();
+  const pending = all.filter((record) => record && (record.deleted || record.syncStatus !== 'synced'));
+  if (!pending.length) return;
+
+  for (const record of pending) {
+    if (record.deleted) await syncDeletedDraft(record);
+    else await syncDraftRecord(record);
+  }
+  await loadDrafts();
+}
+
 async function saveDraft() {
   try {
-    await api('/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draftPayload()) });
-    showNotice('Draft saved on the server.');
+    if (!draftDb) throw new Error('Browser draft storage is not available.');
+
+    const value = draftPayload();
+    const existing = await idbGet(value.id);
+    const savedAt = new Date().toISOString();
+    const record = {
+      id: value.id,
+      type: 'formalReportDraft',
+      name: existing?.name || defaultDraftName(value),
+      savedAt,
+      value,
+      syncStatus: 'pending',
+      syncError: ''
+    };
+
+    await idbPut(record);
     await loadDrafts();
+
+    if (navigator.onLine) {
+      syncDraftRecord(record)
+        .then(() => loadDrafts())
+        .catch(() => {});
+      showNotice('Draft saved on this device. Server sync started.');
+    } else {
+      showNotice('Draft saved on this device. It will sync automatically when online.');
+    }
   } catch (error) { showNotice(error.message, 'error'); }
 }
 
 async function loadDrafts() {
   const list = $('drafts-list');
   list.innerHTML = '<div class="text-muted small">Loading drafts…</div>';
+
   try {
-    const data = await api('/drafts');
-    const drafts = Array.isArray(data.drafts) ? data.drafts : [];
+    const localRecords = draftDb ? await idbGetAll() : [];
+    const localDrafts = localRecords
+      .filter((record) => record && !record.deleted && record.type === 'formalReportDraft' && record.value)
+      .map(localDraftSummary);
+
+    const byId = new Map(localDrafts.map((draft) => [draft.id, draft]));
+
+    if (navigator.onLine) {
+      try {
+        const data = await api('/drafts');
+        const serverDrafts = Array.isArray(data.drafts) ? data.drafts : [];
+        serverDrafts.forEach((draft) => {
+          if (!byId.has(draft.id)) byId.set(draft.id, { ...draft, syncStatus: 'server', syncError: '' });
+        });
+      } catch {
+        // Browser drafts remain usable if the server list is temporarily unavailable.
+      }
+    }
+
+    const drafts = Array.from(byId.values())
+      .sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
+
     $('draft-count').textContent = `${drafts.length} draft(s)`;
-    list.innerHTML = drafts.length ? drafts.map((draft) => `
-      <div class="draft-row">
-        <div class="draft-copy"><div class="fw-bold draft-name">${escapeHtml(draft.name || `${draft.section} · ${draft.month} · Week ${draft.week}`)}</div><div class="text-muted small">Updated: ${new Date(draft.savedAt).toLocaleString('en-ZA')}</div></div>
-        <div class="draft-actions"><button class="btn btn-primary btn-sm" type="button" data-load-draft="${escapeHtml(draft.id)}">Load</button><button class="btn btn-outline-secondary btn-sm" type="button" data-rename-draft="${escapeHtml(draft.id)}">Rename</button><button class="btn btn-outline-danger btn-sm" type="button" data-delete-draft="${escapeHtml(draft.id)}">Delete</button></div>
-      </div>`).join('') : '<div class="text-muted small">No saved drafts.</div>';
+    list.innerHTML = drafts.length ? drafts.map((draft) => {
+      const status = draft.syncStatus === 'synced' || draft.syncStatus === 'server'
+        ? '<span class="badge bg-success ms-2">Server synced</span>'
+        : draft.syncStatus === 'syncing'
+          ? '<span class="badge bg-info ms-2">Syncing</span>'
+          : '<span class="badge bg-warning text-dark ms-2">Saved locally</span>';
+      const syncError = draft.syncError
+        ? `<div class="text-danger small">Server sync pending: ${escapeHtml(draft.syncError)}</div>`
+        : '';
+      return `
+        <div class="draft-row">
+          <div class="draft-copy">
+            <div class="fw-bold draft-name">${escapeHtml(draft.name || `${draft.section} · ${draft.month} · Week ${draft.week}`)}${status}</div>
+            <div class="text-muted small">Updated: ${draft.savedAt ? new Date(draft.savedAt).toLocaleString('en-ZA') : 'Server draft'}</div>
+            ${syncError}
+          </div>
+          <div class="draft-actions"><button class="btn btn-primary btn-sm" type="button" data-load-draft="${escapeHtml(draft.id)}">Load</button><button class="btn btn-outline-secondary btn-sm" type="button" data-rename-draft="${escapeHtml(draft.id)}">Rename</button><button class="btn btn-outline-danger btn-sm" type="button" data-delete-draft="${escapeHtml(draft.id)}">Delete</button></div>
+        </div>`;
+    }).join('') : '<div class="text-muted small">No saved drafts.</div>';
+
     list.querySelectorAll('[data-load-draft]').forEach((button) => button.addEventListener('click', () => loadDraft(button.dataset.loadDraft)));
     list.querySelectorAll('[data-rename-draft]').forEach((button) => button.addEventListener('click', () => renameDraft(button.dataset.renameDraft)));
     list.querySelectorAll('[data-delete-draft]').forEach((button) => button.addEventListener('click', () => deleteDraft(button.dataset.deleteDraft)));
-  } catch (error) { $('draft-count').textContent = '0 draft(s)'; list.innerHTML = `<div class="notice error">${escapeHtml(error.message)}</div>`; }
+  } catch (error) {
+    $('draft-count').textContent = '0 draft(s)';
+    list.innerHTML = `<div class="notice error">${escapeHtml(error.message)}</div>`;
+  }
 }
 
 async function loadDraft(id) {
   try {
+    const local = await idbGet(id);
+    if (local?.value && !local.deleted) {
+      reopenEntry({ ...local.value, name: local.name }, 'Draft loaded from this device. Continue editing or review it before saving again.');
+      return;
+    }
+
     const data = await api(`/drafts/${encodeURIComponent(id)}`);
+    if (data?.draft && draftDb) {
+      const cached = {
+        id: data.draft.id,
+        type: 'formalReportDraft',
+        name: data.draft.name || defaultDraftName(data.draft),
+        savedAt: data.draft.savedAt || new Date().toISOString(),
+        value: data.draft,
+        syncStatus: 'synced',
+        syncError: '',
+        syncedAt: new Date().toISOString()
+      };
+      await idbPut(cached);
+    }
     reopenEntry(data.draft, 'Draft loaded. Continue editing or review it before saving again.');
+    await loadDrafts();
   } catch (error) { showNotice(error.message, 'error'); }
 }
 
 async function renameDraft(id) {
   const name = window.prompt('New draft name:');
   if (name == null) return;
-  if (!name.trim()) return showNotice('Draft name cannot be empty.', 'error');
+  const cleanName = name.replace(/\s+/g, ' ').trim();
+  if (!cleanName) return showNotice('Draft name cannot be empty.', 'error');
+  if (cleanName.length > 120) return showNotice('Draft name must be 120 characters or fewer.', 'error');
+
   try {
-    await api(`/drafts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
-    showNotice('Draft renamed.');
+    let record = await idbGet(id);
+    if (!record?.value) {
+      const data = await api(`/drafts/${encodeURIComponent(id)}`);
+      record = {
+        id,
+        type: 'formalReportDraft',
+        name: data.draft?.name || defaultDraftName(data.draft || {}),
+        savedAt: data.draft?.savedAt || new Date().toISOString(),
+        value: data.draft,
+        syncStatus: 'synced',
+        syncError: ''
+      };
+    }
+
+    const updated = {
+      ...record,
+      name: cleanName,
+      savedAt: new Date().toISOString(),
+      syncStatus: 'pending',
+      syncError: ''
+    };
+    await idbPut(updated);
     await loadDrafts();
+
+    if (navigator.onLine) {
+      syncDraftRecord(updated)
+        .then(() => loadDrafts())
+        .catch(() => {});
+    }
+    showNotice('Draft renamed on this device. Server sync will continue automatically.');
   } catch (error) { showNotice(error.message, 'error'); }
 }
 
 async function deleteDraft(id) {
   if (!window.confirm('Delete this report draft?')) return;
   try {
-    await api(`/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    showNotice('Draft deleted.');
+    const existing = await idbGet(id);
+    if (existing) {
+      await idbPut({
+        ...existing,
+        deleted: true,
+        syncStatus: 'pending',
+        syncError: '',
+        savedAt: new Date().toISOString()
+      });
+    } else if (draftDb) {
+      await idbPut({
+        id,
+        type: 'formalReportDraft',
+        name: id,
+        savedAt: new Date().toISOString(),
+        value: null,
+        deleted: true,
+        syncStatus: 'pending',
+        syncError: ''
+      });
+    }
+
     await loadDrafts();
+
+    if (navigator.onLine) {
+      const tombstone = await idbGet(id);
+      syncDeletedDraft(tombstone)
+        .then(() => loadDrafts())
+        .catch(async (error) => {
+          const latest = await idbGet(id);
+          if (latest) await idbPut({ ...latest, syncError: String(error?.message || 'Delete sync failed.') });
+          await loadDrafts();
+        });
+    }
+    showNotice(navigator.onLine ? 'Draft deleted locally. Server deletion is syncing.' : 'Draft deleted locally. Server deletion will sync when online.');
   } catch (error) { showNotice(error.message, 'error'); }
 }
 
@@ -310,6 +615,14 @@ async function initialize() {
   populateWeeks();
   const today = new Date();
   $('month').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+  try {
+    draftDb = await openDraftDb();
+    await loadDrafts();
+  } catch (error) {
+    showNotice(`Browser draft storage unavailable: ${error.message}`, 'error');
+  }
+
   try {
     const body = await api('/sections');
     state.sections = body.sections;
@@ -317,6 +630,7 @@ async function initialize() {
       const option = doc.createElement('option'); option.value = section.name; option.textContent = `${section.name} (${section.systemCount} systems)`; $('section').append(option);
     });
     await loadDrafts();
+    if (navigator.onLine) syncPendingDrafts().catch(() => {});
   } catch (error) { showNotice(`Unable to load areas: ${error.message}`, 'error'); }
 }
 
@@ -374,7 +688,22 @@ root.addEventListener('click', async (event) => {
   } catch (error) { showNotice(error.message, 'error'); }
 });
 
+const onOnline = () => {
+  syncPendingDrafts().catch(() => {});
+  loadDrafts().catch(() => {});
+};
+window.addEventListener('online', onOnline);
+const syncTimer = window.setInterval(() => {
+  if (navigator.onLine) syncPendingDrafts().catch(() => {});
+}, 10000);
+
 initialize();
 
-return () => {};
+return () => {
+  stopped = true;
+  window.removeEventListener('online', onOnline);
+  window.clearInterval(syncTimer);
+  try { draftDb?.close(); } catch {}
+  draftDb = null;
+};
 }

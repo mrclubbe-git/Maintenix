@@ -1802,3 +1802,25 @@ Validation/deployment support:
 - GitHub Pages run `38869784141` completed successfully; build and deploy both passed.
 - Frontend-only changes; no CRA backend files changed and no DEV service restart is required.
 
+## Consolidated security remediation candidate — 2026-10-18
+
+- The agreed application-side security remediation is consolidated on `security-remediation-20261016`.
+- Candidate baseline before this documentation update: `6497885dad984238cdce7a9ff454778419d62006`.
+- Security branch CI run `39102250630` passed backend syntax/regression tests, Formal Reporting Python compilation, the full GitHub Pages production build, CSP presence, source-map removal, and removal of frontend Bearer-token request headers.
+- Application-side remediation includes:
+  - server-managed Secure/HttpOnly 8-hour sessions;
+  - per-session CSRF protection for authenticated writes;
+  - active-session logout invalidation and account/password lifecycle revocation;
+  - the approved Stock Control role matrix in both UI and API;
+  - mandatory valid technician signatures for Servicing and Call Out;
+  - backend image/upload content and dimension validation;
+  - atomic Formal/Section Report publication and bounded compiler/sign-off fields;
+  - ADMIN-only server telemetry in Administration -> System with the Overview telemetry tile removed;
+  - production source maps disabled;
+  - restrictive frontend CSP compatible with the current GitHub Pages test deployment;
+  - client-side frame-deny fallback while the frontend remains on GitHub Pages.
+- The cookie-session frontend and backend are a coordinated release. Do not deploy the matching frontend to `deploy` until the updated CRA DEV backend is installed and validated, because the old bearer-token backend is not compatible with the new frontend.
+- Final edge/header controls that belong to the planned Cloudflare-hosted site are migration requirements, not DEV application services. Do not create temporary systemd units, proxy daemons, header-injection services, or other persistent local processes solely to imitate Cloudflare.
+- In particular, final response-header enforcement such as `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, HSTS/edge TLS policy, and other Cloudflare-owned controls are to be configured at final hosting/migration time.
+- Application-owned processes remain unchanged by this rule: API, Servicing worker, Call Out worker, Notification worker, the on-demand Formal Reporting worker, and the browser push service worker continue to be tracked normally.
+- LIVE remains untouched until explicit migration approval.

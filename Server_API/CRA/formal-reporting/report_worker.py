@@ -18,6 +18,8 @@ from docx.shared import Mm, RGBColor
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+from text_validation import compiled_section_has_content
+
 
 MAINTENIX_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES_DIR = MAINTENIX_ROOT / "data" / "templates" / "formal-reports"
@@ -252,13 +254,11 @@ def build_report(payload: dict, model: str, systems: list[dict], docx_dir: Path,
     if any(token in pdf_text for token in forbidden):
         raise RuntimeError("Generated PDF contains an unresolved template placeholder")
 
-    normalized_pdf_text = re.sub(r"\s+", " ", pdf_text)
-    required_text = [
-        "5. Compiled By",
+    if not compiled_section_has_content(
+        pdf_text,
         payload["compiledName"].strip(),
         payload["compiledDesignation"].strip(),
-    ]
-    if any(re.sub(r"\s+", " ", value) not in normalized_pdf_text for value in required_text):
+    ):
         raise RuntimeError("Generated PDF is missing required Compiled By content")
 
     return {"model": model, "systems": len(systems), "docx": docx_path.name, "pdf": pdf_path.name}

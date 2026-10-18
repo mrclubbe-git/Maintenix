@@ -20,7 +20,7 @@ const pageMarkup = `
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><div class="fw-bold">Saved Drafts</div><div id="draft-count" class="text-muted small">0 draft(s)</div></div>
       <div class="card-body">
         <div id="drafts-list"><div class="text-muted small">Loading drafts…</div></div>
-        <div class="text-muted small draft-help">Save the draft in the Review step. Queued generation will be added here in the next workflow step.</div>
+        <div class="text-muted small draft-help">Drafts save on this device first and synchronize to your server draft folder in the background when online.</div>
       </div>
     </section>
     <div id="notice" class="notice hidden" role="status"></div>

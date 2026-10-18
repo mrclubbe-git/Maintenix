@@ -1824,3 +1824,13 @@ Validation/deployment support:
 - In particular, final response-header enforcement such as `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, HSTS/edge TLS policy, and other Cloudflare-owned controls are to be configured at final hosting/migration time.
 - Application-owned processes remain unchanged by this rule: API, Servicing worker, Call Out worker, Notification worker, the on-demand Formal Reporting worker, and the browser push service worker continue to be tracked normally.
 - LIVE remains untouched until explicit migration approval.
+
+## Coordinated security remediation DEV rollout — 2026-10-18
+
+- User confirmed the consolidated CRA security-remediation backend handoff was installed on DEV and `maintenix-dev-api.service` was restarted.
+- Matching security-remediation Web UI was promoted to the `deploy` branch at commit `f4c295d4a2a887d088b099f257c41598144a6ef8`.
+- GitHub Pages workflow run `39104043091` completed successfully: build and deploy both passed.
+- The deployed frontend is now the cookie-session/CSRF-compatible build matching the installed remediation backend.
+- No new DEV systemd service, proxy daemon, Cloudflare-emulation service, or other persistent infrastructure was created.
+- Runtime acceptance is still required before calling the remediation validated on DEV: login/session cookie, logout replay rejection, CSRF-protected writes, role/session revocation, Stock matrix, mandatory signatures, Section Reports, Admin -> System, notifications, Servicing, Call Out and report moderation.
+- Final Cloudflare-owned response headers and edge controls remain deferred to final hosting/migration as documented in `LIVE_MIGRATION_CHECKLIST.md`.

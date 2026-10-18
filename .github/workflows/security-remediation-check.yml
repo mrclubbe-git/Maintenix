@@ -38,6 +38,12 @@ jobs:
           node --check lib/servicingGenerator.js
           node --check routes/auth.js
           node --check routes/admin.js
+          node --check routes/areas.js
+          node --check routes/presence.js
+          node --check routes/notifications.js
+          node --check routes/dailyPlanner.js
+          node --check routes/reports.js
+          node --check routes/push.js
           node --check routes/profilePassword.js
           node --check routes/stock.js
           node --check routes/servicing.js

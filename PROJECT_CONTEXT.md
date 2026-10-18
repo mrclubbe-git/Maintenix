@@ -1862,3 +1862,13 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Backend packaging run `39109935810` passed and produced the updated `cra-security-remediation-backend` handoff artifact.
 - No frontend code change was required for these two repairs.
 - These repairs are source-complete but are not considered DEV-validated until the updated backend handoff is installed on CRA DEV, the existing service is restarted, and the focused acceptance cases are rerun.
+
+
+## DEV acceptance repair backend installation — 2026-10-18
+
+- User confirmed the targeted DEV acceptance-repair backend handoff was installed on CRA DEV.
+- Installed source corresponds to the repair package based on commit `782c0960281406b40b494208d2cdd83777ae2e22`.
+- Repairs cover DEV-01 avatar saves and DEV-02 long Section Report Compiled By verification.
+- No frontend deployment is required for this repair batch.
+- Service restart/runtime retest remains the acceptance boundary unless separately confirmed complete.
+- Focused retest must cover valid avatar replacement/persistence at L1/L2/L3/ADMIN, invalid image rejection, short/realistic-long/exact-boundary Section Reports, over-limit validation, no partial publication, plus a narrow login/session/CSRF and core workflow smoke test.

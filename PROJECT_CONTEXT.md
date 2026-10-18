@@ -1886,3 +1886,16 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Packaging run `39112150118` passed and produced the updated CRA security-remediation backend handoff.
 - No frontend source change is required.
 - This repair is source-complete but remains pending CRA DEV installation/restart and focused runtime retest before the deferred narrow smoke regression can begin.
+
+
+## DEV remediation acceptance cleared — 2026-10-18
+
+- Final targeted Section Report retest passed the exact previously failing unbroken 120/160 Compiled By values twice through the normal UI with HTTP 200.
+- Both generated DOCX/PDF pairs retained the complete compiler name/designation and rendered with wrapping but no clipping or missing-content error.
+- The earlier avatar repair remains cleared across L1/L2/L3/ADMIN.
+- With both repair gates cleared, the requested narrow smoke regression was completed: 72 checks passed covering login/session/CSRF, Stock permissions, Servicing, Call Out, Reports and Administration -> System.
+- Test reports, drafts and stock items created for the retest were removed and cleanup verified. Audit history was intentionally retained.
+- Production/LIVE was not touched.
+- Current application-remediation acceptance status for CRA DEV: PASSED for the executed GitHub Pages + CRA DEV scope.
+- Cloudflare-owned response headers, TLS/edge controls, WAF/bot controls, final routing/origin hiding and other final-hosting controls remain deferred to the Cloudflare cutover acceptance cycle.
+- Browser/device gaps previously recorded (physical camera, native push/audio, Safari/Edge/Firefox matrix, default third-party-cookie blocking behaviour) remain separate residual acceptance items unless later exercised.

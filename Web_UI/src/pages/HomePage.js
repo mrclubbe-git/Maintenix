@@ -113,7 +113,6 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
 
       try {
         const res = await fetch("/api/profile/me", {
-          ,
           signal: controller.signal
         });
 

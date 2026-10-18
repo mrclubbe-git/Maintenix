@@ -8,7 +8,7 @@ const multer = require("multer");
 // ✅ Match Servicing auth pattern
 const { getSession, extractBearer } = require("../lib/sessions");
 const { getUsers } = require("../lib/userStore");
-const { validateImageBuffer, decodeImageDataUrl, safeGeneratedImageName } = require("../lib/imageValidation");
+const { validateImageBuffer, validateSignatureDataUrl, safeGeneratedImageName } = require("../lib/imageValidation");
 
 const router = express.Router();
 
@@ -35,10 +35,7 @@ function totalUploadBytes(files) {
 
 function validateRequiredSignature(payload) {
   try {
-    return decodeImageDataUrl(payload?.signatureDataUrl || payload?.signature || "", {
-      allowed: ["png"],
-      maxBytes: 2 * 1024 * 1024
-    });
+    return validateSignatureDataUrl(payload?.signatureDataUrl || payload?.signature || "");
   } catch (error) {
     const wrapped = new Error(`A valid technician signature is required. ${String(error?.message || "")}`.trim());
     wrapped.status = /too large/i.test(String(error?.message || "")) ? 413 : 400;

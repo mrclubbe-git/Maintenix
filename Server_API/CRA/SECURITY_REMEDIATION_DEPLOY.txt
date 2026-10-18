@@ -71,3 +71,27 @@ Cloudflare-bound controls
   candidate.
 - This does not change the required Maintenix application processes managed by
   startAll.js.
+
+
+Targeted DEV acceptance repairs — 2026-10-18
+- DEV-01 avatar save repair:
+  - New profile images are stored under Server_API/CRA/data/profilepics by default.
+  - The historical public URL /uploads/profilepics/<file> is preserved.
+  - Existing legacy files under data/uploads/profilepics remain readable as a fallback.
+  - PROFILE_PICS_DIR may override the new storage directory if deliberately configured.
+  - Preserve both data/profilepics and any legacy data/uploads/profilepics content during migration.
+  - The change avoids requiring the service account to create/write a new child directory under the
+    historical uploads tree when only established runtime upload subdirectories are writable.
+  - Invalid image-content validation remains unchanged and must still reject malformed/mismatched files.
+- DEV-02 Section Report long compiler-text repair:
+  - Accepted Compiled By values remain capped at 120 characters for name and 160 for designation.
+  - PDF verification now tolerates pdftotext line wrapping/interleaving from adjacent table cells while
+    still requiring every compiler-name/designation token after the Compiled By heading.
+  - Atomic publication remains unchanged: failed staging/generation must not publish partial outputs.
+
+Targeted DEV retest after install/restart
+1. Replace avatar twice with valid supported PNG images at L1/L2/L3/ADMIN; verify persistence after refresh/logout/login.
+2. Reconfirm malformed/mismatched avatar content returns 400.
+3. Generate Section Reports with short values, the realistic accepted long case, and exact 120/160 boundaries.
+4. Reconfirm 121/161 cases return validation errors and no failed case publishes a completed report.
+5. Smoke login/session/CSRF, Stock permissions, Servicing, Call Out, Reports and Administration -> System.

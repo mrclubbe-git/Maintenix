@@ -557,7 +557,7 @@ router.get("/drafts/:draftId", requireAuth, (req, res) => {
     if (!fs.existsSync(p)) return res.status(404).json({ ok: false, message: "Draft not found." });
     const rec = readJsonFile(p, null);
     if (!rec) return res.status(500).json({ ok: false, message: "Draft file invalid." });
-    return res.json({ ok: true, draft: publicDraft(rec, { includeValue: false }) });
+    return res.json({ ok: true, draft: publicDraft(rec) });
   } catch (e) {
     return res.status(500).json({ ok: false, message: String(e?.message || "Failed to load draft.") });
   }
@@ -586,7 +586,7 @@ router.post("/drafts", requireAuth, (req, res) => {
       value: nextValue
     });
     writeJsonFileAtomic(draftPathFor(userKey, key), rec);
-    return res.json({ ok: true, draft: publicDraft(rec) });
+    return res.json({ ok: true, draft: publicDraft(rec, { includeValue: false }) });
   } catch (e) {
     return res.status(500).json({ ok: false, message: String(e?.message || "Failed to save draft.") });
   }

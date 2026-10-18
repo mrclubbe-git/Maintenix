@@ -1834,3 +1834,15 @@ Validation/deployment support:
 - No new DEV systemd service, proxy daemon, Cloudflare-emulation service, or other persistent infrastructure was created.
 - Runtime acceptance is still required before calling the remediation validated on DEV: login/session cookie, logout replay rejection, CSRF-protected writes, role/session revocation, Stock matrix, mandatory signatures, Section Reports, Admin -> System, notifications, Servicing, Call Out and report moderation.
 - Final Cloudflare-owned response headers and edge controls remain deferred to final hosting/migration as documented in `LIVE_MIGRATION_CHECKLIST.md`.
+
+## GitHub Pages CSP blank-screen correction — 2026-10-18
+
+- After coordinated security-remediation deployment, the CRA GitHub Pages route loaded as a blank page even though the Pages deployment itself succeeded.
+- Root cause was confirmed from the deployed Pages artifact: CRA 3 injected the webpack runtime as an inline `<script>`, while the new CSP deliberately used `script-src 'self'` without `unsafe-inline`. The browser therefore blocked the runtime before React could mount.
+- `Web_UI/scripts/build-github.js` now sets `INLINE_RUNTIME_CHUNK=false`, keeping the webpack runtime as an external same-origin JavaScript asset compatible with the strict CSP.
+- `.github/workflows/deploy-web-ui.yml` now verifies that production source maps are absent, CSP is present, an external `runtime-main.*.js` is referenced, and the CRA build does not contain an inline executable script.
+- Source commits: `7133a9f774ebddd94cb412b7e4b72660dfb15b51` and `706a9303f1ab8d990b3d6f87fbbadce13b902ce2`.
+- Deploy commit: `a11930c4267b9b60e05d29e27fc64535a207a4ed`.
+- GitHub Pages run `39105053513` completed successfully; build verification and deployment both passed.
+- The published artifact was inspected after deployment: CRA index references only external scripts (`api-bootstrap.js`, `runtime-main.*.js`, vendor chunk and main chunk) and contains no production `.map` files.
+- Correct CRA DEV frontend URL remains `https://mrclubbe-git.github.io/Maintenix/CRA/`.

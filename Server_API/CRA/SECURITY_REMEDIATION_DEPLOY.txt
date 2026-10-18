@@ -58,3 +58,16 @@ Frontend deployment coupling
   code includes a client-side frame-deny fallback. Full C-08 header compliance
   still requires a frontend custom domain/proxy where response headers can be
   controlled (for example through Cloudflare).
+
+Cloudflare-bound controls
+- The final Maintenix site will run behind Cloudflare.
+- Do not create temporary DEV systemd units, local reverse-proxy/header daemons,
+  scheduled jobs, or other persistent services solely to reproduce controls that
+  belong to the final Cloudflare edge.
+- Current application-side hardening should be tested as-is on DEV.
+- Final HTTP response-header enforcement (including CSP frame-ancestors 'none',
+  X-Frame-Options: DENY, HSTS/edge TLS policy, and final proxy/header rules) is
+  a migration requirement and must be validated on the Cloudflare-hosted
+  candidate.
+- This does not change the required Maintenix application processes managed by
+  startAll.js.

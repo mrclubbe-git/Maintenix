@@ -141,6 +141,23 @@ function decodeImageDataUrl(dataUrl, options = {}) {
   return { buffer, ...info };
 }
 
+function validateSignatureDataUrl(dataUrl, options = {}) {
+  const decoded = decodeImageDataUrl(dataUrl, {
+    allowed: ["png"],
+    maxBytes: Number(options.maxBytes || 2 * 1024 * 1024)
+  });
+
+  const minWidth = Number(options.minWidth || 120);
+  const minHeight = Number(options.minHeight || 50);
+  const minBytes = Number(options.minBytes || 800);
+
+  if (decoded.width < minWidth || decoded.height < minHeight || decoded.bytes < minBytes) {
+    throw new Error("Signature image is missing or too small to be valid.");
+  }
+
+  return decoded;
+}
+
 function safeGeneratedImageName(prefix, identifier, ext) {
   const safePrefix = String(prefix || "image").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40) || "image";
   const safeId = String(identifier || "").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 80) || "file";
@@ -152,5 +169,6 @@ module.exports = {
   detectImageType,
   validateImageBuffer,
   decodeImageDataUrl,
+  validateSignatureDataUrl,
   safeGeneratedImageName
 };

@@ -1872,3 +1872,17 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - No frontend deployment is required for this repair batch.
 - Service restart/runtime retest remains the acceptance boundary unless separately confirmed complete.
 - Focused retest must cover valid avatar replacement/persistence at L1/L2/L3/ADMIN, invalid image rejection, short/realistic-long/exact-boundary Section Reports, over-limit validation, no partial publication, plus a narrow login/session/CSRF and core workflow smoke test.
+
+
+## Final Section Report boundary verifier repair — 2026-10-18
+
+- Targeted repair retest cleared DEV-01 avatar replacement across L1/L2/L3/ADMIN.
+- One DEV-02 edge case remained: accepted exact 120/160 Compiled By fields containing long unbroken N/D padding returned HTTP 500, while realistic 118/160 and spaced 120/160 values passed.
+- Root cause was the PDF post-generation verifier requiring each expected token to survive pdftotext as one token. LibreOffice can wrap one long unbroken token across physical lines, causing pdftotext to emit ordered fragments interleaved with adjacent table-column content.
+- `formal-reporting/text_validation.py` now reconstructs only long expected tokens from ordered pdftotext fragments while skipping unrelated interleaved tokens. Normal words still require exact token presence.
+- The assessor's exact captured 120-character name and 160-character designation are encoded as a permanent regression case, plus a negative case proving a missing fragment still fails verification.
+- Source commit: `64ac975a8f836004cdfdafeb8f465fd231f695ab`.
+- Backend CI run `39112150115` passed. Formal text validation now runs six tests, including the exact captured boundary case.
+- Packaging run `39112150118` passed and produced the updated CRA security-remediation backend handoff.
+- No frontend source change is required.
+- This repair is source-complete but remains pending CRA DEV installation/restart and focused runtime retest before the deferred narrow smoke regression can begin.

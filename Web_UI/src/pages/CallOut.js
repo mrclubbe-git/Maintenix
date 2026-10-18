@@ -905,7 +905,7 @@ export default function CallOut() {
   }
 
   // ✅ Drafts refresh
-  async function refreshDrafts() {
+  async function refreshDrafts({ includeServer = true } = {}) {
     if (!dbRef.current) return;
     setLoadingDrafts(true);
     try {
@@ -914,7 +914,7 @@ export default function CallOut() {
         .filter((x) => x && typeof x.key === "string" && x.key.startsWith("callout_v2_draft_") && x.type === "calloutV2Draft")
         .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
 
-      if (authToken && navigator.onLine) {
+      if (includeServer && authToken && navigator.onLine) {
         try {
           const serverDrafts = await listServerDrafts();
           const byKey = new Map();
@@ -1568,7 +1568,7 @@ export default function CallOut() {
     };
 
     await idbPut(dbRef.current, "calloutCache", rec);
-    await refreshDrafts();
+    await refreshDrafts({ includeServer: false });
 
     if (authToken && navigator.onLine) {
       syncDraftRecord(rec)
@@ -1622,7 +1622,7 @@ export default function CallOut() {
         syncError: ""
       };
       await idbPut(dbRef.current, "calloutCache", updated);
-      await refreshDrafts();
+      await refreshDrafts({ includeServer: false });
       if (authToken && navigator.onLine) {
         syncDraftRecord(updated)
           .then(() => refreshDrafts())

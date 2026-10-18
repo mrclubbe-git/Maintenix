@@ -717,7 +717,7 @@ export default function CallOut() {
 
   async function fetchJson(url) {
     const res = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+      headers: {}
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
@@ -737,8 +737,7 @@ export default function CallOut() {
 
   async function apiJson(path, options = {}) {
     const headers = {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${authToken}`
+      ...(options.headers || {})
     };
     if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
@@ -1269,7 +1268,7 @@ export default function CallOut() {
     }
 
     try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+      const res = await fetch(url, { headers: {} });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setErr(data?.message || `Download failed (HTTP ${res.status}).`);
@@ -1319,7 +1318,7 @@ export default function CallOut() {
 
     const res = await fetch("/api/callout/submit-payload", {
       method: "POST",
-      headers: { Authorization: `Bearer ${authToken}` },
+      headers: {},
       body: fd
     });
 
@@ -1338,7 +1337,7 @@ export default function CallOut() {
     if (!rid) throw new Error("Missing reportId.");
 
     const res = await fetch(`/api/callout/status/${encodeURIComponent(rid)}`, {
-      headers: { Authorization: `Bearer ${authToken}` }
+      headers: {}
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || `Status failed (HTTP ${res.status})`);

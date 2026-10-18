@@ -4,6 +4,11 @@ const express = require("express");
 
 const { extractBearer, getSession, getSessionExpiresAt } = require("./sessions");
 const { decodeImageDataUrl, safeGeneratedImageName } = require("./imageValidation");
+const {
+  ensureProfilePicsDir,
+  publicUrlForProfilePhoto,
+  profilePhotoCandidatePaths
+} = require("./profilePhotoStorage");
 const { getUsers, updateUserById } = require("./userStore");
 const { getUserPreferences, updateUserPreferences } = require("./userPreferences");
 
@@ -148,16 +153,16 @@ router.put("/photo", requireAuth, (req, res) => {
     return res.status(status).json({ ok: false, message });
   }
 
-  const uploadsDir = path.join(__dirname, "..", "data", "uploads", "profilepics");
-  fs.mkdirSync(uploadsDir, { recursive: true });
-
-  const filename = safeGeneratedImageName("profile", req.user.id, decoded.ext);
-  const filepath = path.join(uploadsDir, filename);
   const previousUrl = String(req.user.photoUrl || "").trim();
+  let filepath = "";
 
   try {
+    const uploadsDir = ensureProfilePicsDir();
+    const filename = safeGeneratedImageName("profile", req.user.id, decoded.ext);
+    filepath = path.join(uploadsDir, filename);
+
     fs.writeFileSync(filepath, decoded.buffer, { mode: 0o600 });
-    const publicUrl = `/uploads/profilepics/${filename}`;
+    const publicUrl = publicUrlForProfilePhoto(filename);
     const updated = updateUserById(req.user.id, { photoUrl: publicUrl });
 
     if (!updated) {
@@ -165,17 +170,21 @@ router.put("/photo", requireAuth, (req, res) => {
       return res.status(404).json({ ok: false, message: "User not found" });
     }
 
-    if (previousUrl.startsWith("/uploads/profilepics/")) {
-      const previousName = path.basename(previousUrl);
-      const previousPath = path.join(uploadsDir, previousName);
-      if (previousPath !== filepath) {
-        try { fs.unlinkSync(previousPath); } catch {}
-      }
+    for (const previousPath of profilePhotoCandidatePaths(previousUrl)) {
+      if (path.resolve(previousPath) === path.resolve(filepath)) continue;
+      try { fs.unlinkSync(previousPath); } catch {}
     }
 
     return res.json({ ok: true, photoUrl: publicUrl });
-  } catch {
-    try { fs.unlinkSync(filepath); } catch {}
+  } catch (error) {
+    if (filepath) {
+      try { fs.unlinkSync(filepath); } catch {}
+    }
+    console.error(
+      "Profile photo save failed:",
+      String(error?.code || ""),
+      String(error?.message || error || "unknown error")
+    );
     return res.status(500).json({ ok: false, message: "Profile image could not be saved." });
   }
 });

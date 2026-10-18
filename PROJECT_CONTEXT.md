@@ -1910,3 +1910,10 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - This evidence therefore points first to the existing DEV Cloudflare Tunnel/origin availability path, not to a requestSecurity.js CORS regression.
 - Do not add permissive CORS or a temporary proxy/service as a workaround. Diagnose the existing path in order: local CRA API on 127.0.0.1:5056, cloudflared connector health/logs, then public DEV hostname/tunnel route.
 - The prior application-remediation acceptance result remains valid for the tests that passed, but DEV transport availability is now a separate operational issue to resolve/observe.
+
+
+## DEV server restart after transport errors — 2026-10-18
+
+- User confirmed the CRA DEV server was restarted after repeated browser-visible 502/530 transport failures on notifications and presence requests.
+- Treat the restart as an operational recovery action only; the transport issue is not considered resolved until the public DEV API and browser console are rechecked.
+- No application CORS code change was made for this incident.

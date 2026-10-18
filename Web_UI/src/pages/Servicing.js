@@ -891,7 +891,7 @@ export default function Servicing() {
 
   async function fetchJson(url) {
     const res = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+      headers: {}
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
@@ -911,8 +911,7 @@ export default function Servicing() {
 
   async function apiJson(path, options = {}) {
     const headers = {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${authToken}`
+      ...(options.headers || {})
     };
     if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
@@ -1543,7 +1542,7 @@ export default function Servicing() {
     }
 
     try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+      const res = await fetch(url, { headers: {} });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setErr(data?.message || `Download failed (HTTP ${res.status}).`);
@@ -1593,7 +1592,7 @@ export default function Servicing() {
 
     const res = await fetch("/api/servicing/submit-payload", {
       method: "POST",
-      headers: { Authorization: `Bearer ${authToken}` },
+      headers: {},
       body: fd
     });
 
@@ -1612,7 +1611,7 @@ export default function Servicing() {
     if (!rid) throw new Error("Missing reportId.");
 
     const res = await fetch(`/api/servicing/status/${encodeURIComponent(rid)}`, {
-      headers: { Authorization: `Bearer ${authToken}` }
+      headers: {}
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || `Status failed (HTTP ${res.status})`);

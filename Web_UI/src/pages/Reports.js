@@ -191,7 +191,7 @@ export default function Reports() {
         batch.map(async ({ stored, reportId }) => {
           try {
             const res = await fetch(`/api/servicing/status/${encodeURIComponent(reportId)}`, {
-              headers: { Authorization: `Bearer ${authToken}` }
+              headers: {}
             });
             const data = await res.json().catch(() => null);
             if (!res.ok || !data) return { stored, display: "" };
@@ -227,7 +227,7 @@ export default function Reports() {
     setErr("");
     try {
       const res = await fetch("/api/reports", {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       const data = await res.json().catch(() => ({}));
@@ -256,7 +256,7 @@ export default function Reports() {
     try {
       const res = await fetch(`/api/reports/${encodeURIComponent(fileName)}/approve`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: "Approved by reviewer." })
       });
       const data = await res.json().catch(() => ({}));
@@ -281,7 +281,7 @@ export default function Reports() {
     try {
       const res = await fetch(`/api/reports/${encodeURIComponent(fileName)}/deny`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason })
       });
       const data = await res.json().catch(() => ({}));
@@ -314,7 +314,7 @@ export default function Reports() {
     try {
       const res = await fetch(`/api/reports/${encodeURIComponent(fileName)}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       const data = await res.json().catch(() => ({}));
@@ -439,7 +439,7 @@ export default function Reports() {
     setErr("");
     try {
       const res = await fetch(`/api/reports/file/${encodeURIComponent(fileName)}`, {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       if (!res.ok) {
@@ -481,7 +481,7 @@ export default function Reports() {
         : `/api/reports/file/${encodeURIComponent(fileName)}`;
 
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       if (!res.ok) {
@@ -521,7 +521,7 @@ export default function Reports() {
       const files = filteredReports.map((r) => String(r.fileName || "")).filter(Boolean);
       const res = await fetch("/api/reports/zip", {
         method: "POST",
-        headers: { Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files })
       });
       if (!res.ok) {

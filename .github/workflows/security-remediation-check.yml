@@ -1,0 +1,72 @@
+name: Security Remediation Branch Check
+
+on:
+  push:
+    branches:
+      - security-remediation-20261016
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Server_API/CRA
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: Server_API/CRA/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci
+      - name: Syntax checks
+        run: |
+          node --check index.js
+          node --check startAll.js
+          node --check servicingWorker.js
+          node --check calloutWorker.js
+          node --check notificationWorker.js
+          node --check lib/sessions.js
+          node --check lib/requestSecurity.js
+          node --check lib/imageValidation.js
+          node --check lib/profileRoutes.js
+          node --check lib/servicingGenerator.js
+          node --check routes/auth.js
+          node --check routes/admin.js
+          node --check routes/profilePassword.js
+          node --check routes/stock.js
+          node --check routes/servicing.js
+          node --check routes/callout.js
+          node --check routes/formalReports.js
+          node --check routes/photos.js
+          node --check routes/standby.js
+          python3 -m py_compile formal-reporting/report_worker.py
+      - name: Backend regression tests
+        run: npm run test:backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Web_UI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.16.0"
+          cache: npm
+          cache-dependency-path: Web_UI/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Build GitHub Pages UI
+        env:
+          CI: "false"
+          REACT_APP_API_BASE_URL: https://dev-api.main-tenix.com/CRA
+          REACT_APP_ORGANIZATION_CODE: CRA
+          REACT_APP_ORGANIZATION_NAME: Collaborative Risk Applications
+        run: npm run build:github

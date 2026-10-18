@@ -2629,6 +2629,11 @@ export default function Servicing() {
                             : "Saved locally"}
                       </Badge>
                     </div>
+                    {d.syncError ? (
+                      <div className="text-danger small mobile-break-anywhere">
+                        Server sync pending: {d.syncError}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div

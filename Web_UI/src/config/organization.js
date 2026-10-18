@@ -112,13 +112,17 @@ export const orgSessionStorage = {
 
 export function setOrgCsrfToken(value) {
   try {
-    window.__maintenixSetCsrfToken?.(String(value || ""));
+    if (typeof window.__maintenixSetCsrfToken === "function") {
+      window.__maintenixSetCsrfToken(String(value || ""));
+    }
   } catch {}
 }
 
 export function clearOrgCsrfToken() {
   try {
-    window.__maintenixClearCsrfToken?.();
+    if (typeof window.__maintenixClearCsrfToken === "function") {
+      window.__maintenixClearCsrfToken();
+    }
   } catch {}
 }
 

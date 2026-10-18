@@ -68,7 +68,7 @@ jobs:
           node --check routes/areas.js
           node --check routes/admin.js
           node --check routes/servicing.js
-          python3 -m py_compile formal-reporting/report_worker.py
+          python3 -m py_compile formal-reporting/report_worker.py formal-reporting/text_validation.py formal-reporting/test_text_validation.py
 
       - name: Backend regression tests
         run: npm run test:backend

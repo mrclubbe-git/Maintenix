@@ -1926,3 +1926,29 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - The earlier CORS console messages are therefore classified as secondary browser symptoms of the temporary DEV API/tunnel/origin availability interruption, not as an application CORS-policy defect.
 - No CORS code change, permissive origin change, temporary proxy, or new infrastructure service was required.
 - CRA DEV transport availability incident: RESOLVED after server restart, subject to normal ongoing operational monitoring.
+
+
+## Servicing local-first draft persistence — 2026-10-18
+
+- Large Servicing draft diagnosis used the user's 54-image test set. Original images totalled about 45.13 MiB; the prior draft path converted evidence to base64 and mirrored first-defect evidence into both defects[] and the legacy question-level photoDataUrl field, inflating the draft significantly.
+- Servicing evidence normalization now runs for all selected images instead of bypassing files below 3 MiB. Images are constrained to a 1600 px maximum dimension and JPEG quality 0.78; already-efficient JPEGs are kept when re-encoding would make them larger. The user's exact 54-image set normalizes to about 3.14 MiB binary / 4.19 MiB base64 before normal JSON overhead.
+- New modern drafts no longer duplicate first-defect image data into the legacy question-level photoDataUrl field. Legacy drafts remain readable through the existing fallback logic.
+- Draft creation is now browser-first:
+  1. completed checklist/signature/evidence is assembled locally;
+  2. the draft is written to IndexedDB first;
+  3. the UI can report Draft saved successfully without waiting for the API;
+  4. when online, API sync starts immediately in the background;
+  5. if connectivity is unavailable at save time, the local draft remains pending and retries automatically when online.
+- The current broader offline mode remains intentionally disabled. Starting/reloading Servicing still requires the online lists/checklist; this change only makes completed draft persistence resilient and local-first as groundwork for the later offline project.
+- Saved Drafts now show sync state: Saved locally, Syncing, or Server synced, with a visible pending-sync error when API sync fails.
+- Local draft content is authoritative while pending; an individual server draft is fetched only when no full local copy exists.
+- Server API list/save responses were reduced:
+  - GET /api/servicing/drafts returns metadata summaries only.
+  - GET /api/servicing/drafts/:draftId still returns the full draft.
+  - POST /api/servicing/drafts stores the full draft but returns only a summary.
+  This prevents Saved Drafts refreshes and save acknowledgements from re-downloading all base64 evidence.
+- Frontend source commits on main: `826b8633c3d4acc945cddf43f832fb03af157299`, follow-up `34979ce08e53e006ef4e2c467dd79145dc4cfe73`, sync-error UI `f6f30816667ff4e39c5c3eaa1e2d7ae129de3fca`.
+- Backend regression run `39150315731` passed. Security backend packaging run `39150315783` passed.
+- GitHub Pages deployment run `39150610497` passed after deploy commit `0964a125c1ded18f5cafacd70b785fe755a7a0ab`.
+- Backend route optimization is source-complete but still requires manual DEV placement of Server_API/CRA/routes/servicing.js and restart of the existing maintenix-dev-api.service.
+- No LIVE/production change was made.

@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { decodeImageDataUrl } = require("./lib/imageValidation");
+const { validateSignatureDataUrl } = require("./lib/imageValidation");
 const fsp = fs.promises;
 const path = require("path");
 const { writeJsonAtomicSync: atomicWriteJsonSync, updateJsonWithLockSync } = require("./lib/lockedJson");
@@ -237,10 +237,7 @@ function writeSignatureImage(reportId, payload) {
 
   let decoded;
   try {
-    decoded = decodeImageDataUrl(payload?.signatureDataUrl || payload?.signature || "", {
-      allowed: ["png"],
-      maxBytes: 2 * 1024 * 1024
-    });
+    decoded = validateSignatureDataUrl(payload?.signatureDataUrl || payload?.signature || "");
   } catch (error) {
     throw new Error(`A valid technician signature is required. ${String(error?.message || "")}`.trim());
   }

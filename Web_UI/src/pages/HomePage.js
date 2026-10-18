@@ -40,17 +40,6 @@ const RouteWithLoader = ({ component: Component, ...rest }) => {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    const handleInvalidSession = () => {
-      clearOrgAuth();
-      setVerifiedUser(null);
-      setAuthOk(false);
-      setAuthChecked(true);
-    };
-    window.addEventListener("maintenixSessionInvalid", handleInvalidSession);
-    return () => window.removeEventListener("maintenixSessionInvalid", handleInvalidSession);
-  }, []);
-
   return (
     <Route
       {...rest}
@@ -78,6 +67,17 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
   useEffect(() => {
     const timer = setTimeout(() => setLoaded(true), 1000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleInvalidSession = () => {
+      clearOrgAuth();
+      setVerifiedUser(null);
+      setAuthOk(false);
+      setAuthChecked(true);
+    };
+    window.addEventListener("maintenixSessionInvalid", handleInvalidSession);
+    return () => window.removeEventListener("maintenixSessionInvalid", handleInvalidSession);
   }, []);
 
   // ✅ NEW: verify token against backend (handles server restarts)

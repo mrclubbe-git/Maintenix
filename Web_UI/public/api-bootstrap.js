@@ -9,6 +9,13 @@
   var apiBase = configured.replace(/\/+$/, "");
   var csrfToken = "";
 
+  // GitHub Pages cannot emit custom frame-control response headers. Keep a
+  // client-side deny fallback so a framed copy never renders interactive UI.
+  if (window.top !== window.self) {
+    try { window.top.location = window.self.location.href; } catch (e) {}
+    document.documentElement.style.display = "none";
+  }
+
   function isServerRelative(value) {
     return (
       value === "/api" ||
@@ -86,6 +93,53 @@
 
   if (typeof window.fetch === "function") {
     var nativeFetch = window.fetch.bind(window);
+    var csrfRefreshPromise = null;
+
+    function requestPath(url) {
+      try { return new URL(url, window.location.href).pathname; }
+      catch (e) { return ""; }
+    }
+
+    function stateChanging(init) {
+      var method = String((init && init.method) || "GET").toUpperCase();
+      return ["POST", "PUT", "PATCH", "DELETE"].indexOf(method) >= 0;
+    }
+
+    function refreshCsrfToken() {
+      if (csrfRefreshPromise) return csrfRefreshPromise;
+
+      var csrfUrl = resolveApiUrl("/api/auth/csrf");
+      csrfRefreshPromise = nativeFetch(csrfUrl, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include"
+      })
+        .then(function (response) {
+          if (!response.ok) return null;
+          return response.json().catch(function () { return null; });
+        })
+        .then(function (body) {
+          var next = String((body && body.csrfToken) || "").trim();
+          if (next) csrfToken = next;
+          return next;
+        })
+        .finally(function () {
+          csrfRefreshPromise = null;
+        });
+
+      return csrfRefreshPromise;
+    }
+
+    function finishResponse(response, path) {
+      if (
+        response.status === 401 &&
+        path.indexOf("/api/auth/login") < 0 &&
+        path.indexOf("/api/auth/register") < 0
+      ) {
+        try { window.dispatchEvent(new Event("maintenixSessionInvalid")); } catch (e) {}
+      }
+      return response;
+    }
 
     window.fetch = function (input, init) {
       var source = typeof input === "string" ? input : input && input.url ? input.url : "";
@@ -95,18 +149,26 @@
 
       if (!apiRequest) return nativeFetch(input, init);
 
+      var path = requestPath(url);
       var options = secureApiOptions(url, init);
+
       return nativeFetch(url || input, options).then(function (response) {
-        var path = "";
-        try { path = new URL(url, window.location.href).pathname; } catch (e) {}
-        if (
-          response.status === 401 &&
+        var csrfEligible =
+          response.status === 403 &&
+          stateChanging(options) &&
           path.indexOf("/api/auth/login") < 0 &&
-          path.indexOf("/api/auth/register") < 0
-        ) {
-          try { window.dispatchEvent(new Event("maintenixSessionInvalid")); } catch (e) {}
-        }
-        return response;
+          path.indexOf("/api/auth/register") < 0;
+
+        if (!csrfEligible) return finishResponse(response, path);
+
+        return refreshCsrfToken().then(function (nextToken) {
+          if (!nextToken) return finishResponse(response, path);
+          var retryOptions = secureApiOptions(url, init);
+          retryOptions.headers.set("X-CSRF-Token", nextToken);
+          return nativeFetch(url || input, retryOptions).then(function (retryResponse) {
+            return finishResponse(retryResponse, path);
+          });
+        });
       });
     };
   }

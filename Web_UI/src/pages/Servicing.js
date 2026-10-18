@@ -1038,6 +1038,8 @@ export default function Servicing() {
       rec.syncStatus !== "synced"
     ));
 
+    if (!pending.length) return;
+
     for (const rec of pending) {
       await syncDraftRecord(rec);
     }

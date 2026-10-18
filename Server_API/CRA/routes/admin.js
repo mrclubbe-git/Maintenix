@@ -23,7 +23,8 @@ function safeRole(x) {
     .replace(/\s+/g, "");
 }
 
-function requireAdmin(req, res, next) {\n  const token = extractBearer(req);
+function requireAdmin(req, res, next) {
+  const token = extractBearer(req);
 
   const session = token ? getSession(token) : null;
   if (!session) return res.status(401).json({ ok: false, message: "Not logged in." });

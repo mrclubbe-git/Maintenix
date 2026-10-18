@@ -256,7 +256,7 @@ function PresenceHeartbeat() {
 
       await fetch("/api/presence/ping", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {},
         // keepalive helps when tab is closing / being backgrounded (browser support varies)
         keepalive: true,
         ...opts
@@ -680,7 +680,7 @@ async function submitPayloadToServer(job, token) {
 
   const res = await fetch("/api/servicing/submit-payload", {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {},
     body: form
   });
 
@@ -701,7 +701,7 @@ async function pollServerStatus(reportId, token) {
   if (!id) throw new Error("Missing reportId (cannot poll).");
 
   const res = await fetch(`/api/servicing/status/${encodeURIComponent(id)}`, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: {}
   });
 
   const data = await res.json().catch(() => ({}));
@@ -923,7 +923,7 @@ async function submitCalloutPayloadToServer(job, token) {
 
   const res = await fetch("/api/callout/submit-payload", {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {},
     body: form
   });
 
@@ -944,7 +944,7 @@ async function pollCalloutServerStatus(reportId, token) {
   if (!id) throw new Error("Missing reportId (cannot poll).");
 
   const res = await fetch(`/api/callout/status/${encodeURIComponent(id)}`, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: {}
   });
 
   const data = await res.json().catch(() => ({}));

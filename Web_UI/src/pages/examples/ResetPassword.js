@@ -56,8 +56,7 @@ export default function ResetPassword() {
       const res = await fetch("/api/profile/change-password", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           currentPassword,

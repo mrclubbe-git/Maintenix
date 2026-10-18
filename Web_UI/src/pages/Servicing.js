@@ -690,6 +690,7 @@ export default function Servicing() {
   const sigCanvasRef = useRef(null);
   const sigCtxRef = useRef(null);
   const sigIsDrawingRef = useRef(false);
+  const sigHasStrokeRef = useRef(false);
   const sigLastRef = useRef({ x: 0, y: 0 });
 
   const [signatureDataUrl, setSignatureDataUrl] = useState(""); // base64 png
@@ -890,7 +891,7 @@ export default function Servicing() {
 
   async function fetchJson(url) {
     const res = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+      headers: {}
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
@@ -910,8 +911,7 @@ export default function Servicing() {
 
   async function apiJson(path, options = {}) {
     const headers = {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${authToken}`
+      ...(options.headers || {})
     };
     if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
@@ -1432,6 +1432,7 @@ export default function Servicing() {
     const p = getCanvasPoint(e, canvas);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
+    sigHasStrokeRef.current = true;
 
     sigLastRef.current = p;
   }
@@ -1457,6 +1458,7 @@ export default function Servicing() {
 
     setSignatureDataUrl("");
     setSignatureTouched(false);
+    sigHasStrokeRef.current = false;
     setDraftProgress(0);
     setDraftProgressText("");
   }
@@ -1540,7 +1542,7 @@ export default function Servicing() {
     }
 
     try {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+      const res = await fetch(url, { headers: {} });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setErr(data?.message || `Download failed (HTTP ${res.status}).`);
@@ -1590,7 +1592,7 @@ export default function Servicing() {
 
     const res = await fetch("/api/servicing/submit-payload", {
       method: "POST",
-      headers: { Authorization: `Bearer ${authToken}` },
+      headers: {},
       body: fd
     });
 
@@ -1609,7 +1611,7 @@ export default function Servicing() {
     if (!rid) throw new Error("Missing reportId.");
 
     const res = await fetch(`/api/servicing/status/${encodeURIComponent(rid)}`, {
-      headers: { Authorization: `Bearer ${authToken}` }
+      headers: {}
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || `Status failed (HTTP ${res.status})`);
@@ -2208,7 +2210,13 @@ export default function Servicing() {
     try {
       let capturedSignature = signatureDataUrl || "";
       if (signatureTouched) {
+        if (!sigHasStrokeRef.current) {
+          throw new Error("A technician signature is required. Please draw a signature before submitting.");
+        }
         capturedSignature = captureSignatureNow() || capturedSignature;
+      }
+      if (!/^data:image\/png;base64,/i.test(String(capturedSignature || ""))) {
+        throw new Error("A valid technician signature is required before submitting.");
       }
 
       setDraftProgress(35);
@@ -3029,7 +3037,7 @@ export default function Servicing() {
             <small className="text-muted">Incomplete: {unansweredCount} • Defects found: {defectsFoundCount}</small>
           </Card.Header>
           <Card.Body>
-            <Alert variant="info">Review the completed checklist, add the technician signature if required, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
+            <Alert variant="info">Review the completed checklist, add the required technician signature, then press <strong>Submit</strong>. The draft will be created immediately and you will return to Pre-Start.</Alert>
 
             <div className="mb-2"><strong>Technician:</strong> {authUser?.name || authUser?.email || "-"}</div>
             <div className="mb-2"><strong>System Type:</strong> {systemType === "conveyor" ? "Conveyor" : "Substation"}</div>
@@ -3124,7 +3132,7 @@ export default function Servicing() {
                   </div>
 
                   <div className="d-flex align-items-center" style={{ gap: 8 }}>
-                    {signatureDataUrl ? <Badge bg="success">Captured</Badge> : <Badge bg="secondary">Not captured</Badge>}
+                    {signatureDataUrl ? <Badge bg="success">Captured</Badge> : <Badge bg="danger">Required</Badge>}
                     <ServicingButton variant="outline-secondary" onClick={clearSignature}>Clear</ServicingButton>
                   </div>
                 </div>
@@ -3159,7 +3167,7 @@ export default function Servicing() {
                 </div>
 
                 <div className="text-muted small mt-2">
-                  Signature will be captured as PNG when you press Submit.
+                  A technician signature is mandatory. It will be captured as PNG when you press Submit.
                 </div>
               </Card.Body>
             </Card>

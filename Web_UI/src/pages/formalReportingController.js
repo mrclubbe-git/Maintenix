@@ -8,9 +8,7 @@ const doc = root.ownerDocument || root.host?.ownerDocument || document;
 const $ = (id) => root.querySelector(`#${CSS.escape(id)}`);
 
 async function api(url, options = {}) {
-  const token = orgLocalStorage.getItem('authToken') || '';
-  const headers = { Authorization: `Bearer ${token}`, ...(options.headers || {}) };
-  const response = await fetch(`/api/formal-reports${url}`, { cache: 'no-store', ...options, headers });
+  const response = await fetch(`/api/formal-reports${url}`, { cache: 'no-store', ...options });
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || `${response.status} ${response.statusText}`);
   return body;
@@ -334,6 +332,8 @@ $('setup-form').addEventListener('submit', (event) => {
   const month = $('month').value; const week = Number($('week').value);
   const compiledName = $('compiled-name').value.trim(); const compiledDesignation = $('compiled-designation').value.trim();
   if (!section || !month || !week || !compiledName || !compiledDesignation) return showNotice('Complete the area, service period and Compiled By details.', 'error');
+  if (compiledName.length > 120) return showNotice('Compiled By name must be 120 characters or fewer.', 'error');
+  if (compiledDesignation.length > 160) return showNotice('Designation / position must be 160 characters or fewer.', 'error');
   const range = isoWeekRange(Number(month.slice(0, 4)), week);
   if (!overlapMonth(range, month)) return showNotice('The selected calendar week does not overlap the selected month.', 'error');
   state.section = section; state.month = month; state.week = week; state.weekRange = `${dateLabel(range.monday)} – ${dateLabel(range.sunday)}`; state.compiledName = compiledName; state.compiledDesignation = compiledDesignation; state.systems = section.systems; state.responses = {}; state.index = 0;
@@ -362,8 +362,7 @@ root.addEventListener('click', async (event) => {
   if (!link) return;
   event.preventDefault();
   try {
-    const token = orgLocalStorage.getItem('authToken') || '';
-    const response = await fetch(link.getAttribute('href') || link.href, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    const response = await fetch(link.getAttribute('href') || link.href, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Download failed (HTTP ${response.status})`);
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);

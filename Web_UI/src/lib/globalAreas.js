@@ -11,7 +11,7 @@ async function readJsonResponse(res) {
 function authHeaders(authToken, extra = {}) {
   return {
     ...extra,
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+    
   };
 }
 

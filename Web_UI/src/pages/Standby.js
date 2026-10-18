@@ -70,8 +70,7 @@ export default function Standby() {
 
   async function apiFetch(url, opts = {}) {
     const headers = { ...(opts.headers || {}) };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+        if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
     const res = await fetch(url, { ...opts, headers });
     let data = null;

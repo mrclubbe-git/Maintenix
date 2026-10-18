@@ -149,7 +149,7 @@ export default function Pictures() {
   const [selected, setSelected] = useState({});
   const [previewIndex, setPreviewIndex] = useState(-1);
 
-  const authHeaders = useMemo(() => (token ? { Authorization: `Bearer ${token}` } : {}), [token]);
+  const authHeaders = useMemo(() => ({}), []);
   const selectedRows = useMemo(() => rows.filter((r) => selected[itemKey(r)]), [rows, selected]);
   const previewRow = previewIndex >= 0 ? rows[previewIndex] : null;
 

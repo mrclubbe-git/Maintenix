@@ -1,6 +1,6 @@
 import { orgLocalStorage } from "../../config/organization";
 import React, { useEffect, useState } from "react";
-import { Col, Row, Card, Table, Badge, ProgressBar, Alert } from "@themesberg/react-bootstrap";
+import { Col, Row, Card, Table, Badge, Alert } from "@themesberg/react-bootstrap";
 
 // ---------------------------
 // Helpers (no external libs)
@@ -122,72 +122,6 @@ function UserCell({ user }) {
 // Dashboard
 // ---------------------------
 export default function DashboardOverview() {
-  // Server metrics from API
-  const [serverInfo, setServerInfo] = useState(null);
-  const [serverErr, setServerErr] = useState("");
-
-  useEffect(() => {
-    let mounted = true;
-    let pollId = null;
-    const controller = new AbortController();
-    const statusPath = "/api/server/status";
-    const statusUrl =
-      typeof window.__maintenixResolveApiUrl === "function"
-        ? window.__maintenixResolveApiUrl(statusPath)
-        : statusPath;
-
-    async function load() {
-      try {
-        setServerErr("");
-        const res = await fetch(statusPath, { signal: controller.signal });
-
-        if (!res.ok) {
-          const err = new Error(`HTTP ${res.status}`);
-          err.status = res.status;
-          throw err;
-        }
-
-        const data = await res.json();
-        const normalized = {
-          host: data.host ?? "Unknown",
-          cpuUsagePercent: Number.isFinite(Number(data.cpuUsagePercent)) ? Number(data.cpuUsagePercent) : 0,
-          storageUsedPercent: Number.isFinite(Number(data.storageUsedPercent)) ? Number(data.storageUsedPercent) : 0,
-          storageFreeGB: Number.isFinite(Number(data.storageFreeGB)) ? Number(data.storageFreeGB) : 0
-        };
-
-        if (mounted) setServerInfo(normalized);
-        return true;
-      } catch (e) {
-        if (e?.name === "AbortError") return false;
-        if (!mounted) return false;
-
-        setServerInfo(null);
-
-        if (e?.status === 404) {
-          setServerErr(
-            `Server metrics endpoint is not available: ${statusUrl} (HTTP 404). The API may still be online.`
-          );
-          return false;
-        }
-
-        setServerErr(
-          `Server metrics unavailable from ${statusUrl}${e?.status ? ` (HTTP ${e.status})` : ""}.`
-        );
-        return true;
-      }
-    }
-
-    load().then((shouldPoll) => {
-      if (mounted && shouldPoll) pollId = setInterval(load, 10000);
-    });
-
-    return () => {
-      mounted = false;
-      if (pollId) clearInterval(pollId);
-      controller.abort();
-    };
-  }, []);
-
   // ---------------------------
   // Auth token
   // ---------------------------
@@ -210,9 +144,7 @@ export default function DashboardOverview() {
 
     try {
       setPresenceErr("");
-      const res = await fetch("/api/presence/users", {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
+      const res = await fetch("/api/presence/users");
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -241,54 +173,13 @@ export default function DashboardOverview() {
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4 gap-2">
         <div>
           <h4 className="mb-0">Overview</h4>
-          <small className="text-muted">Server status and user activity</small>
+          <small className="text-muted">User activity</small>
         </div>
       </div>
 
-      {serverErr ? (
-        <Alert variant="warning" className="mb-4">
-          {serverErr} Make sure the Maintenix API is running and reachable via <code>/api</code>. In local development, use the React dev proxy.
-        </Alert>
-      ) : null}
-
       <Row className="mb-4">
-        {/* Server info */}
-        <Col xs={12} xl={4} className="mb-4 mb-xl-0">
-          <Card border="light" className="shadow-sm h-100">
-            <Card.Header>
-              <h5 className="mb-0">Server Info</h5>
-            </Card.Header>
-            <Card.Body>
-              <div className="mb-3">
-                <div className="text-muted">Host</div>
-                <div className="fw-bold">{serverInfo?.host ?? "Loading..."}</div>
-              </div>
-
-              <div className="mb-3">
-                <div className="d-flex justify-content-between">
-                  <span className="text-muted">CPU usage</span>
-                  <span className="fw-bold">{serverInfo ? `${serverInfo.cpuUsagePercent}%` : "--"}</span>
-                </div>
-                <ProgressBar now={serverInfo?.cpuUsagePercent ?? 0} min={0} max={100} />
-              </div>
-
-              <div className="mb-2">
-                <div className="d-flex justify-content-between">
-                  <span className="text-muted">Storage used</span>
-                  <span className="fw-bold">{serverInfo ? `${serverInfo.storageUsedPercent}%` : "--"}</span>
-                </div>
-                <ProgressBar now={serverInfo?.storageUsedPercent ?? 0} min={0} max={100} />
-              </div>
-
-              <div className="text-muted">
-                Free space: <span className="fw-bold">{serverInfo ? `${serverInfo.storageFreeGB} GB` : "--"}</span>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
         {/* Users online / last seen */}
-        <Col xs={12} xl={8}>
+        <Col xs={12}>
           <Card border="light" className="shadow-sm h-100">
             <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h5 className="mb-0">Users Online / Last Seen</h5>

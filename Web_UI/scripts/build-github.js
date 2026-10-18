@@ -3,6 +3,7 @@ const { spawnSync } = require("child_process");
 
 const apiBase = process.env.REACT_APP_API_BASE_URL || "https://dev-api.main-tenix.com/CRA";
 process.env.REACT_APP_API_BASE_URL = apiBase;
+process.env.GENERATE_SOURCEMAP = "false";
 
 if (!String(process.env.NODE_OPTIONS || "").includes("--openssl-legacy-provider")) {
   process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --openssl-legacy-provider`.trim();

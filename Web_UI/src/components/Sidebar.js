@@ -1,4 +1,4 @@
-import { clearOrgAuth, orgLocalStorage } from "../config/organization";
+import { logoutOrgSession, orgLocalStorage } from "../config/organization";
 import React, { useMemo, useState } from "react";
 import SimpleBar from "simplebar-react";
 import { useLocation, Link } from "react-router-dom";
@@ -38,15 +38,10 @@ export default function Sidebar(props = {}) {
     return url ? url : ProfileFallback;
   }, [authUser]);
 
-  function handleLogout() {
-    orgLocalStorage.removeItem("authToken");
-    orgLocalStorage.removeItem("authUser");
-
-    // ✅ update Navbar instantly (same tab)
-    window.dispatchEvent(new Event("authUserUpdated"));
-
+  async function handleLogout() {
     setShow(false);
-    window.location.hash = Routes.Signin.path; // HashRouter-safe
+    await logoutOrgSession();
+    window.location.hash = Routes.Signin.path;
   }
 
   const NavItem = (p) => {

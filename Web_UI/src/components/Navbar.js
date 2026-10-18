@@ -1,4 +1,4 @@
-import { clearOrgAuth, getNotificationPreferences, orgLocalStorage, setNotificationPreferences as persistNotificationPreferences } from "../config/organization";
+import { clearOrgAuth, getNotificationPreferences, orgLocalStorage, setNotificationPreferences as persistNotificationPreferences , logoutOrgSession } from "../config/organization";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Nav, Navbar, Dropdown, Container, Badge } from "@themesberg/react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -87,9 +87,7 @@ async function refreshAuthUserFromApi() {
   if (!token) return;
 
   try {
-    const res = await fetch("/api/profile/me", {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await fetch("/api/profile/me");
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return;
@@ -144,9 +142,7 @@ export default function NavbarTop() {
     if (!token) return;
 
     try {
-      const res = await fetch("/api/profile/preferences", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch("/api/profile/preferences");
 
       if (res.status === 404) return;
 
@@ -171,9 +167,7 @@ export default function NavbarTop() {
     }
 
     try {
-      const res = await fetch("/api/notifications", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch("/api/notifications");
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
       const remote = Array.isArray(data.notifications) ? data.notifications : [];
@@ -292,7 +286,7 @@ export default function NavbarTop() {
     const token = orgLocalStorage.getItem("authToken") || "";
     if (!token) return;
     try {
-      const res = await fetch(path, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(path, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       await loadNotifications();
       window.dispatchEvent(new CustomEvent("notificationsUpdated", { detail: data }));
@@ -330,8 +324,7 @@ export default function NavbarTop() {
       const res = await fetch("/api/notifications/broadcast", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ title: broadcastTitle, message: broadcastMessage, requiresAck: broadcastAck })
       });
@@ -406,8 +399,8 @@ export default function NavbarTop() {
     };
   }, [notifOpen]);
 
-  function handleLogout() {
-    clearOrgAuth();
+  async function handleLogout() {
+    await logoutOrgSession();
     window.location.hash = Routes.Signin.path;
   }
 

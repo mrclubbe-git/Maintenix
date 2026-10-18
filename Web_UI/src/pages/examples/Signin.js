@@ -36,7 +36,7 @@ export default function Signin() {
     async function verifyExistingSession() {
       try {
         const res = await fetch("/api/profile/me", {
-          headers: { Authorization: `Bearer ${existingToken}` },
+          
           signal: controller.signal
         });
         const data = await res.json().catch(() => ({}));

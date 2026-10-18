@@ -9,10 +9,17 @@ const zlib = require("node:zlib");
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "maintenix-security-"));
 process.env.SESSION_DATA_FILE = path.join(tempDir, "sessions.json");
+process.env.PROFILE_PICS_DIR = path.join(tempDir, "profilepics");
 delete process.env.ALLOW_LEGACY_BEARER;
 
 const sessions = require("../lib/sessions");
 const { validateSignatureDataUrl } = require("../lib/imageValidation");
+const {
+  PROFILE_PICS_DIR,
+  ensureProfilePicsDir,
+  publicUrlForProfilePhoto,
+  profilePhotoCandidatePaths
+} = require("../lib/profilePhotoStorage");
 
 test.after(() => {
   try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
@@ -121,4 +128,20 @@ test("signature validation rejects placeholder images and accepts a real-sized P
   assert.equal(decoded.width, 240);
   assert.equal(decoded.height, 90);
   assert.equal(decoded.type, "png");
+});
+
+
+test("profile photo storage uses an isolated writable runtime directory with legacy cleanup compatibility", () => {
+  assert.equal(PROFILE_PICS_DIR, path.join(tempDir, "profilepics"));
+  const dir = ensureProfilePicsDir();
+  const filename = "profile_user-a_123.png";
+  const probe = path.join(dir, filename);
+
+  fs.writeFileSync(probe, Buffer.from("avatar-probe"));
+  assert.equal(fs.readFileSync(probe, "utf8"), "avatar-probe");
+  assert.equal(publicUrlForProfilePhoto(filename), `/uploads/profilepics/${filename}`);
+
+  const candidates = profilePhotoCandidatePaths(`/uploads/profilepics/${filename}`);
+  assert.equal(candidates[0], probe);
+  assert.match(candidates[1], /data[\\/]uploads[\\/]profilepics[\\/]profile_user-a_123\.png$/);
 });

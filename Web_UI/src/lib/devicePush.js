@@ -56,7 +56,7 @@ async function fetchPushConfiguration(authToken) {
   if (!authToken) return { configured: false, publicKey: "" };
 
   const res = await fetch("/api/push/public-key", {
-    headers: { Authorization: `Bearer ${authToken}` }
+    headers: {}
   });
   const data = await res.json().catch(() => ({}));
 
@@ -159,8 +159,7 @@ export async function enableDevicePush(authToken) {
   const res = await fetch("/api/push/subscribe", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${authToken}`
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       subscription: subscription.toJSON()
@@ -201,8 +200,7 @@ export async function disableDevicePush(authToken) {
       await fetch("/api/push/unsubscribe", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ endpoint: subscription.endpoint })
       });
@@ -236,7 +234,7 @@ export async function disableDevicePush(authToken) {
 export async function sendDevicePushTest(authToken) {
   const res = await fetch("/api/push/test", {
     method: "POST",
-    headers: { Authorization: `Bearer ${authToken}` }
+    headers: {}
   });
   const data = await res.json().catch(() => ({}));
 

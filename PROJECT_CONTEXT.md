@@ -1899,3 +1899,14 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Current application-remediation acceptance status for CRA DEV: PASSED for the executed GitHub Pages + CRA DEV scope.
 - Cloudflare-owned response headers, TLS/edge controls, WAF/bot controls, final routing/origin hiding and other final-hosting controls remain deferred to the Cloudflare cutover acceptance cycle.
 - Browser/device gaps previously recorded (physical camera, native push/audio, Safari/Edge/Firefox matrix, default third-party-cookie blocking behaviour) remain separate residual acceptance items unless later exercised.
+
+
+## Post-acceptance DEV API transport errors observed — 2026-10-18
+
+- After the CRA DEV application-remediation acceptance pass, browser console evidence showed repeated failures to `https://dev-api.main-tenix.com/CRA/api/notifications` and `/api/presence/ping`.
+- Observed browser/network statuses included HTTP 502 and HTTP 530, plus failed CORS/preflight messages because the error responses did not include the application's normal Access-Control-Allow-Origin header.
+- Repository CORS configuration remains correct for the GitHub Pages origin: `https://mrclubbe-git.github.io` is an allowed origin and the DEV deployment requires `CORS_ORIGINS=https://mrclubbe-git.github.io`.
+- Because Cloudflare-generated/tunnel error responses bypass the Node application's CORS middleware, the browser can report these transport failures as CORS errors even when application CORS policy is correctly configured.
+- This evidence therefore points first to the existing DEV Cloudflare Tunnel/origin availability path, not to a requestSecurity.js CORS regression.
+- Do not add permissive CORS or a temporary proxy/service as a workaround. Diagnose the existing path in order: local CRA API on 127.0.0.1:5056, cloudflared connector health/logs, then public DEV hostname/tunnel route.
+- The prior application-remediation acceptance result remains valid for the tests that passed, but DEV transport availability is now a separate operational issue to resolve/observe.

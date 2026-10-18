@@ -421,3 +421,19 @@ Final edge requirements include, at minimum:
 - any additional Cloudflare edge controls approved during migration.
 
 These controls must be validated on the final Cloudflare-hosted candidate before LIVE acceptance. They are migration configuration, not additional Maintenix application services.
+
+
+## Profile photo runtime storage
+
+The repaired CRA application now stores newly uploaded profile photos in `Server_API/CRA/data/profilepics` by default. The public application URL remains `/uploads/profilepics/<file>`.
+
+Migration requirements:
+
+- preserve `data/profilepics` as runtime state;
+- also preserve any legacy `data/uploads/profilepics` directory while user records may still reference older avatar files;
+- do not overwrite either directory from Git;
+- if `PROFILE_PICS_DIR` is deliberately configured, preserve and restore that configured runtime directory instead;
+- retain service-account write access to the active profile-photo directory;
+- verify a valid avatar replacement and persistence after the final migration.
+
+The application serves the new directory first and retains legacy-folder fallback, so no destructive one-time avatar migration is required before cut-over.

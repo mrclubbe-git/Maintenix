@@ -113,7 +113,7 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
 
       try {
         const res = await fetch("/api/profile/me", {
-          headers: { Authorization: `Bearer ${authToken}` },
+          ,
           signal: controller.signal
         });
 

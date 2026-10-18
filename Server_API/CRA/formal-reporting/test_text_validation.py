@@ -57,9 +57,6 @@ SEC TEST USER    Senior Electrical Maintenance
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 EXACT_FAILING_NAME = "SEC-TEST-REPAIR-1792311564029 VALID NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"
 EXACT_FAILING_DESIGNATION = "SEC-TEST Synthetic Engineering Acceptance DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"
@@ -118,3 +115,6 @@ Name                                      Designation / Position                
                 EXACT_FAILING_DESIGNATION,
             )
         )
+
+if __name__ == "__main__":
+    unittest.main()

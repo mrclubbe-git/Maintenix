@@ -236,7 +236,7 @@ export default function StockControl() {
       // Example: DELETE /api/stock/movements
       const res = await fetch("/api/stock/movements", {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       // Some servers may return 204 No Content
@@ -275,7 +275,7 @@ export default function StockControl() {
     setErr("");
     try {
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       if (!res.ok) {
@@ -328,7 +328,7 @@ export default function StockControl() {
     setErr("");
     try {
       const res = await fetch("/api/stock/items", {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       const data = await res.json().catch(() => ({}));
@@ -353,7 +353,7 @@ export default function StockControl() {
     setLoadingMoves(true);
     try {
       const res = await fetch("/api/stock/movements", {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -441,7 +441,7 @@ export default function StockControl() {
     try {
       const res = await fetch("/api/stock/items", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, unit, location, qty, minQty })
       });
 
@@ -490,7 +490,7 @@ export default function StockControl() {
     try {
       const res = await fetch(`/api/stock/items/${encodeURIComponent(editItem.id)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, unit, location, minQty })
       });
 
@@ -530,7 +530,7 @@ export default function StockControl() {
     try {
       const res = await fetch(`/api/stock/items/${encodeURIComponent(id)}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       const data = await res.json().catch(() => ({}));
@@ -567,7 +567,7 @@ function openMove(i, type) {
     try {
       const res = await fetch("/api/stock/move", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId: moveItem.id, type, qty, reason })
       });
 
@@ -678,8 +678,7 @@ function openMove(i, type) {
       const res = await fetch("/api/stock/issue-note", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ customerCompany, deliveryAddress, collectedBy, releasedBy, date, lines })
       });

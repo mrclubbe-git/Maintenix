@@ -1,0 +1,72 @@
+name: Package CRA Security Remediation Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Server_API/CRA/**"
+      - ".github/workflows/package-cra-security-remediation-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build exact DEV handoff package
+        run: |
+          set -euo pipefail
+          ROOT="cra-security-remediation-backend"
+          mkdir -p "$ROOT/Server_API/CRA/lib"
+          mkdir -p "$ROOT/Server_API/CRA/routes"
+          mkdir -p "$ROOT/Server_API/CRA/formal-reporting"
+          mkdir -p "$ROOT/Server_API/CRA/test"
+
+          files=(
+            "Server_API/CRA/SECURITY_REMEDIATION_DEPLOY.txt"
+            "Server_API/CRA/calloutWorker.js"
+            "Server_API/CRA/formal-reporting/report_worker.py"
+            "Server_API/CRA/index.js"
+            "Server_API/CRA/lib/imageValidation.js"
+            "Server_API/CRA/lib/profileRoutes.js"
+            "Server_API/CRA/lib/requestSecurity.js"
+            "Server_API/CRA/lib/servicingGenerator.js"
+            "Server_API/CRA/lib/sessions.js"
+            "Server_API/CRA/package.json"
+            "Server_API/CRA/routes/admin.js"
+            "Server_API/CRA/routes/areas.js"
+            "Server_API/CRA/routes/auth.js"
+            "Server_API/CRA/routes/callout.js"
+            "Server_API/CRA/routes/formalReports.js"
+            "Server_API/CRA/routes/photos.js"
+            "Server_API/CRA/routes/presence.js"
+            "Server_API/CRA/routes/profilePassword.js"
+            "Server_API/CRA/routes/servicing.js"
+            "Server_API/CRA/routes/standby.js"
+            "Server_API/CRA/routes/stock.js"
+            "Server_API/CRA/test/security-remediation.test.js"
+          )
+
+          for file in "${files[@]}"; do
+            test -f "$file"
+            mkdir -p "$ROOT/$(dirname "$file")"
+            cp "$file" "$ROOT/$file"
+          done
+
+          printf '%s\n' "${files[@]}" > "$ROOT/SECURITY_REMEDIATION_MANIFEST.txt"
+          printf 'Source commit: %s\n' "$GITHUB_SHA" >> "$ROOT/SECURITY_REMEDIATION_MANIFEST.txt"
+
+          zip -r cra-security-remediation-backend.zip "$ROOT"
+
+      - name: Upload backend handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: cra-security-remediation-backend
+          path: cra-security-remediation-backend.zip
+          if-no-files-found: error
+          retention-days: 30

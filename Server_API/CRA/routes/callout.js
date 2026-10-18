@@ -151,15 +151,16 @@ function isCalloutV2Draft(record, expectedKey = "") {
   );
 }
 
-function publicDraft(record) {
-  return {
+function publicDraft(record, { includeValue = true } = {}) {
+  const draft = {
     key: String(record.key || ""),
     type: "calloutV2Draft",
     name: String(record.name || record.key || ""),
     createdAt: String(record.createdAt || ""),
-    updatedAt: String(record.updatedAt || ""),
-    value: isPlainObject(record.value) ? record.value : {}
+    updatedAt: String(record.updatedAt || "")
   };
+  if (includeValue) draft.value = isPlainObject(record.value) ? record.value : {};
+  return draft;
 }
 
 // -------------------- Multer (multipart form-data) --------------------
@@ -199,7 +200,7 @@ router.get("/drafts", requireAuth, async (req, res) => {
       if (!name.endsWith(".json")) continue;
       const record = await readDraftFile(path.join(dir, name));
       if (!isCalloutV2Draft(record)) continue;
-      drafts.push(publicDraft(record));
+      drafts.push(publicDraft(record, { includeValue: false }));
     }
 
     drafts.sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
@@ -257,7 +258,7 @@ router.post("/drafts", requireAuth, async (req, res) => {
     };
 
     await writeDraftFileAtomic(filePath, record);
-    return res.json({ ok: true, draft: publicDraft(record) });
+    return res.json({ ok: true, draft: publicDraft(record, { includeValue: false }) });
   } catch (error) {
     return res.status(500).json({ ok: false, message: String(error?.message || "Failed to save Call Out draft.") });
   }

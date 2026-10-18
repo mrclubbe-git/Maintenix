@@ -1,4 +1,5 @@
-const fs = require("fs");\nconst { decodeImageDataUrl } = require("./lib/imageValidation");
+const fs = require("fs");
+const { decodeImageDataUrl } = require("./lib/imageValidation");
 const fsp = fs.promises;
 const path = require("path");
 const { writeJsonAtomicSync: atomicWriteJsonSync, updateJsonWithLockSync } = require("./lib/lockedJson");

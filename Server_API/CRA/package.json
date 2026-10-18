@@ -13,8 +13,9 @@
     "worker:notifications": "node notificationWorker.js",
     "test:notifications": "node --test test/notifications.test.js",
     "test:areas": "node --test test/area-metadata.test.js",
-    "test:backend": "npm run test:notifications && npm run test:areas && npm run test:servicing",
-    "test:servicing": "node --test test/servicing-features.test.js"
+    "test:backend": "npm run test:notifications && npm run test:areas && npm run test:servicing && npm run test:security",
+    "test:servicing": "node --test test/servicing-features.test.js",
+    "test:security": "node --test test/security-remediation.test.js"
   },
   "keywords": [],
   "author": "",

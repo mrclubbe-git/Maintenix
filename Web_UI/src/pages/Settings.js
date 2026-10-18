@@ -65,7 +65,7 @@ export default function Settings() {
     setErr("");
     try {
       const res = await fetch("/api/profile/me", {
-        headers: { Authorization: `Bearer ${authToken}` }
+        headers: {}
       });
 
       const data = await res.json().catch(() => ({}));
@@ -113,7 +113,7 @@ export default function Settings() {
 
       try {
         const res = await fetch("/api/profile/preferences", {
-          headers: { Authorization: `Bearer ${authToken}` }
+          headers: {}
         });
 
         // Until the server-side preference endpoint is installed, keep using
@@ -151,8 +151,7 @@ export default function Settings() {
       const res = await fetch("/api/profile/preferences", {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ notifications: next })
       });
@@ -286,8 +285,7 @@ export default function Settings() {
       const res = await fetch("/api/profile/photo", {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ dataUrl })
       });
@@ -333,8 +331,7 @@ export default function Settings() {
       const res = await fetch("/api/profile/me", {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ name })
       });

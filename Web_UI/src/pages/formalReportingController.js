@@ -1,4 +1,4 @@
-import { orgLocalStorage, organizationDbName } from "../config/organization";
+import { organizationDbName } from "../config/organization";
 export default function initializeFormalReporting(root) {
 if (!root) return () => {};
 
@@ -359,7 +359,7 @@ async function syncDeletedDraft(record) {
     await api(`/drafts/${encodeURIComponent(record.id)}`, { method: 'DELETE' });
   } catch (error) {
     // A missing server draft is already equivalent to the requested state.
-    if (!/404/.test(String(error?.message || ''))) throw error;
+    if (!/404|draft not found/i.test(String(error?.message || ''))) throw error;
   }
   await idbDelete(record.id);
   return true;

@@ -413,7 +413,6 @@ function blobFromDataUrl(dataUrl) {
 }
 
 const CLIENT_MAX_PHOTO_BYTES = 12 * 1024 * 1024;
-const CLIENT_TARGET_PHOTO_BYTES = 3 * 1024 * 1024;
 const CLIENT_MAX_PHOTO_DIMENSION = 1600;
 const CLIENT_JPEG_QUALITY = 0.78;
 
@@ -424,7 +423,6 @@ function bytesToMb(bytes) {
 function compressImageFile(file) {
   return new Promise((resolve) => {
     if (!file || !String(file.type || "").startsWith("image/")) return resolve(file);
-    if (file.size && file.size <= CLIENT_TARGET_PHOTO_BYTES) return resolve(file);
 
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -435,11 +433,24 @@ function compressImageFile(file) {
         canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
         canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
         const ctx = canvas.getContext("2d");
-        if (!ctx) return resolve(file);
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          return resolve(file);
+        }
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
         canvas.toBlob((blob) => {
           URL.revokeObjectURL(url);
           if (!blob) return resolve(file);
+
+          const originalIsJpeg = /^image\/jpe?g$/i.test(String(file.type || ""));
+          if (originalIsJpeg && scale === 1 && Number(file.size || 0) > 0 && blob.size >= file.size) {
+            return resolve(file);
+          }
+
           const name = String(file.name || "photo.jpg").replace(/\.[^.]+$/, "") + ".jpg";
           resolve(new File([blob], name, { type: "image/jpeg", lastModified: Date.now() }));
         }, "image/jpeg", CLIENT_JPEG_QUALITY);
@@ -577,6 +588,7 @@ export default function CallOut() {
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [dbReady, setDbReady] = useState(false);
   const dbRef = useRef(null);
+  const draftSyncInFlightRef = useRef(new Set());
 
   const [jobs, setJobs] = useState([]); // local UI snapshot
   const [loadingJobs, setLoadingJobs] = useState(false);
@@ -755,13 +767,24 @@ export default function CallOut() {
     return Array.isArray(data?.drafts) ? data.drafts : [];
   }
 
+  function serverDraftPayload(rec) {
+    return {
+      key: rec.key,
+      type: rec.type || "calloutV2Draft",
+      name: rec.name || rec.key,
+      createdAt: rec.createdAt || "",
+      updatedAt: rec.updatedAt || rec.createdAt || "",
+      value: rec.value || {}
+    };
+  }
+
   async function saveServerDraft(rec) {
     if (!authToken || !navigator.onLine) throw new Error("Server drafts unavailable.");
     const data = await apiJson("/api/callout/drafts", {
       method: "POST",
-      body: JSON.stringify(rec)
+      body: JSON.stringify(serverDraftPayload(rec))
     });
-    return data?.draft || rec;
+    return data?.draft || null;
   }
 
   async function getServerDraft(key) {
@@ -775,17 +798,94 @@ export default function CallOut() {
     await apiJson(`/api/callout/drafts/${encodeURIComponent(key)}`, { method: "DELETE" });
   }
 
+  async function syncDraftRecord(rec) {
+    if (!dbRef.current || !rec?.key || !rec?.value) return rec || null;
+    if (!authToken || !navigator.onLine) return rec;
+    if (draftSyncInFlightRef.current.has(rec.key)) return rec;
+
+    draftSyncInFlightRef.current.add(rec.key);
+    const syncing = {
+      ...rec,
+      syncStatus: "syncing",
+      syncError: "",
+      lastSyncAttemptAt: new Date().toISOString()
+    };
+
+    try {
+      await idbPut(dbRef.current, "calloutCache", syncing);
+      const serverSummary = await saveServerDraft(syncing);
+      const latest = await idbGet(dbRef.current, "calloutCache", rec.key);
+      if (!latest) return null;
+
+      if (String(latest.updatedAt || "") !== String(syncing.updatedAt || "")) {
+        const pending = { ...latest, syncStatus: "pending" };
+        await idbPut(dbRef.current, "calloutCache", pending);
+        return pending;
+      }
+
+      const synced = {
+        ...latest,
+        syncStatus: "synced",
+        syncError: "",
+        syncedAt: new Date().toISOString(),
+        serverUpdatedAt: String(serverSummary?.updatedAt || "")
+      };
+      await idbPut(dbRef.current, "calloutCache", synced);
+      return synced;
+    } catch (e) {
+      const latest = await idbGet(dbRef.current, "calloutCache", rec.key);
+      if (!latest) return null;
+      const failed = {
+        ...latest,
+        syncStatus: "pending",
+        syncError: String(e?.message || "Draft sync failed."),
+        lastSyncAttemptAt: new Date().toISOString()
+      };
+      await idbPut(dbRef.current, "calloutCache", failed);
+      return failed;
+    } finally {
+      draftSyncInFlightRef.current.delete(rec.key);
+    }
+  }
+
+  async function syncPendingDrafts() {
+    if (!dbRef.current || !authToken || !navigator.onLine) return;
+    const all = await idbGetAll(dbRef.current, "calloutCache");
+    const pending = (all || []).filter((rec) => (
+      rec &&
+      typeof rec.key === "string" &&
+      rec.key.startsWith("callout_v2_draft_") &&
+      rec.type === "calloutV2Draft" &&
+      rec.value &&
+      rec.syncStatus !== "synced"
+    ));
+    if (!pending.length) return;
+
+    for (const rec of pending) {
+      await syncDraftRecord(rec);
+    }
+    await refreshDrafts();
+  }
+
   async function getDraftRecord(key) {
+    if (!dbRef.current) return null;
+
+    const local = await idbGet(dbRef.current, "calloutCache", key);
+    if (local?.value) return local;
+
     if (authToken && navigator.onLine) {
       try {
         const serverRec = await getServerDraft(key);
-        if (serverRec) return serverRec;
+        if (serverRec?.value) {
+          const cached = { ...serverRec, syncStatus: "synced", syncedAt: new Date().toISOString() };
+          await idbPut(dbRef.current, "calloutCache", cached);
+          return cached;
+        }
       } catch {
-        // fall back to the browser mirror
+        // no local/server draft available
       }
     }
-    if (!dbRef.current) return null;
-    return await idbGet(dbRef.current, "calloutCache", key);
+    return local || null;
   }
 
   async function refreshJobs() {
@@ -818,9 +918,9 @@ export default function CallOut() {
         try {
           const serverDrafts = await listServerDrafts();
           const byKey = new Map();
-          serverDrafts.forEach((d) => byKey.set(d.key, d));
-          onlyDrafts.forEach((d) => {
-            if (!byKey.has(d.key)) byKey.set(d.key, d);
+          onlyDrafts.forEach((d) => byKey.set(d.key, d));
+          serverDrafts.forEach((d) => {
+            if (!byKey.has(d.key)) byKey.set(d.key, { ...d, syncStatus: "server" });
           });
           setDrafts(Array.from(byKey.values()).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))));
           return;
@@ -883,6 +983,30 @@ export default function CallOut() {
     if (dbReady) refreshDrafts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbReady]);
+
+  // Completed Call Out drafts are browser-first. When connectivity is available,
+  // synchronize pending local drafts to the server draft folder in the background.
+  useEffect(() => {
+    if (!dbReady || !canAccess || !authToken || !online) return undefined;
+
+    let alive = true;
+    const tick = async () => {
+      if (!alive) return;
+      try {
+        await syncPendingDrafts();
+      } catch {
+        // Pending drafts remain local and retry later.
+      }
+    };
+
+    tick();
+    const t = window.setInterval(tick, 10000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbReady, online, authToken, canAccess]);
 
   useEffect(() => {
     setErr("");
@@ -1425,33 +1549,34 @@ export default function CallOut() {
   }
 
   async function saveDraftRecord(nameOverride, valueOverride) {
-    if (!dbRef.current) throw new Error("Offline storage not available in this browser.");
+    if (!dbRef.current) throw new Error("Browser draft storage is not available.");
 
     const key = makeDraftKey();
     const value = valueOverride || buildDraftValue();
     const name = String(nameOverride || "").trim() || buildDraftNameFromValue(value, key);
+    const now = new Date().toISOString();
 
     const rec = {
       key,
       type: "calloutV2Draft",
       name,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      value
+      createdAt: now,
+      updatedAt: now,
+      value,
+      syncStatus: "pending",
+      syncError: ""
     };
 
-    let saved = rec;
+    await idbPut(dbRef.current, "calloutCache", rec);
+    await refreshDrafts();
+
     if (authToken && navigator.onLine) {
-      try {
-        saved = await saveServerDraft(rec);
-      } catch (e) {
-        console.warn("Failed to save Call Out draft on server; keeping browser fallback.", e);
-      }
+      syncDraftRecord(rec)
+        .then(() => refreshDrafts())
+        .catch(() => {});
     }
 
-    await idbPut(dbRef.current, "calloutCache", saved);
-    await refreshDrafts();
-    return saved.key || key;
+    return key;
   }
 
   async function loadDraft(draftKey) {
@@ -1489,21 +1614,21 @@ export default function CallOut() {
         setErr("Draft not found.");
         return;
       }
-      let updated = {
+      const updated = {
         ...rec,
         name,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        syncStatus: "pending",
+        syncError: ""
       };
-      if (authToken && navigator.onLine) {
-        try {
-          updated = await saveServerDraft(updated);
-        } catch (e) {
-          console.warn("Failed to rename Call Out draft on server; keeping browser fallback.", e);
-        }
-      }
       await idbPut(dbRef.current, "calloutCache", updated);
       await refreshDrafts();
-      setInfo("Draft renamed.");
+      if (authToken && navigator.onLine) {
+        syncDraftRecord(updated)
+          .then(() => refreshDrafts())
+          .catch(() => {});
+      }
+      setInfo("Draft renamed on this device. Server sync will continue automatically.");
     } catch (e) {
       setErr(String(e?.message || "Failed to rename draft."));
     }
@@ -1749,11 +1874,6 @@ export default function CallOut() {
 
     if (draftSubmitting) return;
 
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setErr("Internet connection is required to submit this call-out checklist.");
-      return;
-    }
-
     if (!dbRef.current) {
       setErr("Draft storage is not available in this browser.");
       return;
@@ -1799,16 +1919,24 @@ export default function CallOut() {
       const name = buildDraftNameFromValue(value, Date.now());
 
       setDraftProgress(65);
-      setDraftProgressText("Saving draft…");
+      setDraftProgressText("Saving draft on this device…");
 
       await saveDraftRecord(name, value);
 
       setDraftProgress(100);
-      setDraftProgressText("Draft created successfully.");
+      setDraftProgressText(
+        navigator.onLine
+          ? "Draft saved locally. Server sync started."
+          : "Draft saved locally. It will sync when online."
+      );
 
       await new Promise((resolve) => window.setTimeout(resolve, 650));
 
-      resetToStart(`Draft saved: ${name}`);
+      resetToStart(
+        navigator.onLine
+          ? `Draft saved locally: ${name}. Server sync is continuing in the background.`
+          : `Draft saved locally: ${name}. It will sync automatically when online.`
+      );
     } catch (e) {
       setDraftProgress(0);
       setDraftProgressText("");
@@ -2061,9 +2189,29 @@ export default function CallOut() {
                     style={{ minWidth: 0, flex: "1 1 220px", maxWidth: "100%" }}
                   >
                     <div className="fw-bold mobile-break-anywhere">{d.name || d.key}</div>
-                    <div className="text-muted small mobile-break-anywhere">
-                      Updated: {formatDateTimeLocal(d.updatedAt || d.createdAt)}
+                    <div className="d-flex align-items-center flex-wrap" style={{ gap: 6 }}>
+                      <div className="text-muted small mobile-break-anywhere">
+                        Updated: {formatDateTimeLocal(d.updatedAt || d.createdAt)}
+                      </div>
+                      <Badge bg={
+                        d.syncStatus === "synced" || d.syncStatus === "server"
+                          ? "success"
+                          : d.syncStatus === "syncing"
+                            ? "info"
+                            : "warning"
+                      }>
+                        {d.syncStatus === "synced" || d.syncStatus === "server"
+                          ? "Server synced"
+                          : d.syncStatus === "syncing"
+                            ? "Syncing"
+                            : "Saved locally"}
+                      </Badge>
                     </div>
+                    {d.syncError ? (
+                      <div className="text-danger small mobile-break-anywhere">
+                        Server sync pending: {d.syncError}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div
@@ -2097,7 +2245,7 @@ export default function CallOut() {
             ) : null}
 
             <div className="text-muted small mt-2">
-              Drafts are saved to your user account on the server and mirrored in this browser, so they can be continued from another browser session.
+              Drafts are saved on this device first, then synchronized to your server draft folder in the background when online.
             </div>
           </Card.Body>
         </Card>

@@ -318,7 +318,14 @@ async function syncDraftRecord(record) {
 
   try {
     await idbPut(syncing);
-    const result = await saveDraftToServer(syncing);
+    let result = await saveDraftToServer(syncing);
+    if (syncing.nameDirty) {
+      result = await api(`/drafts/${encodeURIComponent(syncing.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: syncing.name })
+      });
+    }
     const latest = await idbGet(record.id);
     if (!latest) return null;
 
@@ -330,6 +337,10 @@ async function syncDraftRecord(record) {
 
     const synced = {
       ...latest,
+      name: syncing.nameDirty
+        ? latest.name
+        : String(result?.draft?.name || latest.name || ''),
+      nameDirty: false,
       syncStatus: 'synced',
       syncError: '',
       syncedAt: new Date().toISOString(),
@@ -389,6 +400,7 @@ async function saveDraft() {
       id: value.id,
       type: 'formalReportDraft',
       name: existing?.name || defaultDraftName(value),
+      nameDirty: Boolean(existing?.nameDirty),
       savedAt,
       value,
       syncStatus: 'pending',
@@ -482,6 +494,7 @@ async function loadDraft(id) {
         name: data.draft.name || defaultDraftName(data.draft),
         savedAt: data.draft.savedAt || new Date().toISOString(),
         value: data.draft,
+        nameDirty: false,
         syncStatus: 'synced',
         syncError: '',
         syncedAt: new Date().toISOString()
@@ -510,6 +523,7 @@ async function renameDraft(id) {
         name: data.draft?.name || defaultDraftName(data.draft || {}),
         savedAt: data.draft?.savedAt || new Date().toISOString(),
         value: data.draft,
+        nameDirty: false,
         syncStatus: 'synced',
         syncError: ''
       };
@@ -518,6 +532,7 @@ async function renameDraft(id) {
     const updated = {
       ...record,
       name: cleanName,
+      nameDirty: true,
       savedAt: new Date().toISOString(),
       syncStatus: 'pending',
       syncError: ''

@@ -1846,3 +1846,19 @@ Validation/deployment support:
 - GitHub Pages run `39105053513` completed successfully; build verification and deployment both passed.
 - The published artifact was inspected after deployment: CRA index references only external scripts (`api-bootstrap.js`, `runtime-main.*.js`, vendor chunk and main chunk) and contains no production `.map` files.
 - Correct CRA DEV frontend URL remains `https://mrclubbe-git.github.io/Maintenix/CRA/`.
+
+
+## DEV acceptance repairs implemented — 2026-10-18
+
+The consolidated DEV acceptance report identified two application defects after the wider security-remediation cycle: valid avatar replacements returned HTTP 500, and accepted longer Section Report Compiled By values returned HTTP 500 during PDF verification.
+
+Repairs are now committed on main at source commit `782c0960281406b40b494208d2cdd83777ae2e22`:
+
+- Avatar storage now defaults to `Server_API/CRA/data/profilepics`, a runtime directory alongside the writable CRA data store rather than requiring creation/writes beneath the historical uploads tree. Existing `/uploads/profilepics/<file>` URLs are preserved. The API serves the new directory first and falls through to legacy `data/uploads/profilepics` so existing avatar references remain valid.
+- Avatar image-content validation remains unchanged. Malformed, mismatched and corrupt image content must continue to be rejected.
+- Section Report PDF verification no longer requires an accepted long Compiled By name/designation to remain contiguous in `pdftotext -layout` output. It now validates the full token multiset after the Compiled By heading, which tolerates line wrapping/interleaving between adjacent table cells while still requiring the supplied content to survive PDF conversion.
+- The approved limits remain 120 characters for Compiled By name and 160 for designation. Atomic publication behavior remains unchanged.
+- Backend regression CI run `39109935818` passed, including the new avatar-runtime-storage test and four formal-text validation tests.
+- Backend packaging run `39109935810` passed and produced the updated `cra-security-remediation-backend` handoff artifact.
+- No frontend code change was required for these two repairs.
+- These repairs are source-complete but are not considered DEV-validated until the updated backend handoff is installed on CRA DEV, the existing service is restarted, and the focused acceptance cases are rerun.

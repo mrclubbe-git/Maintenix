@@ -279,15 +279,16 @@ function draftPathFor(userKey, draftId) {
   return path.join(SERVICING_DRAFTS_DIR, userKey, `${safeFilename(draftId)}.json`);
 }
 
-function publicDraft(rec) {
-  return {
+function publicDraft(rec, { includeValue = true } = {}) {
+  const draft = {
     key: rec.key,
     type: rec.type || "servicingDraft",
     name: rec.name || rec.key,
     createdAt: rec.createdAt || "",
-    updatedAt: rec.updatedAt || rec.createdAt || "",
-    value: rec.value || {}
+    updatedAt: rec.updatedAt || rec.createdAt || ""
   };
+  if (includeValue) draft.value = rec.value || {};
+  return draft;
 }
 
 function ensureDraftOwner(req, rec) {
@@ -539,7 +540,7 @@ router.get("/drafts", requireAuth, (req, res) => {
       .filter((f) => f.endsWith(".json"))
       .map((f) => readJsonFile(path.join(dir, f), null))
       .filter((x) => x && x.key)
-      .map(publicDraft)
+      .map((rec) => publicDraft(rec, { includeValue: false }))
       .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
     return res.json({ ok: true, drafts });
   } catch (e) {
@@ -556,7 +557,7 @@ router.get("/drafts/:draftId", requireAuth, (req, res) => {
     if (!fs.existsSync(p)) return res.status(404).json({ ok: false, message: "Draft not found." });
     const rec = readJsonFile(p, null);
     if (!rec) return res.status(500).json({ ok: false, message: "Draft file invalid." });
-    return res.json({ ok: true, draft: publicDraft(rec) });
+    return res.json({ ok: true, draft: publicDraft(rec, { includeValue: false }) });
   } catch (e) {
     return res.status(500).json({ ok: false, message: String(e?.message || "Failed to load draft.") });
   }

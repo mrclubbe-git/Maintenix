@@ -95,3 +95,20 @@ Targeted DEV retest after install/restart
 3. Generate Section Reports with short values, the realistic accepted long case, and exact 120/160 boundaries.
 4. Reconfirm 121/161 cases return validation errors and no failed case publishes a completed report.
 5. Smoke login/session/CSRF, Stock permissions, Servicing, Call Out, Reports and Administration -> System.
+
+
+Outstanding Section Report boundary repair — 2026-10-18
+- Targeted retest cleared avatar replacement for L1/L2/L3/ADMIN.
+- One Section Report verifier edge case remained: exact accepted 120/160 compiler fields containing
+  very long unbroken N/D padding returned HTTP 500 even though spaced 120/160 and realistic 118/160 passed.
+- PDF verification now reconstructs long expected tokens from ordered pdftotext fragments while ignoring
+  interleaved adjacent-column tokens. Normal words still require exact token presence.
+- The exact captured 120/160 failing input is now a permanent automated regression test.
+- Supported limits remain unchanged: name <= 120 characters, designation <= 160 characters.
+- Atomic publication behavior is unchanged.
+- Focused retest after install:
+  1. exact captured unbroken 120/160 case must generate readable DOCX/PDF;
+  2. spaced 120/160 and realistic 118/160 controls must continue to pass;
+  3. 121/161 must continue to return HTTP 400;
+  4. failed/rejected cases must not publish completed reports;
+  5. if all repair gates pass, proceed with the previously deferred narrow smoke regression.

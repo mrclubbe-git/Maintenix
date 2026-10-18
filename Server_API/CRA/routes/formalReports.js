@@ -148,6 +148,18 @@ function generationId() {
   return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "z").toLowerCase();
 }
 
+function formalDraftSummary(draft) {
+  return {
+    id: draft.id,
+    name: String(draft.name || "").trim(),
+    section: draft.section,
+    month: draft.month,
+    week: draft.week,
+    compiledName: draft.compiledName,
+    savedAt: draft.savedAt
+  };
+}
+
 function validateDraft(payload) {
   const section = sectionInventory().find((candidate) => candidate.name === payload?.section);
   if (!section) return "Unknown reporting section";
@@ -251,10 +263,14 @@ router.post("/drafts", (req, res) => {
   const destination = userDraftPath(req, id);
   const existing = fs.existsSync(destination) ? readJson(destination) : {};
   const defaultName = `${req.body.section} · ${req.body.month} · Week ${req.body.week}`;
+  const requestedName = String(req.body?.name || "").replace(/\s+/g, " ").trim();
+  if (requestedName.length > 120) {
+    return res.status(400).json({ ok: false, error: "Draft name must be 120 characters or fewer" });
+  }
   const saved = {
     ...req.body,
     id,
-    name: existing.name || defaultName,
+    name: requestedName || existing.name || defaultName,
     savedAt: new Date().toISOString(),
     savedBy: req.user.id,
     owner: {
@@ -266,7 +282,7 @@ router.post("/drafts", (req, res) => {
   };
 
   writeJsonAtomic(destination, saved);
-  res.json({ ok: true, draft: saved });
+  res.json({ ok: true, draft: formalDraftSummary(saved) });
 });
 
 router.get("/drafts", (req, res) => {
@@ -276,15 +292,7 @@ router.get("/drafts", (req, res) => {
     .map((file) => readJson(path.join(userDraftDir(req), file.name)))
     .filter((draft) => String(draft?.savedBy || "") === String(req.user.id || ""))
     .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")))
-    .map((draft) => ({
-      id: draft.id,
-      name: String(draft.name || "").trim(),
-      section: draft.section,
-      month: draft.month,
-      week: draft.week,
-      compiledName: draft.compiledName,
-      savedAt: draft.savedAt
-    }));
+    .map(formalDraftSummary);
 
   res.json({ ok: true, drafts });
 });

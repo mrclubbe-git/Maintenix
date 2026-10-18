@@ -48,6 +48,14 @@ jobs:
           REACT_APP_ORGANIZATION_NAME: Collaborative Risk Applications
         run: npm run build:github
 
+      - name: Verify deployable security build
+        working-directory: Web_UI
+        run: |
+          test -z "$(find build -type f -name '*.map' -print -quit)"
+          grep -q "Content-Security-Policy" build/index.html
+          grep -Eq 'runtime-main\.[a-z0-9]+\.js' build/index.html
+          ! grep -Eq '<script( [^>]*)?>[^<[:space:]][^<]*</script>' build/index.html
+
       - name: Assemble organization Pages artifact
         working-directory: Web_UI
         run: |

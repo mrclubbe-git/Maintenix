@@ -2,7 +2,7 @@
 
 **Document purpose:** Tester instruction / acceptance plan  
 **Environment:** CRA DEV only  
-**Frontend under test:** https://mrclubbe-git.github.io/CRA/  
+**Frontend under test:** https://mrclubbe-git.github.io/Maintenix/CRA/  
 **DEV API:** https://dev-api.main-tenix.com/CRA  
 **Do not test against LIVE.**  
 **Date prepared:** 2026-10-18
@@ -28,6 +28,8 @@ A missing Cloudflare-owned response header on the current GitHub Pages frontend 
 
 ## 2. Current DEV architecture being tested
 
+**GitHub Pages project-site note:** this repository is published as a GitHub Pages **project site**, so the repository name `Maintenix` is part of the public path. The correct CRA frontend is `https://mrclubbe-git.github.io/Maintenix/CRA/`. The repository Pages root `https://mrclubbe-git.github.io/Maintenix/` redirects into `CRA/`. The shorter `https://mrclubbe-git.github.io/CRA/` is not the Maintenix project site and may return GitHub's "There isn't a GitHub Pages site here" 404 page.
+
 Current DEV traffic is approximately:
 
 ```text
@@ -36,7 +38,7 @@ Browser
   | HTTPS
   v
 GitHub Pages
-https://mrclubbe-git.github.io/CRA/
+https://mrclubbe-git.github.io/Maintenix/CRA/
   |
   | cross-origin HTTPS API requests
   | Secure/HttpOnly session cookie
@@ -143,7 +145,7 @@ The following application behaviours are in scope and should be tested now:
 Use the GitHub Pages CRA DEV site only:
 
 ```text
-https://mrclubbe-git.github.io/CRA/
+https://mrclubbe-git.github.io/Maintenix/CRA/
 ```
 
 Do not perform any test against LIVE.

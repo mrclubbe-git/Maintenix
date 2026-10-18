@@ -1917,3 +1917,12 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - User confirmed the CRA DEV server was restarted after repeated browser-visible 502/530 transport failures on notifications and presence requests.
 - Treat the restart as an operational recovery action only; the transport issue is not considered resolved until the public DEV API and browser console are rechecked.
 - No application CORS code change was made for this incident.
+
+
+## DEV API transport recovery confirmed — 2026-10-18
+
+- After the CRA DEV server restart, the user rechecked the GitHub Pages application and confirmed there are no longer any HTTP 502 or HTTP 530 responses.
+- The browser is again reaching the normal CRA DEV API surface, including notifications and presence heartbeat requests.
+- The earlier CORS console messages are therefore classified as secondary browser symptoms of the temporary DEV API/tunnel/origin availability interruption, not as an application CORS-policy defect.
+- No CORS code change, permissive origin change, temporary proxy, or new infrastructure service was required.
+- CRA DEV transport availability incident: RESOLVED after server restart, subject to normal ongoing operational monitoring.

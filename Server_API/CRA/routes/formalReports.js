@@ -270,7 +270,7 @@ router.post("/drafts", (req, res) => {
   const saved = {
     ...req.body,
     id,
-    name: requestedName || existing.name || defaultName,
+    name: existing.name || requestedName || defaultName,
     savedAt: new Date().toISOString(),
     savedBy: req.user.id,
     owner: {

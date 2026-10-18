@@ -7,7 +7,7 @@ const {
   resolveUnder,
   ensureDir: ensureReportDir
 } = require("./reportStorage");
-const { decodeImageDataUrl } = require("./imageValidation");
+const { validateSignatureDataUrl } = require("./imageValidation");
 const {
   filterServicingResponses,
   normalizeYesNoChoice,
@@ -445,10 +445,7 @@ async function generateServicingDocx(opts) {
   // Signature is mandatory and must decode as a real PNG.
   let signatureImage;
   try {
-    signatureImage = decodeImageDataUrl(payload?.signatureDataUrl || payload?.signature || "", {
-      allowed: ["png"],
-      maxBytes: 2 * 1024 * 1024
-    });
+    signatureImage = validateSignatureDataUrl(payload?.signatureDataUrl || payload?.signature || "");
   } catch (error) {
     throw new Error(`A valid technician signature is required. ${String(error?.message || "")}`.trim());
   }

@@ -1952,3 +1952,36 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - GitHub Pages deployment run `39150610497` passed after deploy commit `0964a125c1ded18f5cafacd70b785fe755a7a0ab`.
 - Backend route optimization is source-complete but still requires manual DEV placement of Server_API/CRA/routes/servicing.js and restart of the existing maintenix-dev-api.service.
 - No LIVE/production change was made.
+
+
+## Call Out + Section Reports local-first draft persistence — 2026-10-18
+
+- User validated the preceding Servicing local-first draft workflow and requested the same browser-first persistence pattern for Call Out and Administration -> Section Reports.
+- Full offline mode remains a later development phase. Starting/reloading the workflows still depends on current online API data; this change only makes completed draft persistence local-first and resilient if connectivity disappears before save.
+- Call Out:
+  - evidence images are normalized locally for all captures instead of bypassing compression below 3 MiB;
+  - maximum evidence dimension remains 1600 px and JPEG quality remains 0.78;
+  - already-efficient JPEGs are retained when re-encoding would increase size;
+  - Submit writes the completed draft to Call Out IndexedDB first;
+  - the user-facing saved result no longer waits for an API request or server draft-list refresh;
+  - online API sync begins immediately in the background; pending local drafts retry automatically when online;
+  - Saved Drafts shows Saved locally / Syncing / Server synced and exposes pending sync errors;
+  - local draft content is authoritative while pending; server-only drafts fetch full content only when loaded;
+  - GET /api/callout/drafts and POST /api/callout/drafts now return summary metadata, while GET /api/callout/drafts/:draftId remains the full-detail endpoint.
+- Section Reports:
+  - added an organization-scoped IndexedDB draft store;
+  - Save draft writes locally first and returns success without waiting for API/server-list work;
+  - online sync starts in the background and retries pending local drafts after connectivity returns;
+  - Saved Drafts merges local records with server summaries and shows Saved locally / Syncing / Server synced plus sync errors;
+  - local drafts load directly from IndexedDB; server-only drafts are fetched in full on demand and cached locally;
+  - rename is local-first and uses explicit PATCH during sync so existing custom server draft names are not unintentionally overwritten by ordinary content saves;
+  - delete uses a local tombstone so an offline deletion can be propagated when connectivity returns;
+  - POST /api/formal-reports/drafts now returns a lightweight summary; GET /drafts already returns summaries and GET /drafts/:id remains full detail.
+- Servicing follow-up in the same batch: local draft creation/rename now refreshes the Saved Drafts UI from IndexedDB only before reporting success, eliminating the remaining server-list wait from the browser-first acknowledgement boundary.
+- Backend source commit carrying the final Section Report server-name preservation: `71db278e296db3c642c94dfb138293db21639805`.
+- Current frontend source on main after the final local-only acknowledgement/rename-sync changes: `c9e879c48e51c33e56f3594a5642c05943b85d13`.
+- CRA backend CI run `39158239411` passed. Backend packaging run `39158239396` passed.
+- Final GitHub Pages build/deploy run `39158262663` passed, including the no-source-map/CSP deployment checks.
+- Targeted DEV backend handoff contains only `Server_API/CRA/routes/callout.js` and `Server_API/CRA/routes/formalReports.js`; SHA-256 `e0fdc74e1cf52c01c5d00ee92e8d1b13e7640ce29e30dabac698f409435ab367`.
+- Frontend is deployed to CRA DEV. The two backend route files still require manual DEV placement and restart of the existing `maintenix-dev-api.service` before the server-side response optimizations/rename sync are active.
+- No LIVE/production change was made.

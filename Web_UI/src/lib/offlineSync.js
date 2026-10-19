@@ -252,6 +252,13 @@ async function syncServicingDrafts(db) {
       // One unavailable server draft must not block the rest of automatic sync.
     }
   }
+
+  const serverKeys = new Set(summaries.map((item) => String(item?.key || "")).filter(Boolean));
+  for (const [key, local] of localByKey.entries()) {
+    if (local?.syncStatus === "synced" && !serverKeys.has(key)) {
+      await idbDelete(db, "servicingCache", key);
+    }
+  }
 }
 
 async function syncCalloutDrafts(db) {
@@ -327,6 +334,13 @@ async function syncCalloutDrafts(db) {
       });
     } catch {
       // Continue syncing remaining drafts.
+    }
+  }
+
+  const serverKeys = new Set(summaries.map((item) => String(item?.key || "")).filter(Boolean));
+  for (const [key, local] of localByKey.entries()) {
+    if (local?.syncStatus === "synced" && !serverKeys.has(key)) {
+      await idbDelete(db, "calloutCache", key);
     }
   }
 }
@@ -426,6 +440,13 @@ async function syncFormalDrafts(db) {
       });
     } catch {
       // Continue syncing remaining drafts.
+    }
+  }
+
+  const serverIds = new Set(summaries.map((item) => String(item?.id || "")).filter(Boolean));
+  for (const [id, local] of localById.entries()) {
+    if (!local?.deleted && local?.syncStatus === "synced" && !local?.nameDirty && !serverIds.has(id)) {
+      await idbDelete(db, "formalReportDrafts", id);
     }
   }
 }

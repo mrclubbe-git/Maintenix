@@ -211,13 +211,19 @@ export function startSiteLogger() {
 
   const onApiError = (event) => {
     const detail = event?.detail || {};
+    const status = Number(detail.status || 0);
+    const serverError = status >= 500;
     logSiteEvent({
-      level: detail.networkError ? "WARN" : "ERROR",
+      level: detail.networkError || !serverError ? "WARN" : "ERROR",
       category: "API",
-      event: detail.networkError ? "API_NETWORK_ERROR" : "API_SERVER_ERROR",
+      event: detail.networkError
+        ? "API_NETWORK_ERROR"
+        : serverError
+          ? "API_SERVER_ERROR"
+          : "API_REQUEST_WARNING",
       message: detail.networkError
         ? "API request could not reach the server."
-        : `API request failed with HTTP ${Number(detail.status || 0)}.`,
+        : `API request failed with HTTP ${status}.`,
       requestId: detail.requestId || "",
       route: detail.path || "",
       method: detail.method || "",

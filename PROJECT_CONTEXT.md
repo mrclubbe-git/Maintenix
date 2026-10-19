@@ -2065,3 +2065,33 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Deploy commit: `3c71158f6214d7dfa34928b72bc9b7c7ed246be6`.
 - GitHub Pages deployment run `39243472606` completed successfully.
 - No backend or LIVE change was required.
+
+
+## Administration Site Logs Phase 1 — 2026-10-19
+
+- User approved the recommended centralized Site Logs architecture and requested implementation.
+- Phase 1 source has been implemented on GitHub `main` at commit `a970e82f18a34ab7b6b76dffd04e570b5c9c1f3d`.
+- Backend:
+  - new `Server_API/CRA/lib/siteLogger.js` writes daily NDJSON under `data/site-logs/YYYY-MM-DD.ndjson`;
+  - default retention is 90 days, cleaned lazily by the API; optional `SITE_LOG_DIR` / `SITE_LOG_RETENTION_DAYS`;
+  - sensitive keys (passwords, tokens, cookies, CSRF values, signatures, private/VAPID keys, leases/secrets) are redacted before persistence;
+  - logging writes are fail-safe and must not break normal application actions;
+  - authenticated client ingestion endpoint `POST /api/site-logs/client` is CSRF-protected by the existing global middleware and rate-limited to 120 events/minute/user;
+  - ADMIN-only `GET /api/admin/site-logs` and `GET /api/admin/site-logs/:id`;
+  - request correlation IDs are generated server-side and returned as `X-Request-Id`;
+  - unhandled API errors, payload-too-large failures, successful meaningful API writes, denied/rate-limited requests, authentication activity and Administration user/area changes are logged.
+- Frontend:
+  - new `Web_UI/src/lib/siteLogger.js` captures uncaught browser errors, unhandled promise rejections, failed API responses and connectivity transitions;
+  - browser events are stored in an IndexedDB outbox when offline/unreachable and retry automatically when connectivity returns;
+  - API failure capture is deduplicated per method/path/status for one minute to avoid retry noise;
+  - the Admin page has a new `Site Logs` tab with 24h/7d/30d/90d filters, level/module/search filters, summary cards, responsive table/cards and a details modal;
+  - Site Logs client payloads include current frontend bundle hash/device context but never credentials or evidence bodies.
+- Runtime/migration:
+  - Site Logs are runtime operational/audit data and must never be overwritten from Git or copied from DEV to LIVE;
+  - no new systemd service, worker, daemon or cron job is introduced;
+  - LIVE migration checklist and backend deploy notes were updated.
+- Backend CI run `39246620438` passed, including the new Site Logs regression tests.
+- Backend packaging run `39246620512` passed; artifact ID `12184240492`.
+- Targeted CRA DEV backend handoff: `cra-site-logs-phase1-backend-2026-10-19.zip`, SHA-256 `b021b8b312d87186ef3db58c5b5c00dd541a57a000eac04808f3ca9c07897b9f`.
+- IMPORTANT deployment order: frontend Site Logs changes are intentionally **not yet copied to `deploy`**. Install/restart the matching DEV backend first, then deploy the frontend so the client logger does not continuously queue against an undeployed endpoint.
+- No LIVE/production change was made.

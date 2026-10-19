@@ -177,6 +177,19 @@ The DEV installation remains separate and must not be treated as a Git checkout/
 
 ## 5. Runtime data: preserve vs. do not copy from DEV
 
+### Current selective-data migration rule — 2026-10-19
+
+Do **not** treat `Server_API/CRA/data/` as one directory that is either kept untouched or replaced wholesale. The LIVE migration is file/directory-specific:
+
+- preserve LIVE production/business records such as `users.json`, `reports.meta.json`, `uploads/` (reports/pictures/evidence), `stock.json`, `standby.json`, planner/notification/preferences data, profile pictures, area metadata, Site Logs, existing LIVE cryptographic keys/subscriptions and in-flight report state when present;
+- reset ephemeral `sessions.json` and `presence.json` after taking the migration backup so the new session/presence implementation starts cleanly;
+- copy **only** `Server_API/CRA/data/templates/` from CRA DEV;
+- because `data/templates/areas.txt` is runtime-mutable, stage the DEV templates and merge LIVE-only Area names into the staged `areas.txt` before installing the template directory;
+- do not copy any other CRA DEV runtime data;
+- if a new runtime file introduced during development is absent on LIVE, allow LIVE to create its own instance rather than copying DEV state.
+
+The current migration ZIP implementing this rule is `Maintenix_Current_Site_Migration_2026-10-19_v2.zip`. It also uses the exact frontend currently served by the repo at deploy head `8ef05c88f0d263a3bbf9161244f94aa667c1a966`.
+
 The application stores operational state under `Server_API/CRA/data/`.
 
 Before any LIVE migration, take a verified backup of the existing LIVE data directory.

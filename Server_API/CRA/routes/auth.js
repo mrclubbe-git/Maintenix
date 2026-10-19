@@ -220,10 +220,11 @@ router.get("/me", (req, res) => {
     return res.status(401).json({ ok: false, message: "Not logged in." });
   }
 
+  const expiresAt = setSessionCookie(res, auth.token);
   return res.json({
     ok: true,
     user: publicUser(auth.user),
-    expiresAt: getSessionExpiresAt(auth.token),
+    expiresAt,
     csrfToken: auth.session.csrfToken,
     offlineLease: issueOfflineLease(auth.user, { organization: auth.session.organization })
   });
@@ -239,7 +240,7 @@ router.get("/csrf", (req, res) => {
   return res.json({
     ok: true,
     csrfToken: auth.session.csrfToken,
-    expiresAt: getSessionExpiresAt(auth.token)
+    expiresAt: setSessionCookie(res, auth.token)
   });
 });
 

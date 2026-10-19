@@ -347,7 +347,14 @@ async function syncCalloutDrafts(db) {
 
 async function syncFormalDrafts(db) {
   let records = await idbGetAll(db, "formalReportDrafts");
-  const drafts = records.filter((rec) => rec?.type === "formalReportDraft");
+  const drafts = records.filter((rec) => (
+    rec?.type === "formalReportDraft" &&
+    (
+      rec.deleted ||
+      rec.syncStatus === "pending" ||
+      rec.syncStatus === "syncing"
+    )
+  ));
 
   for (const rec of drafts) {
     if (rec.deleted) {
@@ -374,7 +381,7 @@ async function syncFormalDrafts(db) {
       let data = await apiJson("/api/formal-reports/drafts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...rec.value, name: rec.name || "" })
+        body: JSON.stringify(rec.value)
       });
 
       if (rec.nameDirty) {
@@ -395,10 +402,13 @@ async function syncFormalDrafts(db) {
         serverSavedAt: String(data?.draft?.savedAt || "")
       });
     } catch (error) {
+      const permanentValidationError = Number(error?.status || 0) === 400;
       await idbPut(db, "formalReportDrafts", {
         ...rec,
-        syncStatus: "pending",
-        syncError: String(error?.message || "Draft sync failed."),
+        syncStatus: permanentValidationError ? "blocked" : "pending",
+        syncError: permanentValidationError
+          ? `Server rejected this saved draft: ${String(error?.message || "validation failed")}. Open and save the draft again to retry.`
+          : String(error?.message || "Draft sync failed."),
         lastSyncAttemptAt: new Date().toISOString()
       });
     }
@@ -447,6 +457,24 @@ async function syncFormalDrafts(db) {
   for (const [id, local] of localById.entries()) {
     if (!local?.deleted && local?.syncStatus === "synced" && !local?.nameDirty && !serverIds.has(id)) {
       await idbDelete(db, "formalReportDrafts", id);
+      continue;
+    }
+
+    // Records created before local-first sync had no syncStatus. They may use
+    // an older schema. Do not post them automatically: if a server copy exists
+    // it is refreshed above; otherwise preserve the local record for manual
+    // review/save instead of hammering the API with repeat 400 responses.
+    if (
+      local?.type === "formalReportDraft" &&
+      !local?.deleted &&
+      !local?.syncStatus &&
+      !serverIds.has(id)
+    ) {
+      await idbPut(db, "formalReportDrafts", {
+        ...local,
+        syncStatus: "blocked",
+        syncError: "Legacy local draft requires review. Open it and save it again before server synchronization."
+      });
     }
   }
 }

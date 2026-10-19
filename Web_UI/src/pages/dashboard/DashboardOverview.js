@@ -134,7 +134,7 @@ function UserCell({ user }) {
   const size = 28;
 
   return (
-    <div className="d-flex align-items-center gap-2">
+    <div className="d-flex align-items-center gap-2 overview-presence-user">
       {photoUrl ? (
         <img
           src={photoUrl}
@@ -173,7 +173,7 @@ function UserCell({ user }) {
         </div>
       )}
 
-      <div className="fw-bold" style={{ lineHeight: 1.1 }}>
+      <div className="fw-bold overview-presence-user-copy" style={{ lineHeight: 1.1 }}>
         {label}
         {user?.email && user?.name ? (
           <div className="text-muted fw-normal" style={{ fontSize: 12 }}>
@@ -334,7 +334,7 @@ export default function DashboardOverview() {
             ) : null}
 
             <Card.Body className="p-0">
-              <Table responsive className="table-centered table-nowrap mb-0 rounded mobile-wrap-table">
+              <Table responsive className="table-centered table-nowrap mb-0 rounded overview-presence-table">
                 <thead className="thead-light">
                   <tr>
                     <th className="border-0">User</th>

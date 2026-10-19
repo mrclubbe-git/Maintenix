@@ -41,6 +41,7 @@ jobs:
           node --check calloutWorker.js
           node --check notificationWorker.js
           node --check lib/sessions.js
+          node --check lib/offlineLease.js
           node --check lib/requestSecurity.js
           node --check lib/imageValidation.js
           node --check lib/profileRoutes.js

@@ -586,6 +586,8 @@ export default function CallOut() {
 
   // ✅ Offline/queue UI
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [referenceSource, setReferenceSource] = useState("");
+  const [referenceUpdatedAt, setReferenceUpdatedAt] = useState("");
   const [dbReady, setDbReady] = useState(false);
   const dbRef = useRef(null);
   const draftSyncInFlightRef = useRef(new Set());
@@ -668,12 +670,16 @@ export default function CallOut() {
 
   const canAddArea = useMemo(() => {
     const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
-    return !!candidate && !hasExactAreaMatch(areaOptions, candidate);
-  }, [areaOptions, areaSearch]);
+    return online && !!candidate && !hasExactAreaMatch(areaOptions, candidate);
+  }, [areaOptions, areaSearch, online]);
 
   async function createGlobalAreaFromSearch() {
     const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
     if (!candidate || addingArea) return;
+    if (!online) {
+      setErr("Connect to a network before adding a new Area. Existing saved Areas remain available offline.");
+      return;
+    }
 
     setErr("");
     setInfo("");
@@ -741,10 +747,9 @@ export default function CallOut() {
     await idbPut(dbRef.current, "calloutCache", { key, value, updatedAt: new Date().toISOString() });
   }
 
-  async function cacheGet(key) {
+  async function cacheGetRecord(key) {
     if (!dbRef.current) return null;
-    const rec = await idbGet(dbRef.current, "calloutCache", key);
-    return rec?.value ?? null;
+    return await idbGet(dbRef.current, "calloutCache", key);
   }
 
   async function apiJson(path, options = {}) {
@@ -950,33 +955,47 @@ export default function CallOut() {
       setErr("Not logged in.");
       return;
     }
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setAreaOptions([]);
-      setErr("Internet connection is required. Offline mode is temporarily disabled.");
-      return;
-    }
 
     setLoadingLists(true);
     try {
-      const areas = await fetchGlobalAreas(authToken);
+      if (typeof navigator === "undefined" || navigator.onLine !== false) {
+        try {
+          const areas = await fetchGlobalAreas(authToken);
+          const updatedAt = new Date().toISOString();
+          setAreaOptions(areas);
+          setReferenceSource("online");
+          setReferenceUpdatedAt(updatedAt);
+          await cacheSet("areas", areas);
+          return;
+        } catch {
+          // Fall through to the last synchronized device copy.
+        }
+      }
+
+      const cached = await cacheGetRecord("areas");
+      const areas = Array.isArray(cached?.value) ? cached.value : [];
+      if (!areas.length) {
+        setAreaOptions([]);
+        setReferenceSource("");
+        setReferenceUpdatedAt("");
+        setErr("No synchronized Call Out Area list is available on this device. Connect to a network once to refresh it.");
+        return;
+      }
+
       setAreaOptions(areas);
-      await cacheSet("areas", areas);
-    } catch (e) {
-      setErr(String(e?.message || "Failed to load the shared Area list."));
+      setReferenceSource("offline");
+      setReferenceUpdatedAt(String(cached?.updatedAt || ""));
+      setInfo(`Using the saved Area list from this device${cached?.updatedAt ? ` (updated ${new Date(cached.updatedAt).toLocaleString()})` : ""}.`);
     } finally {
       setLoadingLists(false);
     }
   }
 
   useEffect(() => {
-    if (!canAccess) return;
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setErr("Internet connection is required. Offline mode is temporarily disabled.");
-      return;
-    }
+    if (!canAccess || !dbReady) return;
     loadAreaList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online, canAccess]);
+  }, [online, canAccess, dbReady]);
 
   useEffect(() => {
     if (dbReady) refreshJobs();
@@ -1015,7 +1034,6 @@ export default function CallOut() {
   }, [step]);
 
   function validatePreStart() {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return "Internet connection is required. Offline mode is temporarily disabled.";
     if (!area) return "Please select an Area.";
     return "";
   }
@@ -2051,7 +2069,11 @@ export default function CallOut() {
           {!online ? (
             <div className="mt-1">
               <Badge bg="warning" text="dark">Offline</Badge>
-              <span className="text-muted small ms-2">Internet connection is required. Offline mode is temporarily disabled.</span>
+              <span className="text-muted small ms-2">
+                {referenceSource === "offline"
+                  ? `Using the saved Area list${referenceUpdatedAt ? ` from ${new Date(referenceUpdatedAt).toLocaleString()}` : ""}. Drafts save locally and sync automatically when connected.`
+                  : "A saved Area list is required to start a Call Out offline."}
+              </span>
             </div>
           ) : null}
         </div>
@@ -2263,7 +2285,9 @@ export default function CallOut() {
                 <Form.Group>
                   <Form.Label>Area <span className="text-danger">*</span></Form.Label>
                   <div className="text-muted small mb-2">
-                    Choose an existing area or add it to the shared area list if it is not available.
+                    {online
+                      ? "Choose an existing area or add it to the shared area list if it is not available."
+                      : "Choose an existing saved area. Adding new areas requires a network connection."}
                   </div>
 
                   <div ref={areaBoxRef} style={{ position: "relative" }}>

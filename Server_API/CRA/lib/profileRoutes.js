@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 
-const { extractBearer, getSession, getSessionExpiresAt } = require("./sessions");
+const { extractBearer, getSession, setSessionCookie } = require("./sessions");
 const { decodeImageDataUrl, safeGeneratedImageName } = require("./imageValidation");
 const { issueOfflineLease } = require("./offlineLease");
 const {
@@ -50,7 +50,7 @@ router.get("/me", requireAuth, (req, res) => {
       status: u.status,
       photoUrl: u.photoUrl || ""
     },
-    expiresAt: getSessionExpiresAt(req.authSessionToken),
+    expiresAt: setSessionCookie(res, req.authSessionToken),
     csrfToken: req.authSession?.csrfToken || "",
     offlineLease: issueOfflineLease(u, { organization: req.authSession?.organization })
   });

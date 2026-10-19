@@ -2,9 +2,136 @@
 
 > **Purpose:** This file is the persistent source of truth for critical Maintenix development context across ChatGPT project sessions.
 >
-> **Last updated:** 2026-10-14
+> **Last updated:** 2026-10-19
 >
 > Future work should read this file before making architecture, workflow, report-template, or servicing changes.
+
+## 0. CURRENT OPERATING STATE — READ THIS FIRST
+
+This section is the **authoritative workflow and development rule set for all future Maintenix sessions**. Older sections below remain useful historical/design context, but where an older statement conflicts with this section, **this section wins**.
+
+### Development status
+
+- Development is paused as of **2026-10-19**.
+- The current repository state is designated the **LIVE VERSION CLONE**: it is the frozen source reference for the version intended to match/live alongside the production migration state.
+- Two immutable Git marker branches are used for this frozen reference:
+  - `live-version-clone-main-20261019` — complete source/documentation snapshot from `main`;
+  - `live-version-clone-deploy-20261019` — exact currently served frontend snapshot from `deploy`.
+- These marker branches are **read-only reference points**. Do not advance, force-update, delete, or reuse them for new development unless the user explicitly declares a replacement LIVE clone.
+- Current exact frontend/deploy state: `8ef05c88f0d263a3bbf9161244f94aa667c1a966`.
+- Successful GitHub Pages run for that frontend: `39281337899`.
+- Current/accepted CRA backend application tree SHA: `35e7367e289e4f0a30213bdf7a90253a9de2476d`.
+- The currently served frontend includes the native Web Push **Mark as read / Acknowledge** enhancement.
+- The corrected migration package for this state is `Maintenix_Current_Site_Migration_2026-10-19_v2.zip`, SHA-256 `869f89b4a62d2d7d225a8a7ecf92831eea7abbfe8bf420f87f29b8fa0d4942ff`.
+
+### Repository and branch workflow
+
+- Repository: `mrclubbe-git/Maintenix`.
+- `main` is the source-of-truth development branch.
+- `deploy` is the frontend GitHub Pages deployment branch.
+- Frontend source lives under `Web_UI/`.
+- Active backend source lives under `Server_API/CRA/`.
+- Always inspect the exact current files and branch heads before modifying code; do not work from remembered copies.
+- Make source edits on `main` first.
+- For frontend changes, promote **only the required changed `Web_UI` files** from `main` to `deploy`, then verify the GitHub Pages workflow completes successfully.
+- Do not treat a commit on `main` as deployed frontend behavior until the matching `deploy` update and Pages run are successful.
+- Keep changes narrow. Avoid unrelated cleanup or broad refactors while implementing a requested fix.
+- Significant or risky changes should have a clear rollback point before code modification.
+
+### CRA DEV backend workflow — mandatory
+
+The backend workflow for future development is **repo-first + manual DEV installation**:
+
+1. Inspect the current `Server_API/CRA/` source in GitHub.
+2. Make the required backend changes on `main`.
+3. Run the relevant syntax/tests/checks.
+4. Provide the **exact changed backend files in the chat session** for the user to manually install on CRA DEV.
+5. The user manually copies those files to CRA DEV and restarts the existing Maintenix backend service when required.
+6. Validate the change on CRA DEV.
+7. Only after testing/acceptance may the state be considered for a future LIVE version.
+
+Do **not** assume backend changes deploy automatically. Do **not** silently replace files on CRA DEV or LIVE. Do **not** restart a backend service unless the workflow/request explicitly requires it.
+
+Current CRA DEV backend root:
+
+`/home/charl/projects/maintenix-dev-api/Server_API/CRA`
+
+### Frontend workflow — mandatory
+
+For a frontend change:
+
+1. Edit the source on `main`.
+2. Build/check the frontend as appropriate.
+3. Synchronize only the necessary `Web_UI` files to `deploy`.
+4. Verify the final `Deploy Web UI to GitHub Pages` workflow run is successful.
+5. Allow for browser/service-worker caching; reload/close/reopen the app when testing a new deployed bundle.
+6. Record durable behavior/decisions in this context file.
+
+The GitHub Pages build uses `Web_UI/scripts/build-github.js`. DEV Pages can use the configured API base and currently falls back to `https://dev-api.main-tenix.com`.
+
+### Environment boundaries
+
+- **CRA DEV is the development/acceptance environment.**
+- **LIVE is not a development environment.**
+- Never modify LIVE, copy files to LIVE, restart LIVE, or execute a LIVE migration/cutover unless the user explicitly authorizes that operation.
+- A development change made after this LIVE clone marker is **post-LIVE-clone work** until it is tested and the user explicitly accepts it as the replacement LIVE clone.
+- Never overwrite LIVE business/runtime data as a side effect of source deployment.
+
+### Runtime data and migration rules
+
+Do **not** treat `Server_API/CRA/data/` as a single replace/keep unit.
+
+Preserve LIVE-owned production/business records where present, including:
+
+- `users.json`;
+- `reports.meta.json`;
+- `uploads/` including reports, PDFs, pictures and evidence;
+- `stock.json`;
+- `standby.json`;
+- Daily Planner/notification/preferences/profile/area metadata;
+- Site Logs;
+- existing LIVE Web Push subscriptions/VAPID keys;
+- existing LIVE offline-lease keys;
+- notification delivery state;
+- existing servicing/call-out drafts, queues, payloads and status.
+
+For migration, CRA DEV contributes **only** `Server_API/CRA/data/templates/`. No other DEV runtime data is copied to LIVE.
+
+Because `data/templates/areas.txt` is runtime-mutable, stage the DEV template set and merge LIVE-only Area names into staged `areas.txt` before installing templates.
+
+Ephemeral `sessions.json` and `presence.json` are backed up then reset during the approved migration procedure. New runtime files absent on LIVE must be generated by LIVE, not copied from DEV.
+
+### Security / infrastructure rules
+
+- Never run `npm audit fix` as an automatic remediation step.
+- Do not create temporary reverse proxies, header daemons, cron jobs, or extra persistent services merely to imitate final Cloudflare behavior in DEV.
+- Final Cloudflare/infrastructure owns final `frame-ancestors 'none'`, `X-Frame-Options: DENY`, HSTS/TLS, WAF, bot controls, edge rate limiting, caching, DNS/origin hiding and final proxy routing.
+- App-side security changes are allowed when they are genuine application controls and compatible with the final infrastructure.
+- Preserve the secure cookie-session / CSRF design. Do not reintroduce browser bearer-token authentication.
+- Do not expose session cookies, CSRF secrets, VAPID private keys, offline-lease private keys, or other credentials to frontend/service-worker code.
+
+### Testing and acceptance rules
+
+- Inspect first, change narrowly, test, then deploy/promote.
+- For backend JavaScript changes, run `node --check` on changed runtime files and the relevant automated tests when available.
+- For frontend changes, verify the production build and the GitHub Pages workflow.
+- For report-generation changes, test the generated output and relevant worker/runtime path, not only syntax.
+- Preserve existing desktop/tablet behavior unless the request explicitly changes it.
+- Avoid global CSS/table changes to solve one page's mobile problem. The existing global Volt table nowrap behavior is intentional; use page-specific mobile treatment when appropriate.
+- Record durable architectural decisions, accepted behavior, rollback points and deployment results in `PROJECT_CONTEXT.md`.
+- If a change affects LIVE runtime requirements, services, workers, dependencies, persistent storage, secrets, or migration steps, update `LIVE_MIGRATION_CHECKLIST.md` in the same GitHub change.
+
+### Future LIVE-clone replacement procedure
+
+When future development is finished and the user explicitly declares a new state to be the LIVE clone:
+
+1. Confirm the exact `main` and `deploy` heads.
+2. Confirm backend/manual CRA DEV installation is complete for all backend changes.
+3. Confirm relevant testing/acceptance.
+4. Confirm the final Pages deployment is successful.
+5. Update `PROJECT_CONTEXT.md` and `LIVE_MIGRATION_CHECKLIST.md` as needed.
+6. Create new immutable dated LIVE-clone marker branches rather than moving the 2026-10-19 markers.
+7. Build a fresh migration package if LIVE deployment is required.
 
 ## 1. Repository and development workflow
 

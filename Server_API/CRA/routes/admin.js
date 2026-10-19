@@ -1,6 +1,7 @@
 const express = require("express");
 const { getUsers, saveUsers } = require("../lib/userStore");
 const { getSession, extractBearer, deleteSessionsForUser } = require("../lib/sessions");
+const { logEvent, listLogs, getLogById, summarizeLogs } = require("../lib/siteLogger");
 const sharedAreas = require("./areas");
 const {
   cleanSpaces,
@@ -291,6 +292,20 @@ router.patch("/areas/:area/metadata", requireAdmin, noStore, (req, res) => {
     const refreshed = buildAdminAreaView({ reconcile: false });
     const area = refreshed.areas.find((item) => normalizeAreaKey(item.area) === key);
 
+    logEvent({
+      level: "INFO",
+      category: "ADMIN",
+      event: "AREA_METADATA_UPDATED",
+      message: `Area metadata updated for ${existing.area}.`,
+      user: req.admin,
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      area: existing.area,
+      source: "server",
+      details: { section, baseArea, first, second }
+    });
+
     return res.json({ ok: true, metadata, area });
   } catch (error) {
     return res.status(500).json({
@@ -298,6 +313,56 @@ router.patch("/areas/:area/metadata", requireAdmin, noStore, (req, res) => {
       message: String(error?.message || "Failed to update area metadata.")
     });
   }
+});
+
+// GET /api/admin/site-logs
+router.get("/site-logs", requireAdmin, noStore, (req, res) => {
+  try {
+    const now = Date.now();
+    const hours = Math.min(24 * 90, Math.max(1, Number(req.query.hours || 24)));
+    const fromMs = req.query.from ? Date.parse(String(req.query.from)) : now - hours * 60 * 60 * 1000;
+    const toMs = req.query.to ? Date.parse(String(req.query.to)) : now;
+    const logs = listLogs({
+      fromMs: Number.isFinite(fromMs) ? fromMs : now - 24 * 60 * 60 * 1000,
+      toMs: Number.isFinite(toMs) ? toMs : now,
+      level: req.query.level,
+      category: req.query.category,
+      user: req.query.user,
+      search: req.query.search,
+      limit: req.query.limit
+    });
+    const summary = summarizeLogs(hours);
+
+    logEvent({
+      level: "INFO",
+      category: "ADMIN",
+      event: "SITE_LOGS_VIEWED",
+      message: "Site Logs viewed by administrator.",
+      user: req.admin,
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      source: "server",
+      details: {
+        level: req.query.level || "",
+        category: req.query.category || "",
+        user: req.query.user || "",
+        search: req.query.search || "",
+        hours
+      }
+    });
+
+    return res.json({ ok: true, logs, summary });
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: String(error?.message || "Failed to load Site Logs.") });
+  }
+});
+
+// GET /api/admin/site-logs/:id
+router.get("/site-logs/:id", requireAdmin, noStore, (req, res) => {
+  const record = getLogById(req.params.id);
+  if (!record) return res.status(404).json({ ok: false, message: "Log entry not found." });
+  return res.json({ ok: true, log: record });
 });
 
 // GET /api/admin/users?status=PENDING
@@ -343,6 +408,19 @@ router.post("/users/:id/approve", requireAdmin, (req, res) => {
   }
 
   saveUsers(users);
+  logEvent({
+    level: "INFO",
+    category: "ADMIN",
+    event: "USER_APPROVED",
+    message: `User approved: ${u.name || u.email || u.id}.`,
+    user: req.admin,
+    requestId: req.requestId,
+    route: req.originalUrl,
+    method: req.method,
+    entityId: u.id,
+    source: "server",
+    details: { targetUserId: u.id, targetEmail: u.email, targetRole: u.role }
+  });
   res.json({ ok: true });
 });
 
@@ -360,6 +438,19 @@ router.post("/users/:id/deny", requireAdmin, (req, res) => {
 
   saveUsers(users);
   deleteSessionsForUser(u.id);
+  logEvent({
+    level: "WARN",
+    category: "ADMIN",
+    event: "USER_DENIED",
+    message: `User denied: ${u.name || u.email || u.id}.`,
+    user: req.admin,
+    requestId: req.requestId,
+    route: req.originalUrl,
+    method: req.method,
+    entityId: u.id,
+    source: "server",
+    details: { targetUserId: u.id, targetEmail: u.email }
+  });
   res.json({ ok: true, sessionsInvalidated: true });
 });
 
@@ -385,6 +476,22 @@ router.patch("/users/:id/role", requireAdmin, (req, res) => {
   saveUsers(users);
   if (previousRole !== nextRole) deleteSessionsForUser(u.id);
 
+  if (previousRole !== nextRole) {
+    logEvent({
+      level: "INFO",
+      category: "ADMIN",
+      event: "USER_ROLE_CHANGED",
+      message: `User role changed from ${previousRole || "UNKNOWN"} to ${nextRole}.`,
+      user: req.admin,
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      entityId: u.id,
+      source: "server",
+      details: { targetUserId: u.id, targetEmail: u.email, previousRole, nextRole }
+    });
+  }
+
   res.json({
     ok: true,
     user: {
@@ -409,9 +516,24 @@ router.delete("/users/:id", requireAdmin, (req, res) => {
   const exists = users.some((u) => String(u.id) === id);
   if (!exists) return res.status(404).json({ ok: false, message: "User not found." });
 
+  const removed = users.find((u) => String(u.id) === id);
   deleteSessionsForUser(id);
   const updated = users.filter((u) => String(u.id) !== id);
   saveUsers(updated);
+
+  logEvent({
+    level: "WARN",
+    category: "ADMIN",
+    event: "USER_REMOVED",
+    message: `User removed: ${removed?.name || removed?.email || id}.`,
+    user: req.admin,
+    requestId: req.requestId,
+    route: req.originalUrl,
+    method: req.method,
+    entityId: id,
+    source: "server",
+    details: { targetUserId: id, targetEmail: removed?.email || "" }
+  });
 
   res.json({ ok: true, sessionsInvalidated: true });
 });

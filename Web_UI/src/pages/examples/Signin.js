@@ -29,7 +29,7 @@ export default function Signin() {
     let mounted = true;
     const controller = new AbortController();
 
-    async function useOfflineLeaseIfValid() {
+    async function acceptOfflineLeaseIfValid() {
       const offline = await verifyStoredOfflineLease();
       if (!offline?.valid || !offline?.user) return false;
       orgLocalStorage.setItem("authExpiresAt", String(offline.expiresAt));
@@ -40,13 +40,13 @@ export default function Signin() {
 
     async function verifyExistingSession() {
       if (isOrgAuthExpired()) {
-        if (await useOfflineLeaseIfValid()) return;
+        if (await acceptOfflineLeaseIfValid()) return;
         clearStoredAuth();
         return;
       }
 
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        await useOfflineLeaseIfValid();
+        await acceptOfflineLeaseIfValid();
         return;
       }
 
@@ -74,7 +74,7 @@ export default function Signin() {
         }
       } catch (e) {
         if (e?.name === "AbortError") return;
-        await useOfflineLeaseIfValid();
+        await acceptOfflineLeaseIfValid();
       }
     }
 

@@ -185,6 +185,7 @@ Important runtime files include, but are not limited to:
 - `offline-lease-private.pem`
 - `offline-lease-public.pem`
 - `notification-delivery.json`
+- `site-logs/` daily NDJSON runtime logs
 - `area-metadata.json`
 - drafts
 - queue/status data
@@ -206,6 +207,7 @@ Specific rules:
 - Preserve LIVE `data/area-metadata.json`; it contains organisation-specific Admin overrides and pending metadata for dynamically added Areas.
 - Do not replace LIVE `area-metadata.json` with DEV runtime data during deployment.
 - Preserve LIVE uploads and generated reports unless an explicit data-migration plan says otherwise.
+- Do not copy DEV Site Logs into LIVE. LIVE Site Logs are runtime operational/audit data and must remain separate from DEV.
 - Source-controlled templates/configuration may be deployed from GitHub, but verify whether a file is runtime-mutated before replacing it.
 
 ---
@@ -356,6 +358,10 @@ Then verify the public LIVE health endpoint through the actual LIVE reverse prox
 Do not consider the migration complete until all applicable checks pass:
 
 - [ ] Authentication/login works.
+- [ ] Administration -> Site Logs is ADMIN-only and loads recent activity/error records.
+- [ ] Site Logs records show request IDs for correlated API failures.
+- [ ] Client error ingestion is authenticated/CSRF-protected and does not expose passwords, tokens, cookies, signatures or private keys.
+- [ ] Site Logs runtime retention/storage permissions work without a separate service or cron job.
 - [ ] 48-hour renewable session/inactivity window works while connected.
 - [ ] A signed 48-hour offline lease is issued after successful online validation.
 - [ ] Offline access is denied after lease expiry until successful online validation/sign-in.

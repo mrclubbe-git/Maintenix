@@ -2294,3 +2294,32 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - The successful GitHub Pages deployment for the final frontend state is workflow run `39270366042`, with final deploy head `2642634614d8a1c47915c13f9eb2b54d4eb7051d`.
 - CRA DEV remains the development environment for subsequent work. Any later change intended to replace this migration baseline must again be tested and explicitly accepted.
 - This declaration approves the **version/state to be used as the migration baseline**; it does not by itself instruct execution of the LIVE cutover or authorize unrelated LIVE changes.
+
+
+## Native push Mark-as-read / Acknowledge actions — 2026-10-19
+
+- Post-migration-baseline DEV enhancement requested after the accepted migration-approved state; this does **not** replace that accepted baseline unless explicitly accepted after testing.
+- Clear rollback points were created **before any code change**:
+  - main rollback branch: `rollback/device-notification-actions-pre-change-main-20261019` -> `0be1f5ae2a5670f8b4f5a042b2380bca91e46940`;
+  - deploy rollback branch: `rollback/device-notification-actions-pre-change-deploy-20261019` -> `2642634614d8a1c47915c13f9eb2b54d4eb7051d`.
+- Native Web Push notifications now request application action buttons when a real Maintenix notification ID is present:
+  - notifications requiring acknowledgement: **Acknowledge** + **Open**;
+  - ordinary notifications: **Mark as read** + **Open**.
+- Browser/OS-owned controls such as **Unsubscribe** are not controlled by Maintenix and may still be shown by the device/browser.
+- Security design:
+  - the service worker does **not** receive or store session cookies, bearer credentials, or CSRF tokens;
+  - the worker only passes the notification ID and requested action back to the Maintenix browser application;
+  - the application then calls the existing authenticated, CSRF-protected endpoints:
+    - `POST /api/notifications/:id/read`;
+    - `POST /api/notifications/:id/ack`.
+- When Maintenix is already open, the service worker posts a `maintenix-notification-action` message to the controlled client and focuses it.
+- When Maintenix is closed, the service worker opens the app with short-lived query markers (`mtxNotificationAction`, `mtxNotificationId`); the app processes the action through the normal API path and removes the markers after completion.
+- If the secure application session has expired, the pending marker remains until a successful sign-in/auth refresh allows the action to be retried.
+- Acknowledgement preserves existing server semantics: it also marks the notification read and continues existing related-entity handling such as Daily Planner acknowledgement.
+- Source commits on main:
+  - `78b481f9568df5a4480d975892895904a696d708` — browser bridge for native notification actions;
+  - `2315fa40e961c1153cec7ed54b5b05006733abd5` — service-worker action buttons and click handoff;
+  - `5212d69c17eaf3be2b84882019729b236b67ca94` — start the native action bridge.
+- Matching frontend files were promoted to deploy; current deploy head for this enhancement is `8ef05c88f0d263a3bbf9161244f94aa667c1a966`.
+- GitHub Pages workflow run `39281337899` was created for the final deploy head. At the time this context entry was written GitHub Actions still reported it as queued; deployment must not be claimed successful until the run completes successfully.
+- No backend/API contract, runtime data, or LIVE/production changes were made.

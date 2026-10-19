@@ -320,7 +320,7 @@ Normal non-secret preferences may still exist.
 
 **Expected**
 
-The existing valid server session may continue until its absolute expiry. Closing/reopening the browser must not create a new session silently.
+The existing valid server session may continue within its 48-hour validated-activity window. Closing/reopening the browser must not manufacture a new session without the existing Secure/HttpOnly cookie or a valid signed offline lease.
 
 ## AUTH-05 — Logout invalidates the active session
 
@@ -353,19 +353,51 @@ Before logout:
 - Browser B remains valid;
 - logout is not an unintended "log out all devices" action.
 
-## AUTH-07 — Absolute session lifetime
+## AUTH-07 — 48-hour validated-activity session window
 
-The application policy is an approximately **8-hour absolute server session**.
-
-The tester does not need to keep a browser open for eight hours unless the test schedule permits it.
+The application policy is a **48-hour renewable session/inactivity window** coordinated with the signed offline lease.
 
 At minimum:
 
-- record the `expiresAt` value returned by authentication/session state;
-- confirm it is approximately eight hours after creation;
-- confirm activity does not obviously replace it with a fresh eight-hour expiry after every request.
+- record the `expiresAt` value after login and confirm it is approximately 48 hours ahead;
+- allow automatic sync/profile validation to run while connected and confirm the cookie/session expiry moves forward;
+- confirm ordinary client-side timestamp edits alone cannot create a valid offline session;
+- confirm a device that cannot successfully validate online for 48 hours can no longer continue protected offline workflows.
 
-If a full-duration test is performed, access after absolute expiry must require a fresh login.
+If a full-duration test is performed, an expired offline lease must require successful online validation/sign-in before protected operational work can continue.
+
+## AUTH-07A — Signed offline lease
+
+1. Sign in online.
+2. Confirm the authentication/profile response includes an `offlineLease` object with an expiry about 48 hours ahead.
+3. Load Servicing, Call Out and (as ADMIN) Section Reports once while online.
+4. Disconnect the device/network.
+5. Refresh/reopen Maintenix from the installed/cached application shell.
+6. Confirm the same user can enter only while the stored lease verifies successfully.
+7. Tamper with the stored token payload or signature in a disposable test browser profile.
+
+**Expected**
+
+- untampered lease permits the synchronized offline workflows until expiry;
+- tampered/expired lease is rejected;
+- the offline lease is never accepted as an API bearer credential;
+- logout or a later server-side 401/403 does not silently fall back to an invalid local lease.
+
+## AUTH-07B — Automatic reconnect synchronization
+
+1. While offline, create a Servicing or Call Out draft locally.
+2. For ADMIN, create or edit a Section Report draft locally.
+3. Restore connectivity without manually pressing a sync button.
+4. Keep Maintenix open or refocus the tab.
+
+**Expected**
+
+- automatic sync validates the server session;
+- Areas/Servicing reference data refresh;
+- ADMIN Section Report inventory refreshes;
+- pending local drafts synchronize to their server draft folders;
+- the successful sync renews the local 48-hour lease;
+- server-only actions such as report generation remain blocked until connectivity is actually usable.
 
 ## AUTH-08 — Password change revokes prior session
 
@@ -992,7 +1024,7 @@ The tester should verify:
 - no required script is blocked;
 - API requests still work;
 - images and signatures still render;
-- service worker/push behaviour still works where supported;
+- the single Maintenix service worker still supports Web Push and the offline application shell where supported;
 - there are no unexpected CSP console violations that break a legitimate feature.
 
 The tester should **not** expect `frame-ancestors` inside this meta policy because browsers require that directive to be delivered as an HTTP response header.

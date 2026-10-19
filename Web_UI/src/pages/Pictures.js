@@ -428,24 +428,71 @@ export default function Pictures() {
           {viewMode === "grid" ? (
             <Row>{rows.map(renderCard)}</Row>
           ) : (
-            <div className="table-responsive">
-              <table className="table table-centered table-nowrap mb-0 rounded">
-                <thead className="thead-light"><tr><th>Picture</th><th>Report</th><th>Section</th><th>Area</th><th>Captured</th><th className="text-end">Actions</th></tr></thead>
-                <tbody>
-                  {rows.map((r, idx) => {
-                    const key = itemKey(r);
-                    return <tr key={key}>
-                      <td><AuthImage src={r.photo.previewUrl || r.photo.url} alt="" authHeaders={authHeaders} loading="lazy" style={{ width: 96, height: 72, objectFit: "cover", borderRadius: 6, cursor: "pointer" }} onClick={() => setPreviewIndex(idx)} /></td>
-                      <td><div className="fw-bold">{r.reportName || r.reportId}</div><div className="small text-muted">{r.photo.filename}</div></td>
-                      <td>{r.section || "—"}<div className="small text-muted">{r.reportMonth || ""}</div></td>
-                      <td>{r.area || "—"}<div className="small text-muted">{r.technician || ""}</div></td>
-                      <td className="text-muted">{formatDate(r.photo.updatedAt)}</td>
-                      <td className="text-end"><Button size="sm" variant="outline-secondary" className="me-2" onClick={() => setPreviewIndex(idx)}>View</Button>{canDL ? <Button size="sm" variant="outline-primary" className="me-2" onClick={() => downloadPhoto(r)}>Download</Button> : null}{isAdmin ? <Button size="sm" variant="outline-danger" onClick={() => deletePhoto(r)}>Delete</Button> : null}</td>
-                    </tr>;
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="table-responsive d-none d-md-block">
+                <table className="table table-centered table-nowrap mb-0 rounded">
+                  <thead className="thead-light"><tr><th>Picture</th><th>Report</th><th>Section</th><th>Area</th><th>Captured</th><th className="text-end">Actions</th></tr></thead>
+                  <tbody>
+                    {rows.map((r, idx) => {
+                      const key = itemKey(r);
+                      return <tr key={key}>
+                        <td><AuthImage src={r.photo.previewUrl || r.photo.url} alt="" authHeaders={authHeaders} loading="lazy" style={{ width: 96, height: 72, objectFit: "cover", borderRadius: 6, cursor: "pointer" }} onClick={() => setPreviewIndex(idx)} /></td>
+                        <td><div className="fw-bold">{r.reportName || r.reportId}</div><div className="small text-muted">{r.photo.filename}</div></td>
+                        <td>{r.section || "—"}<div className="small text-muted">{r.reportMonth || ""}</div></td>
+                        <td>{r.area || "—"}<div className="small text-muted">{r.technician || ""}</div></td>
+                        <td className="text-muted">{formatDate(r.photo.updatedAt)}</td>
+                        <td className="text-end"><Button size="sm" variant="outline-secondary" className="me-2" onClick={() => setPreviewIndex(idx)}>View</Button>{canDL ? <Button size="sm" variant="outline-primary" className="me-2" onClick={() => downloadPhoto(r)}>Download</Button> : null}{isAdmin ? <Button size="sm" variant="outline-danger" onClick={() => deletePhoto(r)}>Delete</Button> : null}</td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="d-md-none">
+                {rows.map((r, idx) => {
+                  const key = itemKey(r);
+                  const busy = busyId === key;
+                  return (
+                    <Card key={key} border="light" className="shadow-sm mb-3">
+                      <Card.Body className="p-3">
+                        <div className="d-flex align-items-start" style={{ gap: 12 }}>
+                          <div style={{ flex: "0 0 96px" }}>
+                            <AuthImage
+                              src={r.photo.previewUrl || r.photo.url}
+                              alt={r.photo.filename}
+                              authHeaders={authHeaders}
+                              loading="lazy"
+                              style={{ width: 96, height: 72, objectFit: "cover", borderRadius: 6, cursor: "pointer" }}
+                              onClick={() => setPreviewIndex(idx)}
+                            />
+                          </div>
+                          <div className="mobile-min-width-0" style={{ flex: "1 1 auto" }}>
+                            <div className="fw-bold mobile-break-anywhere">{r.reportName || r.reportId}</div>
+                            <div className="small text-muted mobile-break-anywhere">{r.photo.filename}</div>
+                            <div className="d-flex flex-wrap mt-2" style={{ gap: 6 }}>
+                              {r.section ? <Badge bg="secondary">{r.section}</Badge> : null}
+                              {r.reportMonth ? <Badge bg="info">{r.reportMonth}</Badge> : null}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="small mt-3">
+                          <div className="mobile-break-anywhere"><strong>Area:</strong> {r.area || "—"}</div>
+                          <div className="mobile-break-anywhere"><strong>Technician:</strong> {r.technician || "—"}</div>
+                          <div className="text-muted mt-1"><strong>Captured:</strong> {formatDate(r.photo.updatedAt)}</div>
+                        </div>
+
+                        <div className="d-flex flex-wrap mt-3" style={{ gap: 8 }}>
+                          <Button size="sm" variant="outline-secondary" onClick={() => setPreviewIndex(idx)}>View</Button>
+                          {canDL ? <Button size="sm" variant="outline-primary" onClick={() => downloadPhoto(r)}>Download</Button> : null}
+                          {isAdmin ? <Button size="sm" variant="outline-danger" disabled={busy} onClick={() => deletePhoto(r)}>{busy ? "..." : "Delete"}</Button> : null}
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           {!loading && rows.length === 0 ? <div className="text-center text-muted py-4">No pictures found for this filter selection.</div> : null}

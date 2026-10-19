@@ -2165,3 +2165,18 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Deploy commit: `0e9bb5394c8bf54165e77f920e6948f409df19c0`.
 - GitHub Pages run `39251414298` completed successfully.
 - No backend or LIVE change was required.
+
+
+## Site Logs offline transition noise suppression — 2026-10-19
+
+- User noticed repeated API/presence network-error log entries while a device remained offline and requested one offline event followed by one online event only.
+- Frontend Site Logs now treats browser connectivity as a state transition:
+  - first transition to offline -> one `CONNECTIVITY_LOST` WARN;
+  - repeated API/presence network failures while `navigator.onLine === false` are suppressed;
+  - first transition back online -> queued offline log is flushed, then one `CONNECTIVITY_RESTORED` INFO is recorded;
+  - duplicate offline/online browser events while already in the same state are ignored.
+- API network failures while the browser still reports online remain eligible for deduplicated logging, preserving diagnostics for API/tunnel outages that are not true device-offline events.
+- Main commits: `1241ff0176e2993e004a4e5f0c44c4f13ebd87b5` and `4d5139c6dd00fea360ddbb4d6ce0da4a1819113a`.
+- Final deploy head: `1edd1cd5e7c6796415ec36207d26981cc5e1b170`.
+- GitHub Pages run `39252811946` completed successfully.
+- No backend or LIVE change was required.

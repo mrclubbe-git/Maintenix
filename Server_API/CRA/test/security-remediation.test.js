@@ -51,7 +51,12 @@ test("session and offline lease ceilings are 48 hours", () => {
   assert.equal(payload?.organization, "CRA");
   assert.equal(payload?.role, "L1");
 
-  const tampered = lease.token.slice(0, -1) + (lease.token.endsWith("A") ? "B" : "A");
+  const tokenParts = lease.token.split(".");
+  const signature = tokenParts[2];
+  const tamperAt = Math.max(0, Math.floor(signature.length / 2));
+  const replacement = signature[tamperAt] === "A" ? "B" : "A";
+  tokenParts[2] = signature.slice(0, tamperAt) + replacement + signature.slice(tamperAt + 1);
+  const tampered = tokenParts.join(".");
   assert.equal(verifyOfflineLeaseToken(tampered), null);
 });
 

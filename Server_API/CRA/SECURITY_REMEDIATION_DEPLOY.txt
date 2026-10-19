@@ -112,3 +112,41 @@ Outstanding Section Report boundary repair — 2026-10-18
   3. 121/161 must continue to return HTTP 400;
   4. failed/rejected cases must not publish completed reports;
   5. if all repair gates pass, proceed with the previously deferred narrow smoke regression.
+
+
+48-hour offline/session update — 2026-10-19
+- CRA server session policy is now a 48-hour inactivity/validation window.
+- Successful authenticated profile/auth validation refreshes the Secure HttpOnly
+  session cookie for another 48 hours. Automatic frontend synchronization performs
+  this validation while connectivity is available.
+- The API now issues a signed RS256 offline lease valid for 48 hours. The lease is
+  for local browser workflow authorization only; it is never accepted as an API
+  credential and does not bypass cookie session, CSRF, role/status or ownership checks.
+- Runtime signing keys are generated on first use at:
+    data/offline-lease-private.pem
+    data/offline-lease-public.pem
+  unless OFFLINE_LEASE_PRIVATE_KEY_FILE / OFFLINE_LEASE_PUBLIC_KEY_FILE override them.
+- The API service account must be able to create/write the configured key directory.
+- Do not commit or copy the DEV signing keypair into LIVE. LIVE must use its own pair.
+- Preserve a LIVE pair after leases have been issued so ordinary redeployments do not
+  invalidate still-valid local leases.
+- New backend source file required:
+    Server_API/CRA/lib/offlineLease.js
+- Matching modified backend files:
+    Server_API/CRA/lib/sessions.js
+    Server_API/CRA/lib/profileRoutes.js
+    Server_API/CRA/routes/auth.js
+- Matching frontend is already designed to verify the local lease and synchronize
+  reference data/drafts automatically. Backend and frontend must be treated as a
+  coordinated release for offline acceptance.
+
+Targeted DEV validation after install/restart:
+1. Login online and confirm Secure/HttpOnly cookie plus a 48-hour expiresAt.
+2. Confirm /api/profile/me returns offlineLease with a ~48-hour expiresAt.
+3. Stay online and confirm a later profile/automatic sync renews the session/lease window.
+4. Load Servicing, Call Out and (ADMIN) Section Reports online once.
+5. Disconnect network and confirm those workflows can start from synchronized local data.
+6. Save a local draft offline, reconnect, and confirm automatic server sync.
+7. Confirm Add Area and final report generation remain blocked offline.
+8. Confirm an expired/tampered local lease cannot authorize offline protected routes.
+9. Confirm logout/account/password/role lifecycle controls still revoke server sessions.

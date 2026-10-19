@@ -94,6 +94,7 @@
   if (typeof window.fetch === "function") {
     var nativeFetch = window.fetch.bind(window);
     var csrfRefreshPromise = null;
+    var apiErrorSeen = {};
 
     function requestPath(url) {
       try { return new URL(url, window.location.href).pathname; }
@@ -130,13 +131,42 @@
       return csrfRefreshPromise;
     }
 
-    function finishResponse(response, path) {
+    function dispatchApiError(detail) {
+      try {
+        var path = String(detail && detail.path || "");
+        if (path.indexOf("/api/site-logs/") >= 0) return;
+
+        var key = [
+          String(detail && detail.method || "GET"),
+          path,
+          String(detail && detail.status || 0),
+          detail && detail.networkError ? "network" : "http"
+        ].join("|");
+        var now = Date.now();
+        if (apiErrorSeen[key] && now - apiErrorSeen[key] < 60000) return;
+        apiErrorSeen[key] = now;
+
+        window.dispatchEvent(new CustomEvent("maintenix:api-error", { detail: detail || {} }));
+      } catch (e) {}
+    }
+
+    function finishResponse(response, path, method) {
       if (
         response.status === 401 &&
         path.indexOf("/api/auth/login") < 0 &&
         path.indexOf("/api/auth/register") < 0
       ) {
         try { window.dispatchEvent(new Event("maintenixSessionInvalid")); } catch (e) {}
+      }
+
+      if (response.status >= 400) {
+        dispatchApiError({
+          path: path,
+          method: method || "GET",
+          status: response.status,
+          requestId: response.headers.get("X-Request-Id") || "",
+          networkError: false
+        });
       }
       return response;
     }
@@ -152,6 +182,8 @@
       var path = requestPath(url);
       var options = secureApiOptions(url, init);
 
+      var method = String(options.method || "GET").toUpperCase();
+
       return nativeFetch(url || input, options).then(function (response) {
         var csrfEligible =
           response.status === 403 &&
@@ -159,16 +191,26 @@
           path.indexOf("/api/auth/login") < 0 &&
           path.indexOf("/api/auth/register") < 0;
 
-        if (!csrfEligible) return finishResponse(response, path);
+        if (!csrfEligible) return finishResponse(response, path, method);
 
         return refreshCsrfToken().then(function (nextToken) {
-          if (!nextToken) return finishResponse(response, path);
+          if (!nextToken) return finishResponse(response, path, method);
           var retryOptions = secureApiOptions(url, init);
           retryOptions.headers.set("X-CSRF-Token", nextToken);
           return nativeFetch(url || input, retryOptions).then(function (retryResponse) {
-            return finishResponse(retryResponse, path);
+            return finishResponse(retryResponse, path, method);
           });
         });
+      }).catch(function (error) {
+        dispatchApiError({
+          path: path,
+          method: method,
+          status: 0,
+          requestId: "",
+          networkError: true,
+          error: String(error && error.message || error || "Network error")
+        });
+        throw error;
       });
     };
   }

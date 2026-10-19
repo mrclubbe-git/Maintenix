@@ -319,7 +319,7 @@ router.patch("/areas/:area/metadata", requireAdmin, noStore, (req, res) => {
 router.get("/site-logs", requireAdmin, noStore, (req, res) => {
   try {
     const now = Date.now();
-    const hours = Math.min(24 * 30, Math.max(1, Number(req.query.hours || 24)));
+    const hours = Math.min(24 * 60, Math.max(1, Number(req.query.hours || 24)));
     const fromMs = req.query.from ? Date.parse(String(req.query.from)) : now - hours * 60 * 60 * 1000;
     const toMs = req.query.to ? Date.parse(String(req.query.to)) : now;
     const logs = listLogs({

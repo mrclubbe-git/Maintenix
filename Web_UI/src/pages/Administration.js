@@ -143,6 +143,9 @@ export default function Administration() {
   });
   const [loadingSiteLogs, setLoadingSiteLogs] = useState(false);
   const [siteLogError, setSiteLogError] = useState("");
+  const [siteLogMessage, setSiteLogMessage] = useState("");
+  const [clearingSiteLogs, setClearingSiteLogs] = useState(false);
+  const [showClearSiteLogs, setShowClearSiteLogs] = useState(false);
   const [siteLogSearch, setSiteLogSearch] = useState("");
   const [siteLogLevel, setSiteLogLevel] = useState("");
   const [siteLogCategory, setSiteLogCategory] = useState("");
@@ -270,6 +273,27 @@ export default function Administration() {
       setLoadingSystem(false);
     }
   }, [isAdmin]);
+
+  async function clearAllSiteLogs() {
+    if (!isAdmin || clearingSiteLogs) return;
+
+    setClearingSiteLogs(true);
+    setSiteLogError("");
+    setSiteLogMessage("");
+
+    try {
+      const data = await apiRequest("/api/admin/site-logs", { method: "DELETE" });
+      setShowClearSiteLogs(false);
+      setSiteLogMessage(
+        `Site Logs cleared. ${Number(data?.deletedEntries || 0)} entr${Number(data?.deletedEntries || 0) === 1 ? "y" : "ies"} removed.`
+      );
+      await loadSiteLogs();
+    } catch (error) {
+      setSiteLogError(String(error?.message || "Unable to clear Site Logs."));
+    } finally {
+      setClearingSiteLogs(false);
+    }
+  }
 
   const loadSiteLogs = useCallback(async () => {
     if (!isAdmin) return;
@@ -1033,6 +1057,7 @@ export default function Administration() {
       {activeTab === "site-logs" ? (
         <>
           {siteLogError ? <Alert variant="danger">{siteLogError}</Alert> : null}
+          {siteLogMessage ? <Alert variant="success">{siteLogMessage}</Alert> : null}
 
           <Row className="g-3 mb-4">
             <Col xs={12} sm={6} xl={3}>
@@ -1070,9 +1095,20 @@ export default function Administration() {
                     User activity, browser errors, API failures and security-relevant events. Sensitive credentials and payload contents are not recorded.
                   </div>
                 </div>
-                <Button type="button" variant="outline-primary" size="sm" onClick={loadSiteLogs} disabled={loadingSiteLogs}>
-                  {loadingSiteLogs ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Apply / refresh"}
-                </Button>
+                <div className="d-flex flex-wrap" style={{ gap: 8 }}>
+                  <Button
+                    type="button"
+                    variant="outline-danger"
+                    size="sm"
+                    onClick={() => setShowClearSiteLogs(true)}
+                    disabled={loadingSiteLogs || clearingSiteLogs}
+                  >
+                    Clear all
+                  </Button>
+                  <Button type="button" variant="outline-primary" size="sm" onClick={loadSiteLogs} disabled={loadingSiteLogs || clearingSiteLogs}>
+                    {loadingSiteLogs ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Apply / refresh"}
+                  </Button>
+                </div>
               </div>
             </Card.Header>
 
@@ -1125,7 +1161,7 @@ export default function Administration() {
                       <option value="24">Last 24 hours</option>
                       <option value="168">Last 7 days</option>
                       <option value="720">Last 30 days</option>
-                      <option value="2160">Last 90 days</option>
+                      <option value="1440">Last 60 days</option>
                     </Form.Select>
                   </Form.Group>
                 </Col>
@@ -1279,6 +1315,44 @@ export default function Administration() {
           </Card>
         </>
       ) : null}
+
+      <Modal
+        show={showClearSiteLogs}
+        onHide={() => {
+          if (!clearingSiteLogs) setShowClearSiteLogs(false);
+        }}
+        centered
+      >
+        <Modal.Header closeButton={!clearingSiteLogs}>
+          <Modal.Title>Clear all Site Logs</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="warning">
+            This permanently deletes all current Site Log history from the CRA DEV runtime.
+          </Alert>
+          <p className="mb-0">
+            A new audit entry will be created after the clear to record which administrator performed this action.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setShowClearSiteLogs(false)}
+            disabled={clearingSiteLogs}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={clearAllSiteLogs}
+            disabled={clearingSiteLogs}
+          >
+            {clearingSiteLogs ? <><Spinner size="sm" className="me-2" /> Clearing…</> : "Clear all logs"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal
         show={Boolean(selectedSiteLog)}

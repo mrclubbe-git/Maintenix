@@ -16,6 +16,7 @@ function clearStoredAuth() {
 export default function Signin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -192,7 +193,7 @@ export default function Signin() {
                       <Form.Control
                         ref={passwordRef}
                         required
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         name="password"
                         autoComplete="current-password"
                         placeholder="Password"
@@ -201,6 +202,15 @@ export default function Signin() {
                         disabled={loading}
                       />
                     </InputGroup>
+                    <Form.Check
+                      id="signin-show-password"
+                      className="mt-2"
+                      type="checkbox"
+                      label="Show password"
+                      checked={showPassword}
+                      onChange={(e) => setShowPassword(e.target.checked)}
+                      disabled={loading}
+                    />
                   </Form.Group>
 
                   <div className="d-flex justify-content-end mb-4">

@@ -130,20 +130,68 @@ self.addEventListener("push", (event) => {
   }
 
   const title = String(payload?.title || "Maintenix");
+  const data = payload?.data && typeof payload.data === "object" ? payload.data : {};
+  const notificationId = String(data?.notificationId || "").trim();
+  const requiresAck = data?.requiresAck === true;
+
   const options = {
     body: String(payload?.body || ""),
     icon: payload?.icon || "./android-chrome-192x192.png",
     badge: payload?.badge || "./android-chrome-192x192.png",
     tag: payload?.tag || undefined,
     renotify: false,
-    data: payload?.data && typeof payload.data === "object" ? payload.data : {}
+    data
   };
+
+  // Notification action buttons are advisory: platforms that support Web
+  // Notification actions show them; platforms that do not simply ignore them.
+  // Browser/OS-owned controls such as "Unsubscribe" cannot be removed here.
+  if (notificationId && data?.test !== true) {
+    options.actions = [
+      {
+        action: requiresAck ? "acknowledge" : "mark-read",
+        title: requiresAck ? "Acknowledge" : "Mark as read"
+      },
+      {
+        action: "open",
+        title: "Open"
+      }
+    ];
+  }
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+async function focusOrOpenNotificationAction(action, notificationId) {
+  const message = {
+    type: "maintenix-notification-action",
+    action,
+    notificationId
+  };
+
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of windows) {
+    if (!client.url.startsWith(self.registration.scope)) continue;
+    try { client.postMessage(message); } catch {}
+    try { return await client.focus(); } catch { return client; }
+  }
+
+  const launchUrl = new URL("./", self.registration.scope);
+  launchUrl.searchParams.set("mtxNotificationAction", action);
+  launchUrl.searchParams.set("mtxNotificationId", notificationId);
+  return self.clients.openWindow(launchUrl.href);
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  const action = String(event.action || "");
+  const notificationId = String(event.notification?.data?.notificationId || "").trim();
+
+  if ((action === "mark-read" || action === "acknowledge") && notificationId) {
+    event.waitUntil(focusOrOpenNotificationAction(action, notificationId));
+    return;
+  }
 
   const rawUrl = String(event.notification?.data?.url || "./");
   const targetUrl = new URL(rawUrl, self.registration.scope).href;

@@ -35,6 +35,7 @@ jobs:
             "Server_API/CRA/formal-reporting/test_text_validation.py"
             "Server_API/CRA/index.js"
             "Server_API/CRA/lib/imageValidation.js"
+            "Server_API/CRA/lib/offlineLease.js"
             "Server_API/CRA/lib/profileRoutes.js"
             "Server_API/CRA/lib/profilePhotoStorage.js"
             "Server_API/CRA/lib/requestSecurity.js"

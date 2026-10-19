@@ -188,9 +188,9 @@ jobs:
           Copy the packaged backend source:
 
           ```bash
-          rsync -a --delete \\
-            --exclude 'data/' \\
-            /path/to/unpacked/Maintenix_Current_Site_Migration_2026-10-19_v2/Server_API/CRA/ \\
+          rsync -a --delete \
+            --exclude 'data/' \
+            /path/to/unpacked/Maintenix_Current_Site_Migration_2026-10-19_v2/Server_API/CRA/ \
             "$LIVE_CRA/"
           ```
 
@@ -252,8 +252,8 @@ jobs:
           TEMPLATE_STAGE="/tmp/maintenix-templates-$TS"
           mkdir -p "$TEMPLATE_STAGE"
 
-          rsync -a --delete \\
-            /home/charl/projects/maintenix-dev-api/Server_API/CRA/data/templates/ \\
+          rsync -a --delete \
+            /home/charl/projects/maintenix-dev-api/Server_API/CRA/data/templates/ \
             "$TEMPLATE_STAGE/"
           ```
 
@@ -291,7 +291,7 @@ jobs:
                   seen.add(key)
                   merged.append(value)
 
-          stage_path.write_text("\\n".join(merged) + "\\n", encoding="utf-8")
+          stage_path.write_text("\n".join(merged) + "\n", encoding="utf-8")
           print(f"Merged {len(merged)} unique Areas.")
           PY
           ```

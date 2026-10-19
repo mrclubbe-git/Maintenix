@@ -66,6 +66,13 @@ test("Site Logs filters and summarizes recent records", () => {
     message: "Synthetic offline event.",
     user: { id: "u_b", name: "Beta", email: "beta@example.test", role: "L2" }
   });
+  logEvent({
+    level: "ERROR",
+    category: "API",
+    event: "API_SERVER_ERROR",
+    message: "Synthetic server error.",
+    user: { id: "u_a", name: "Alpha", email: "alpha@example.test", role: "L1" }
+  });
 
   const auth = listLogs({ level: "INFO", category: "AUTH", search: "synthetic", limit: 20 });
   assert.ok(auth.some((entry) => entry.event === "LOGIN_SUCCEEDED"));

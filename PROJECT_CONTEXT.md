@@ -2143,3 +2143,14 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - CRA DEV now shows the **Clear all** Site Logs control and offers history periods up to **60 days**.
 - Backend source/package for the matching 60-day retention + DELETE endpoint remains the package `cra-site-logs-clear60-backend-2026-10-19.zip`; do not claim that corrected backend package was installed unless the user explicitly confirms it.
 - No LIVE/production change was made.
+
+
+## Site Logs 60-day backend install confirmed — 2026-10-19
+
+- User confirmed the corrected 60-day Site Logs backend package was manually installed on CRA DEV and the existing API service was restarted.
+- The matching CRA DEV frontend had already been deployed at commit `d6a4a2c879c20c0a51c6b47fb8306932a162fc1c`.
+- CRA DEV is now aligned for focused acceptance of:
+  - 60-day automatic Site Logs retention;
+  - ADMIN manual `Clear all`;
+  - fresh `SITE_LOGS_CLEARED` audit marker after a clear.
+- No LIVE/production change was made.

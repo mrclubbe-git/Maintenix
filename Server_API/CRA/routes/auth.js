@@ -3,6 +3,7 @@ const crypto = require("crypto");
 
 const { getUsers, saveUsers, findByEmail } = require("../lib/userStore");
 const { hashPassword, verifyPassword } = require("../lib/passwords");
+const { issueOfflineLease } = require("../lib/offlineLease");
 const {
   createSession,
   getSession,
@@ -188,7 +189,8 @@ router.post("/login", (req, res) => {
       ok: true,
       expiresAt,
       csrfToken: session?.csrfToken || "",
-      user: publicUser(user)
+      user: publicUser(user),
+      offlineLease: issueOfflineLease(user, { organization })
     });
   } catch {
     return res.status(500).json({ ok: false, message: "Login failed." });
@@ -222,7 +224,8 @@ router.get("/me", (req, res) => {
     ok: true,
     user: publicUser(auth.user),
     expiresAt: getSessionExpiresAt(auth.token),
-    csrfToken: auth.session.csrfToken
+    csrfToken: auth.session.csrfToken,
+    offlineLease: issueOfflineLease(auth.user, { organization: auth.session.organization })
   });
 });
 

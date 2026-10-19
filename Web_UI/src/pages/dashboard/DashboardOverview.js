@@ -295,7 +295,7 @@ export default function DashboardOverview() {
 
     const intervalId = setInterval(() => {
       if (typeof navigator === "undefined" || navigator.onLine !== false) loadMonthlyTracker();
-    }, 60_000);
+    }, 5 * 60_000);
 
     const refresh = () => loadMonthlyTracker();
     window.addEventListener("online", refresh);

@@ -1998,7 +1998,8 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
   - validates the current server session;
   - refreshes Areas, Servicing services, Substation/Conveyor checklists and (ADMIN only) Section Report inventory;
   - writes those reference datasets to the existing organisation-scoped IndexedDB stores;
-  - pushes pending Servicing, Call Out and (ADMIN only) Section Report draft changes;
+  - synchronizes drafts bidirectionally: pushes pending Servicing, Call Out and (ADMIN only) Section Report changes, pulls new/changed server drafts down for offline use, and removes locally synced copies when the authoritative server draft has been deleted elsewhere;
+  - pending local drafts always win over server summaries until they synchronize successfully;
   - only a successful authenticated reference-data refresh renews the locally stored offline lease/sync timestamp.
 - Servicing offline workflow:
   - Pre-Start, Checklist, Review, evidence/signature and local draft save can run from synchronized Areas/services/checklists;
@@ -2016,8 +2017,9 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Application-shell caching never caches authenticated API responses; authenticated/reference data remains in user-scoped IndexedDB and API authorization remains server-enforced when online.
 - Backend regression run `39237649160` passed after the new 48-hour/offline lease implementation and deployment-note update.
 - Security backend packaging run `39237649381` passed; artifact ID `12179608707`, source head `79c4a0dd0f02055aa1bb17c53599499c619c5db5`.
-- Final GitHub Pages run `39237247492` completed successfully, including build, no-source-map/CSP checks and Pages deployment.
-- Deployed frontend head: `c0c958c6dfb524f68365616751b18bca2f4aac6f` (latest worker-refresh deploy commit).
+- Final GitHub Pages run `39238272508` completed successfully, including build, no-source-map/CSP checks and Pages deployment.
+- Deployed frontend head: `be027fcfe5370ce99dbd807128f48d94648b6971`.
+- That final frontend includes bidirectional draft synchronization and reconciliation of server-side draft deletions for already-synced local copies.
 - Targeted CRA DEV backend handoff: `cra-offline-48h-auto-sync-backend-2026-10-19.zip`, SHA-256 `505158afe2a4f39b1afcd27aa1d4cc4d8b1bcb4eeb22731d45430183360763aa`.
 - Backend source still requires manual placement on CRA DEV followed by restart of the existing `maintenix-dev-api.service`; do not claim runtime offline acceptance until that install/restart and focused testing are confirmed.
 - No LIVE/production change was made.

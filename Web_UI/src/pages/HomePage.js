@@ -1,4 +1,5 @@
 import { clearOrgAuth, ensureOrgAuthExpiresAt, isOrgAuthExpired, orgLocalStorage, setOrgCsrfToken } from "../config/organization";
+import { storeOfflineLeaseFromResponse, verifyStoredOfflineLease } from "../lib/offlineSession";
 import React, { useState, useEffect } from "react";
 import { Route, Switch, Redirect } from "react-router-dom";
 import { Routes } from "../routes";
@@ -98,7 +99,21 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
         return;
       }
 
+      const acceptValidOfflineLease = async () => {
+        const offline = await verifyStoredOfflineLease();
+        if (!offline?.valid || !offline?.user) return false;
+        if (!mounted) return true;
+
+        orgLocalStorage.setItem("authExpiresAt", String(offline.expiresAt));
+        orgLocalStorage.setItem("authUser", JSON.stringify(offline.user));
+        setVerifiedUser(offline.user);
+        setAuthOk(true);
+        setAuthChecked(true);
+        return true;
+      };
+
       if (isOrgAuthExpired()) {
+        if (await acceptValidOfflineLease()) return;
         clearOrgAuth();
         if (!mounted) return;
         setVerifiedUser(null);
@@ -110,6 +125,15 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
       // Legacy CRA sessions may predate the client-side expiry key.
       // Give them a client-side ceiling while the backend remains authoritative.
       ensureOrgAuthExpiresAt();
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        if (await acceptValidOfflineLease()) return;
+        if (!mounted) return;
+        setVerifiedUser(null);
+        setAuthOk(false);
+        setAuthChecked(true);
+        return;
+      }
 
       try {
         const res = await fetch("/api/profile/me", {
@@ -129,7 +153,10 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
 
         const data = await res.json().catch(() => ({}));
         setOrgCsrfToken(data?.csrfToken || "");
-        if (data?.expiresAt) orgLocalStorage.setItem("authExpiresAt", String(data.expiresAt));
+        storeOfflineLeaseFromResponse(data);
+        const leaseExpiry = Number(data?.offlineLease?.expiresAt || 0);
+        if (leaseExpiry > Date.now()) orgLocalStorage.setItem("authExpiresAt", String(leaseExpiry));
+        else if (data?.expiresAt) orgLocalStorage.setItem("authExpiresAt", String(data.expiresAt));
         const user = data?.user && typeof data.user === "object" ? data.user : null;
         if (!user) throw new Error("Profile response did not include a user.");
 
@@ -154,7 +181,12 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
       } catch (e) {
         if (e?.name === "AbortError") return;
         if (!mounted) return;
-        // API/network failures do not erase a potentially valid stored session.
+
+        // A transient network/API failure may use a cryptographically verified
+        // local lease until its 48-hour expiry. Server 401/403 responses above
+        // remain authoritative and are never bypassed.
+        if (await acceptValidOfflineLease()) return;
+
         setVerifiedUser(null);
         setAuthOk(false);
         setAuthChecked(true);
@@ -172,29 +204,38 @@ const RouteWithSidebar = ({ component: Component, adminOnly = false, ...rest }) 
     };
   }, [authToken]);
 
-  // Enforce the absolute 8-hour login lifetime even if the user leaves one page open.
+  // Enforce the 48-hour local access ceiling even if a page stays open.
+  // Automatic online synchronization may refresh the signed lease, so re-read
+  // the current expiry instead of holding a stale timeout from initial mount.
   useEffect(() => {
     if (!authToken) return undefined;
 
-    const expiresAt = ensureOrgAuthExpiresAt();
-    const remaining = expiresAt - Date.now();
+    let active = true;
+    const checkExpiry = async () => {
+      if (!active || !isOrgAuthExpired()) return;
 
-    if (remaining <= 0) {
+      const offline = await verifyStoredOfflineLease();
+      if (offline?.valid && offline?.user) {
+        orgLocalStorage.setItem("authExpiresAt", String(offline.expiresAt));
+        setVerifiedUser(offline.user);
+        setAuthOk(true);
+        setAuthChecked(true);
+        return;
+      }
+
       clearOrgAuth();
       setVerifiedUser(null);
       setAuthOk(false);
       setAuthChecked(true);
-      return undefined;
-    }
+    };
 
-    const timer = window.setTimeout(() => {
-      clearOrgAuth();
-      setVerifiedUser(null);
-      setAuthOk(false);
-      setAuthChecked(true);
-    }, remaining);
+    checkExpiry();
+    const timer = window.setInterval(checkExpiry, 30 * 1000);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [authToken]);
 
   const localStorageIsSettingsVisible = () => {

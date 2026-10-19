@@ -8,6 +8,23 @@ const { logEvent, safeText, sanitize } = require("../lib/siteLogger");
 const router = express.Router();
 const ORGANIZATION_CODE = String(process.env.ORGANIZATION_CODE || "CRA").trim().toUpperCase() || "CRA";
 const CLIENT_LEVELS = new Set(["INFO", "WARN", "ERROR"]);
+const CLIENT_WINDOW_MS = 60 * 1000;
+const CLIENT_MAX_EVENTS = 120;
+const clientWindows = new Map();
+
+function allowClientEvent(userId) {
+  const now = Date.now();
+  const key = String(userId || "");
+  const current = clientWindows.get(key);
+  if (!current || now - current.startedAt >= CLIENT_WINDOW_MS) {
+    clientWindows.set(key, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (current.count >= CLIENT_MAX_EVENTS) return false;
+  current.count += 1;
+  clientWindows.set(key, current);
+  return true;
+}
 
 function authenticatedUser(req) {
   const token = extractSessionToken(req);
@@ -27,6 +44,9 @@ function authenticatedUser(req) {
 router.post("/client", (req, res) => {
   const user = authenticatedUser(req);
   if (!user) return res.status(401).json({ ok: false, message: "Not logged in." });
+  if (!allowClientEvent(user.id)) {
+    return res.status(429).json({ ok: false, message: "Client log rate limit reached. Please retry shortly." });
+  }
 
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const requestedLevel = String(body.level || "ERROR").trim().toUpperCase();

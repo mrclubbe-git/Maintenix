@@ -690,6 +690,8 @@ export default function Servicing() {
 
   // ✅ Offline/queue UI
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [referenceSource, setReferenceSource] = useState("");
+  const [referenceUpdatedAt, setReferenceUpdatedAt] = useState("");
   const [dbReady, setDbReady] = useState(false);
   const dbRef = useRef(null);
   const draftSyncInFlightRef = useRef(new Set());
@@ -772,12 +774,16 @@ export default function Servicing() {
 
   const canAddArea = useMemo(() => {
     const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
-    return !!candidate && !hasExactAreaMatch(areaOptions, candidate);
-  }, [areaOptions, areaSearch]);
+    return online && !!candidate && !hasExactAreaMatch(areaOptions, candidate);
+  }, [areaOptions, areaSearch, online]);
 
   async function createGlobalAreaFromSearch() {
     const candidate = String(areaSearch || "").replace(/\s+/g, " ").trim();
     if (!candidate || addingArea) return;
+    if (!online) {
+      setErr("Connect to a network before adding a new Area. Existing saved Areas remain available offline.");
+      return;
+    }
 
     setErr("");
     setInfo("");
@@ -922,6 +928,11 @@ export default function Servicing() {
     if (!dbRef.current) return null;
     const rec = await idbGet(dbRef.current, "servicingCache", key);
     return rec?.value ?? null;
+  }
+
+  async function cacheGetRecord(key) {
+    if (!dbRef.current) return null;
+    return await idbGet(dbRef.current, "servicingCache", key);
   }
 
   async function apiJson(path, options = {}) {
@@ -1133,39 +1144,72 @@ export default function Servicing() {
       setErr("Not logged in.");
       return;
     }
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setChecklist(null);
-      setAreaOptions([]);
-      setServiceOptions([]);
-      setErr("Internet connection is required. Offline mode is temporarily disabled.");
-      return;
-    }
 
     setLoadingLists(true);
     setLoadingChecklist(true);
 
     try {
-      const [areas, servicesRes, checklistRes] = await Promise.all([
-        fetchGlobalAreas(authToken),
-        fetchJson("/api/servicing/services"),
-        fetchJson(`/api/servicing/checklist?type=${encodeURIComponent(systemType)}`)
+      if (typeof navigator === "undefined" || navigator.onLine !== false) {
+        try {
+          const [areas, servicesRes, checklistRes] = await Promise.all([
+            fetchGlobalAreas(authToken),
+            fetchJson("/api/servicing/services"),
+            fetchJson(`/api/servicing/checklist?type=${encodeURIComponent(systemType)}`)
+          ]);
+
+          const services = Array.isArray(servicesRes?.services) ? servicesRes.services : [];
+          const loadedChecklist = getChecklistPayload(checklistRes);
+          const updatedAt = new Date().toISOString();
+
+          setAreaOptions(areas);
+          setServiceOptions(services);
+          setChecklist(loadedChecklist);
+          setReferenceSource("online");
+          setReferenceUpdatedAt(updatedAt);
+
+          await cacheSet("areas", areas);
+          await cacheSet("services", services);
+          await cacheSet(`checklist_${systemType}`, loadedChecklist);
+          return;
+        } catch {
+          // A browser can report "online" while the API/tunnel is unreachable.
+          // Fall through to the last successfully synchronized local snapshot.
+        }
+      }
+
+      const [areasRec, servicesRec, checklistRec] = await Promise.all([
+        cacheGetRecord("areas"),
+        cacheGetRecord("services"),
+        cacheGetRecord(`checklist_${systemType}`)
       ]);
 
-      const services = Array.isArray(servicesRes?.services) ? servicesRes.services : [];
-      const loadedChecklist = getChecklistPayload(checklistRes);
+      const cachedAreas = Array.isArray(areasRec?.value) ? areasRec.value : [];
+      const cachedServices = Array.isArray(servicesRec?.value) ? servicesRec.value : [];
+      const cachedChecklist = checklistRec?.value && typeof checklistRec.value === "object"
+        ? checklistRec.value
+        : null;
 
-      setAreaOptions(areas);
-      setServiceOptions(services);
-      setChecklist(loadedChecklist);
+      if (!cachedAreas.length || !cachedServices.length || !cachedChecklist) {
+        setChecklist(null);
+        setAreaOptions(cachedAreas);
+        setServiceOptions(cachedServices);
+        setReferenceSource("");
+        setReferenceUpdatedAt("");
+        setErr("No synchronized Servicing reference data is available on this device. Connect to a network once to refresh Areas, services and checklists.");
+        return;
+      }
 
-      // Keep a local mirror for current draft/job implementation, but do not
-      // use it as an offline fallback while offline mode is disabled.
-      await cacheSet("areas", areas);
-      await cacheSet("services", services);
-      await cacheSet(`checklist_${systemType}`, loadedChecklist);
-    } catch (e) {
-      setChecklist(null);
-      setErr(String(e?.message || "Failed to load servicing data. Internet connection is required."));
+      const cachedAt = [areasRec?.updatedAt, servicesRec?.updatedAt, checklistRec?.updatedAt]
+        .filter(Boolean)
+        .sort()
+        .slice(-1)[0] || "";
+
+      setAreaOptions(cachedAreas);
+      setServiceOptions(cachedServices);
+      setChecklist(cachedChecklist);
+      setReferenceSource("offline");
+      setReferenceUpdatedAt(cachedAt);
+      setInfo(`Using saved Servicing data from this device${cachedAt ? ` (updated ${new Date(cachedAt).toLocaleString()})` : ""}.`);
     } finally {
       setLoadingLists(false);
       setLoadingChecklist(false);
@@ -1173,14 +1217,10 @@ export default function Servicing() {
   }
 
   useEffect(() => {
-    if (!canAccess) return;
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setErr("Internet connection is required. Offline mode is temporarily disabled.");
-      return;
-    }
+    if (!canAccess || !dbReady) return;
     loadListsAndChecklist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemType, online, canAccess]);
+  }, [systemType, online, canAccess, dbReady]);
 
   useEffect(() => {
     if (dbReady) refreshJobs();
@@ -1219,7 +1259,6 @@ export default function Servicing() {
   }, [step]);
 
   function validatePreStart() {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return "Internet connection is required. Offline mode is temporarily disabled.";
     if (!area) return "Please select an Area.";
     if (!serviceType) return "Please select a Service Type.";
     if (!selectedStandards.length) return "Please select at least one standard.";
@@ -2473,7 +2512,11 @@ export default function Servicing() {
           {!online ? (
             <div className="mt-1">
               <Badge bg="warning" text="dark">Offline</Badge>
-              <span className="text-muted small ms-2">Internet connection is required. Offline mode is temporarily disabled.</span>
+              <span className="text-muted small ms-2">
+                {referenceSource === "offline"
+                  ? `Using saved workflow data${referenceUpdatedAt ? ` from ${new Date(referenceUpdatedAt).toLocaleString()}` : ""}. Drafts save locally and sync automatically when connected.`
+                  : "Saved workflow data will be used when available."}
+              </span>
             </div>
           ) : null}
         </div>

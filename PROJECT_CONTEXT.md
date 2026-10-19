@@ -2180,3 +2180,21 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Final deploy head: `1edd1cd5e7c6796415ec36207d26981cc5e1b170`.
 - GitHub Pages run `39252811946` completed successfully.
 - No backend or LIVE change was required.
+
+
+## Accepted migration milestone — 2026-10-19
+
+- User explicitly declared the current CRA DEV state to be the **accepted migration version milestone**.
+- This supersedes the earlier migration-ready declaration as the current accepted cutover baseline.
+- Accepted source head at declaration:
+  - `main`: `e29d705d5eb526629b0c2ea56a1dd855308c3444`
+  - `deploy`: `1edd1cd5e7c6796415ec36207d26981cc5e1b170`
+- The accepted milestone includes the previously accepted security remediation, Servicing, Call Out, Section Reporting, local-first drafts, 48-hour signed offline access, automatic synchronization, application-shell offline support, Web Push, Sign In show-password control, and Administration -> Site Logs.
+- Site Logs accepted milestone behavior includes:
+  - 60-day default retention;
+  - ADMIN manual Clear all with confirmation and a fresh `SITE_LOGS_CLEARED` audit marker;
+  - wrapped in-window message display;
+  - browser/client error capture and request correlation;
+  - one `CONNECTIVITY_LOST` event per offline transition and one `CONNECTIVITY_RESTORED` event per recovery, with repeated offline API/presence ping failures suppressed.
+- CRA DEV remains the development environment for any future ideas. Any new work intended for migration must be re-tested and explicitly accepted before it replaces this milestone.
+- No LIVE/production cutover or LIVE change was authorized by this milestone declaration.

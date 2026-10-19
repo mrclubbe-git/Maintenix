@@ -2323,3 +2323,23 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Matching frontend files were promoted to deploy; current deploy head for this enhancement is `8ef05c88f0d263a3bbf9161244f94aa667c1a966`.
 - GitHub Pages workflow run `39281337899` was created for the final deploy head. At the time this context entry was written GitHub Actions still reported it as queued; deployment must not be claimed successful until the run completes successfully.
 - No backend/API contract, runtime data, or LIVE/production changes were made.
+
+
+## Approved migration package generated — 2026-10-19
+
+- User requested a complete migration ZIP for the currently accepted migration-approved baseline.
+- The package is pinned to the accepted application state, not to later post-acceptance development:
+  - approved backend/source `main`: `51300a11f7cc85e54093b8af2313aaea8190aeca`;
+  - approved frontend `deploy`: `2642634614d8a1c47915c13f9eb2b54d4eb7051d`.
+- Package name: `Maintenix_Approved_Migration_2026-10-19.zip`.
+- Final package SHA-256: `eedef5ff3b92d6ebe90a3edb652b1c2211b5f4ba0e0703f15611368c84d0ea5a`.
+- GitHub package-builder workflow run `39284470491` completed successfully.
+- The package deliberately contains **no** `Server_API/CRA/data/` directory. This prevents migration from overwriting LIVE runtime state.
+- LIVE runtime data must remain in place, including at minimum LIVE `users.json`, reports/report metadata, pictures/uploads, profile photos, Stock Control, Standby, Daily Planner, notifications/preferences, area metadata, Site Logs, queues/drafts/status, LIVE Web Push subscriptions/VAPID key and LIVE offline-lease keys once issued.
+- The **only** DEV data to be copied during migration is:
+  `/home/charl/projects/maintenix-dev-api/Server_API/CRA/data/templates/`
+  to the matching LIVE `data/templates/` location.
+- No other DEV `data/` file or directory is to be transferred to LIVE.
+- The archive contains migration instructions, LIVE-data preservation instructions, approved-baseline identifiers, a package inventory, verification notes and reference migration documentation.
+- Final local QA passed: ZIP integrity, backend-data exclusion, template exclusion, no packaged `users.json`/reports metadata, approved baseline identifiers, backend JS syntax checks, Formal Reporting Python compilation and required instruction documents.
+- Creating this package does **not** execute the LIVE migration and does not modify LIVE.

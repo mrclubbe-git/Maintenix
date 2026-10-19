@@ -178,8 +178,8 @@ async function refreshReferenceData(servicingDb, calloutDb, formalDb, role) {
 }
 
 async function syncServicingDrafts(db) {
-  const records = await idbGetAll(db, "servicingCache");
-  const drafts = records.filter((rec) => (
+  let records = await idbGetAll(db, "servicingCache");
+  const pending = records.filter((rec) => (
     rec &&
     typeof rec.key === "string" &&
     rec.key.startsWith("servicing_draft_") &&
@@ -187,7 +187,7 @@ async function syncServicingDrafts(db) {
     rec.syncStatus !== "synced"
   ));
 
-  for (const rec of drafts) {
+  for (const rec of pending) {
     try {
       const data = await apiJson("/api/servicing/drafts", {
         method: "POST",
@@ -217,11 +217,46 @@ async function syncServicingDrafts(db) {
       });
     }
   }
+
+  // Pull new/changed server drafts so another-device work is available offline.
+  records = await idbGetAll(db, "servicingCache");
+  const localByKey = new Map(
+    records
+      .filter((rec) => rec?.key?.startsWith?.("servicing_draft_"))
+      .map((rec) => [rec.key, rec])
+  );
+  const list = await apiJson("/api/servicing/drafts");
+  const summaries = Array.isArray(list?.drafts) ? list.drafts : [];
+
+  for (const summary of summaries) {
+    const key = String(summary?.key || "");
+    if (!key) continue;
+    const local = localByKey.get(key);
+    if (local && local.syncStatus !== "synced") continue;
+
+    const localServerAt = String(local?.serverUpdatedAt || local?.updatedAt || "");
+    const serverAt = String(summary?.updatedAt || "");
+    if (local && localServerAt && serverAt && serverAt <= localServerAt) continue;
+
+    try {
+      const detail = await apiJson(`/api/servicing/drafts/${encodeURIComponent(key)}`);
+      if (!detail?.draft?.value) continue;
+      await idbPut(db, "servicingCache", {
+        ...detail.draft,
+        syncStatus: "synced",
+        syncError: "",
+        syncedAt: new Date().toISOString(),
+        serverUpdatedAt: String(detail.draft.updatedAt || serverAt)
+      });
+    } catch {
+      // One unavailable server draft must not block the rest of automatic sync.
+    }
+  }
 }
 
 async function syncCalloutDrafts(db) {
-  const records = await idbGetAll(db, "calloutCache");
-  const drafts = records.filter((rec) => (
+  let records = await idbGetAll(db, "calloutCache");
+  const pending = records.filter((rec) => (
     rec &&
     typeof rec.key === "string" &&
     rec.key.startsWith("callout_v2_draft_") &&
@@ -230,7 +265,7 @@ async function syncCalloutDrafts(db) {
     rec.syncStatus !== "synced"
   ));
 
-  for (const rec of drafts) {
+  for (const rec of pending) {
     try {
       const data = await apiJson("/api/callout/drafts", {
         method: "POST",
@@ -260,10 +295,44 @@ async function syncCalloutDrafts(db) {
       });
     }
   }
+
+  records = await idbGetAll(db, "calloutCache");
+  const localByKey = new Map(
+    records
+      .filter((rec) => rec?.key?.startsWith?.("callout_v2_draft_"))
+      .map((rec) => [rec.key, rec])
+  );
+  const list = await apiJson("/api/callout/drafts");
+  const summaries = Array.isArray(list?.drafts) ? list.drafts : [];
+
+  for (const summary of summaries) {
+    const key = String(summary?.key || "");
+    if (!key) continue;
+    const local = localByKey.get(key);
+    if (local && local.syncStatus !== "synced") continue;
+
+    const localServerAt = String(local?.serverUpdatedAt || local?.updatedAt || "");
+    const serverAt = String(summary?.updatedAt || "");
+    if (local && localServerAt && serverAt && serverAt <= localServerAt) continue;
+
+    try {
+      const detail = await apiJson(`/api/callout/drafts/${encodeURIComponent(key)}`);
+      if (!detail?.draft?.value) continue;
+      await idbPut(db, "calloutCache", {
+        ...detail.draft,
+        syncStatus: "synced",
+        syncError: "",
+        syncedAt: new Date().toISOString(),
+        serverUpdatedAt: String(detail.draft.updatedAt || serverAt)
+      });
+    } catch {
+      // Continue syncing remaining drafts.
+    }
+  }
 }
 
 async function syncFormalDrafts(db) {
-  const records = await idbGetAll(db, "formalReportDrafts");
+  let records = await idbGetAll(db, "formalReportDrafts");
   const drafts = records.filter((rec) => rec?.type === "formalReportDraft");
 
   for (const rec of drafts) {
@@ -318,6 +387,45 @@ async function syncFormalDrafts(db) {
         syncError: String(error?.message || "Draft sync failed."),
         lastSyncAttemptAt: new Date().toISOString()
       });
+    }
+  }
+
+  records = await idbGetAll(db, "formalReportDrafts");
+  const localById = new Map(
+    records
+      .filter((rec) => rec?.type === "formalReportDraft")
+      .map((rec) => [String(rec.id || ""), rec])
+  );
+  const list = await apiJson("/api/formal-reports/drafts");
+  const summaries = Array.isArray(list?.drafts) ? list.drafts : [];
+
+  for (const summary of summaries) {
+    const id = String(summary?.id || "");
+    if (!id) continue;
+    const local = localById.get(id);
+    if (local && (local.deleted || local.syncStatus !== "synced" || local.nameDirty)) continue;
+
+    const localServerAt = String(local?.serverSavedAt || local?.savedAt || "");
+    const serverAt = String(summary?.savedAt || "");
+    if (local && localServerAt && serverAt && serverAt <= localServerAt) continue;
+
+    try {
+      const detail = await apiJson(`/api/formal-reports/drafts/${encodeURIComponent(id)}`);
+      if (!detail?.draft) continue;
+      await idbPut(db, "formalReportDrafts", {
+        id,
+        type: "formalReportDraft",
+        name: detail.draft.name || summary.name || id,
+        nameDirty: false,
+        savedAt: detail.draft.savedAt || serverAt || new Date().toISOString(),
+        value: detail.draft,
+        syncStatus: "synced",
+        syncError: "",
+        syncedAt: new Date().toISOString(),
+        serverSavedAt: detail.draft.savedAt || serverAt || ""
+      });
+    } catch {
+      // Continue syncing remaining drafts.
     }
   }
 }

@@ -92,8 +92,8 @@ test("Site Logs filters and summarizes recent records", () => {
 });
 
 
-test("Site Logs default retention is 30 days", () => {
-  assert.equal(RETENTION_DAYS, 30);
+test("Site Logs default retention is 60 days", () => {
+  assert.equal(RETENTION_DAYS, 60);
 });
 
 test("Site Logs clear-all removes current NDJSON history", () => {

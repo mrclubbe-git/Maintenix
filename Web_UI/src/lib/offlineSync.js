@@ -427,7 +427,16 @@ async function syncFormalDrafts(db) {
     const id = String(summary?.id || "");
     if (!id) continue;
     const local = localById.get(id);
-    if (local && (local.deleted || local.syncStatus !== "synced" || local.nameDirty)) continue;
+    if (
+      local &&
+      (
+        local.deleted ||
+        local.nameDirty ||
+        local.syncStatus === "pending" ||
+        local.syncStatus === "syncing" ||
+        local.syncStatus === "blocked"
+      )
+    ) continue;
 
     const localServerAt = String(local?.serverSavedAt || local?.savedAt || "");
     const serverAt = String(summary?.savedAt || "");

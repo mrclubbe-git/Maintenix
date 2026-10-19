@@ -2127,8 +2127,8 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
   - after clearing, the UI refreshes automatically and shows the new `SITE_LOGS_CLEARED` audit marker;
   - the 90-day filter was removed; 60 days is the longest UI period.
 - Default runtime retention is now 60 days. `SITE_LOG_RETENTION_DAYS` may still override it where explicitly configured.
-- Backend regression run `39249140076` passed, including Site Logs clear-all and retention tests.
-- Backend packaging run `39249140162` passed; artifact ID `12183889460`.
-- Targeted CRA DEV backend handoff: `cra-site-logs-clear60-backend-2026-10-19.zip`, SHA-256 pending regeneration after the 60-day correction..
+- Final backend regression run `39249935749` passed, including Site Logs clear-all/60-day retention tests and the corrected deterministic offline-lease tamper regression.
+- Final backend packaging run `39249935738` passed; artifact ID `12185316293`.
+- Targeted CRA DEV backend handoff: `cra-site-logs-clear60-backend-2026-10-19.zip`, SHA-256 `65d980cc2a6278f502e01551ce74ce5dcaecb3752e8a881056c6c0c9223f62ee`..
 - Matching frontend change is intentionally not yet copied to `deploy`; install/restart the DEV backend first, then promote the UI control.
 - No LIVE/production change was made.

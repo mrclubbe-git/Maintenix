@@ -138,7 +138,7 @@ function listLogs(filters = {}) {
   const now = Date.now();
   const fromMs = Number.isFinite(Number(filters.fromMs)) ? Number(filters.fromMs) : now - 24 * 60 * 60 * 1000;
   const toMs = Number.isFinite(Number(filters.toMs)) ? Number(filters.toMs) : now;
-  const limit = Math.min(500, Math.max(1, Number(filters.limit || 200)));
+  const limit = Math.min(5000, Math.max(1, Number(filters.limit || 200)));
   const level = safeText(filters.level || "", 20).toUpperCase();
   const category = safeText(filters.category || "", 80).toUpperCase();
   const userNeedle = safeText(filters.user || "", 160).toLowerCase();
@@ -198,7 +198,7 @@ function getLogById(id) {
 
 function summarizeLogs(hours = 24) {
   const fromMs = Date.now() - Math.max(1, Number(hours || 24)) * 60 * 60 * 1000;
-  const logs = listLogs({ fromMs, toMs: Date.now(), limit: 500 });
+  const logs = listLogs({ fromMs, toMs: Date.now(), limit: 5000 });
   const users = new Set();
   const categories = new Set();
 

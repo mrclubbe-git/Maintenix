@@ -9,19 +9,6 @@
   var apiBase = configured.replace(/\/+$/, "");
   var csrfToken = "";
 
-  function currentAppBuild() {
-    try {
-      var scripts = Array.prototype.slice.call(document.scripts || []);
-      var src = scripts
-        .map(function (script) { return script.getAttribute("src") || ""; })
-        .find(function (value) { return /\/static\/js\/main\.[^/]+\.js(?:\?|$)/.test(value); });
-      var match = src && /main\.([^.]+)\.js/.exec(src);
-      return match ? match[1] : "";
-    } catch (e) {
-      return "";
-    }
-  }
-
   // GitHub Pages cannot emit custom frame-control response headers. Keep a
   // client-side deny fallback so a framed copy never renders interactive UI.
   if (window.top !== window.self) {
@@ -92,8 +79,6 @@
     if (["POST", "PUT", "PATCH", "DELETE"].indexOf(method) >= 0 && csrfToken) {
       headers.set("X-CSRF-Token", csrfToken);
     }
-    var build = currentAppBuild();
-    if (build) headers.set("X-Maintenix-App-Build", build);
     next.headers = headers;
     return next;
   }

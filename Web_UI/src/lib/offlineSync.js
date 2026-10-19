@@ -378,9 +378,9 @@ export async function runAutomaticOfflineSync() {
     } catch {}
     return false;
   } finally {
-    try { servicingDb?.close(); } catch {}
-    try { calloutDb?.close(); } catch {}
-    try { formalDb?.close(); } catch {}
+    try { if (servicingDb) servicingDb.close(); } catch {}
+    try { if (calloutDb) calloutDb.close(); } catch {}
+    try { if (formalDb) formalDb.close(); } catch {}
     running = false;
     releaseSyncLock(lockId);
   }

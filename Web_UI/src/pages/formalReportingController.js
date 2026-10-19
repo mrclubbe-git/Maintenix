@@ -87,8 +87,12 @@ const $ = (id) => root.querySelector(`#${CSS.escape(id)}`);
 
 async function api(url, options = {}) {
   const response = await fetch(`/api/formal-reports${url}`, { cache: 'no-store', ...options });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error || `${response.status} ${response.statusText}`);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body.error || body.message || `${response.status} ${response.statusText}`);
+    error.status = response.status;
+    throw error;
+  }
   return body;
 }
 
@@ -296,11 +300,14 @@ function draftPayload() {
 }
 
 async function saveDraftToServer(record) {
-  const value = { ...(record.value || {}), name: record.name || defaultDraftName(record.value || {}) };
+  // Ordinary content sync does not resend the local display name. The server
+  // preserves an existing custom name, and explicit local renames are applied
+  // with PATCH below. This also keeps legacy overlong names out of POST
+  // validation while preserving the local draft for review.
   return api('/drafts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(value)
+    body: JSON.stringify(record.value || {})
   });
 }
 
@@ -351,10 +358,13 @@ async function syncDraftRecord(record) {
   } catch (error) {
     const latest = await idbGet(record.id);
     if (!latest) return null;
+    const permanentValidationError = Number(error?.status || 0) === 400;
     const failed = {
       ...latest,
-      syncStatus: 'pending',
-      syncError: String(error?.message || 'Draft sync failed.'),
+      syncStatus: permanentValidationError ? 'blocked' : 'pending',
+      syncError: permanentValidationError
+        ? `Server rejected this saved draft: ${String(error?.message || 'validation failed')}. Open and save the draft again to retry.`
+        : String(error?.message || 'Draft sync failed.'),
       lastSyncAttemptAt: new Date().toISOString()
     };
     await idbPut(failed);
@@ -379,7 +389,14 @@ async function syncDeletedDraft(record) {
 async function syncPendingDrafts() {
   if (!draftDb || !navigator.onLine || stopped) return;
   const all = await idbGetAll();
-  const pending = all.filter((record) => record && (record.deleted || record.syncStatus !== 'synced'));
+  const pending = all.filter((record) => (
+    record &&
+    (
+      record.deleted ||
+      record.syncStatus === 'pending' ||
+      record.syncStatus === 'syncing'
+    )
+  ));
   if (!pending.length) return;
 
   for (const record of pending) {
@@ -454,7 +471,11 @@ async function loadDrafts({ includeServer = true } = {}) {
         ? '<span class="badge bg-success ms-2">Server synced</span>'
         : draft.syncStatus === 'syncing'
           ? '<span class="badge bg-info ms-2">Syncing</span>'
-          : '<span class="badge bg-warning text-dark ms-2">Saved locally</span>';
+          : draft.syncStatus === 'blocked'
+            ? '<span class="badge bg-danger ms-2">Needs review</span>'
+            : draft.syncStatus
+              ? '<span class="badge bg-warning text-dark ms-2">Saved locally</span>'
+              : '<span class="badge bg-secondary ms-2">Legacy local</span>';
       const syncError = draft.syncError
         ? `<div class="text-danger small">Server sync pending: ${escapeHtml(draft.syncError)}</div>`
         : '';

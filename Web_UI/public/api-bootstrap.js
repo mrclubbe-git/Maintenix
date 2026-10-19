@@ -9,6 +9,19 @@
   var apiBase = configured.replace(/\/+$/, "");
   var csrfToken = "";
 
+  function currentAppBuild() {
+    try {
+      var scripts = Array.prototype.slice.call(document.scripts || []);
+      var src = scripts
+        .map(function (script) { return script.getAttribute("src") || ""; })
+        .find(function (value) { return /\/static\/js\/main\.[^/]+\.js(?:\?|$)/.test(value); });
+      var match = src && /main\.([^.]+)\.js/.exec(src);
+      return match ? match[1] : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   // GitHub Pages cannot emit custom frame-control response headers. Keep a
   // client-side deny fallback so a framed copy never renders interactive UI.
   if (window.top !== window.self) {
@@ -79,6 +92,8 @@
     if (["POST", "PUT", "PATCH", "DELETE"].indexOf(method) >= 0 && csrfToken) {
       headers.set("X-CSRF-Token", csrfToken);
     }
+    var build = currentAppBuild();
+    if (build) headers.set("X-Maintenix-App-Build", build);
     next.headers = headers;
     return next;
   }
@@ -130,13 +145,30 @@
       return csrfRefreshPromise;
     }
 
-    function finishResponse(response, path) {
+    function dispatchApiError(detail) {
+      try {
+        if (String(detail && detail.path || "").indexOf("/api/site-logs/") >= 0) return;
+        window.dispatchEvent(new CustomEvent("maintenix:api-error", { detail: detail || {} }));
+      } catch (e) {}
+    }
+
+    function finishResponse(response, path, method) {
       if (
         response.status === 401 &&
         path.indexOf("/api/auth/login") < 0 &&
         path.indexOf("/api/auth/register") < 0
       ) {
         try { window.dispatchEvent(new Event("maintenixSessionInvalid")); } catch (e) {}
+      }
+
+      if (response.status >= 500) {
+        dispatchApiError({
+          path: path,
+          method: method || "GET",
+          status: response.status,
+          requestId: response.headers.get("X-Request-Id") || "",
+          networkError: false
+        });
       }
       return response;
     }
@@ -152,6 +184,8 @@
       var path = requestPath(url);
       var options = secureApiOptions(url, init);
 
+      var method = String(options.method || "GET").toUpperCase();
+
       return nativeFetch(url || input, options).then(function (response) {
         var csrfEligible =
           response.status === 403 &&
@@ -159,16 +193,26 @@
           path.indexOf("/api/auth/login") < 0 &&
           path.indexOf("/api/auth/register") < 0;
 
-        if (!csrfEligible) return finishResponse(response, path);
+        if (!csrfEligible) return finishResponse(response, path, method);
 
         return refreshCsrfToken().then(function (nextToken) {
-          if (!nextToken) return finishResponse(response, path);
+          if (!nextToken) return finishResponse(response, path, method);
           var retryOptions = secureApiOptions(url, init);
           retryOptions.headers.set("X-CSRF-Token", nextToken);
           return nativeFetch(url || input, retryOptions).then(function (retryResponse) {
-            return finishResponse(retryResponse, path);
+            return finishResponse(retryResponse, path, method);
           });
         });
+      }).catch(function (error) {
+        dispatchApiError({
+          path: path,
+          method: method,
+          status: 0,
+          requestId: "",
+          networkError: true,
+          error: String(error && error.message || error || "Network error")
+        });
+        throw error;
       });
     };
   }

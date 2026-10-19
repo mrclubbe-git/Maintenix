@@ -150,3 +150,28 @@ Targeted DEV validation after install/restart:
 7. Confirm Add Area and final report generation remain blocked offline.
 8. Confirm an expired/tampered local lease cannot authorize offline protected routes.
 9. Confirm logout/account/password/role lifecycle controls still revoke server sessions.
+
+
+Site Logs runtime update — 2026-10-19
+- New runtime directory:
+    Server_API/CRA/data/site-logs/
+  unless SITE_LOG_DIR overrides it.
+- The API service account must be able to create/write this directory.
+- Logs are daily NDJSON files (YYYY-MM-DD.ndjson) with lazy retention cleanup.
+- Default retention is 90 days; SITE_LOG_RETENTION_DAYS may override it.
+- Site Logs are runtime operational data:
+  - never overwrite them from Git;
+  - never copy DEV logs into LIVE during normal migration;
+  - back up/preserve LIVE logs according to the approved retention policy.
+- New backend source files:
+    Server_API/CRA/lib/siteLogger.js
+    Server_API/CRA/routes/siteLogs.js
+    Server_API/CRA/test/site-logger.test.js
+- Modified backend source files:
+    Server_API/CRA/index.js
+    Server_API/CRA/routes/admin.js
+    Server_API/CRA/routes/auth.js
+    Server_API/CRA/package.json
+- No new systemd service, worker, cron job or daemon is required.
+- Site Logs client ingestion is authenticated, CSRF-protected and rate-limited.
+- Administration -> Site Logs is ADMIN-only.

@@ -2198,3 +2198,26 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
   - one `CONNECTIVITY_LOST` event per offline transition and one `CONNECTIVITY_RESTORED` event per recovery, with repeated offline API/presence ping failures suppressed.
 - CRA DEV remains the development environment for any future ideas. Any new work intended for migration must be re-tested and explicitly accepted before it replaces this milestone.
 - No LIVE/production cutover or LIVE change was authorized by this milestone declaration.
+
+
+## Overview monthly Servicing + Call Out trackers — 2026-10-19
+
+- Post-milestone DEV enhancement requested after the accepted migration version milestone; this does **not** replace that accepted milestone unless explicitly accepted later.
+- Overview now shows two month-to-date report tracker cards next to the Presence tile on desktop:
+  - **Monthly Servicing** — count of generated SERVICING reports for the current month;
+  - **Monthly Call Outs** — count of generated CALLOUT reports for the current month.
+- Responsive layout:
+  - desktop XL: Presence 6 columns, Servicing tracker 3, Call Out tracker 3;
+  - tablet: Presence full width, the two trackers side-by-side;
+  - mobile: Presence, Servicing tracker, then Call Out tracker stacked vertically.
+- Trackers use the existing authenticated `GET /api/reports` source and count report metadata by current `reportMonth`, with `createdAt` fallback.
+- Formal/Section Report entries are excluded; only SERVICING and CALLOUT report types contribute.
+- Each tracker shows:
+  - current month/year;
+  - month-to-date generated report count;
+  - relative time of the latest generated report, or an empty-month message.
+- The report list refreshes on Overview load, browser focus, reconnect and every five minutes while online. Offline mode preserves the last loaded totals and reports that they are stale rather than repeatedly polling.
+- Main source head for this enhancement: `13d565a608206af286fcae184afb0d6098c8e98e`.
+- Deploy commit: `a55db401a2d524a970bd9438ab9e1df170117804`.
+- GitHub Pages run `39254952717` completed successfully, including build and deployable-security checks.
+- No backend or LIVE/production change was required.

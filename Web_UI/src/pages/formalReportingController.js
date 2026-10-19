@@ -592,6 +592,10 @@ async function deleteDraft(id) {
 
 async function generateReport() {
   const button = $('generate-report');
+  if (!navigator.onLine) {
+    showNotice('Connect to a network before generating the final DOCX/PDF. The draft remains saved on this device.', 'error');
+    return;
+  }
   button.disabled = true; button.textContent = 'Generating…';
   try {
     const result = await api('/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draftPayload()) });
@@ -626,6 +630,34 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 }
 
+function applySections(sections) {
+  state.sections = Array.isArray(sections) ? sections : [];
+  const select = $('section');
+  select.innerHTML = '<option value="">Select area</option>';
+  state.sections.forEach((section) => {
+    const option = doc.createElement('option');
+    option.value = section.name;
+    option.textContent = `${section.name} (${section.systemCount} systems)`;
+    select.append(option);
+  });
+}
+
+async function cacheSections(sections) {
+  if (!draftDb) return;
+  await idbPut({
+    id: '__reference_sections__',
+    type: 'formalReference',
+    value: Array.isArray(sections) ? sections : [],
+    updatedAt: new Date().toISOString()
+  });
+}
+
+async function loadCachedSections() {
+  const cached = await idbGet('__reference_sections__');
+  if (!cached || !Array.isArray(cached.value) || !cached.value.length) return null;
+  return cached;
+}
+
 async function initialize() {
   populateWeeks();
   const today = new Date();
@@ -638,15 +670,38 @@ async function initialize() {
     showNotice(`Browser draft storage unavailable: ${error.message}`, 'error');
   }
 
-  try {
-    const body = await api('/sections');
-    state.sections = body.sections;
-    body.sections.forEach((section) => {
-      const option = doc.createElement('option'); option.value = section.name; option.textContent = `${section.name} (${section.systemCount} systems)`; $('section').append(option);
-    });
-    await loadDrafts();
-    if (navigator.onLine) syncPendingDrafts().catch(() => {});
-  } catch (error) { showNotice(`Unable to load areas: ${error.message}`, 'error'); }
+  let loadedSections = false;
+
+  if (navigator.onLine) {
+    try {
+      const body = await api('/sections');
+      applySections(body.sections);
+      await cacheSections(body.sections);
+      loadedSections = true;
+      await loadDrafts();
+      syncPendingDrafts().catch(() => {});
+    } catch {
+      // A connected browser can still have an unavailable API/tunnel.
+      // Fall through to the last synchronized local section inventory.
+    }
+  }
+
+  if (!loadedSections) {
+    try {
+      const cached = await loadCachedSections();
+      if (!cached) {
+        showNotice('No synchronized Section Report inventory is available on this device. Connect to a network once before using Section Reports offline.', 'error');
+        return;
+      }
+
+      applySections(cached.value);
+      await loadDrafts({ includeServer: false });
+      const label = cached.updatedAt ? new Date(cached.updatedAt).toLocaleString('en-ZA') : '';
+      showNotice(`Offline mode: using saved Section Report inventory${label ? ` from ${label}` : ''}.`, 'success');
+    } catch (error) {
+      showNotice(`Unable to load saved Section Report inventory: ${error.message}`, 'error');
+    }
+  }
 }
 
 $('section').addEventListener('change', () => {

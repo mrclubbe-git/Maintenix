@@ -94,6 +94,7 @@
   if (typeof window.fetch === "function") {
     var nativeFetch = window.fetch.bind(window);
     var csrfRefreshPromise = null;
+    var apiErrorSeen = {};
 
     function requestPath(url) {
       try { return new URL(url, window.location.href).pathname; }
@@ -132,7 +133,19 @@
 
     function dispatchApiError(detail) {
       try {
-        if (String(detail && detail.path || "").indexOf("/api/site-logs/") >= 0) return;
+        var path = String(detail && detail.path || "");
+        if (path.indexOf("/api/site-logs/") >= 0) return;
+
+        var key = [
+          String(detail && detail.method || "GET"),
+          path,
+          String(detail && detail.status || 0),
+          detail && detail.networkError ? "network" : "http"
+        ].join("|");
+        var now = Date.now();
+        if (apiErrorSeen[key] && now - apiErrorSeen[key] < 60000) return;
+        apiErrorSeen[key] = now;
+
         window.dispatchEvent(new CustomEvent("maintenix:api-error", { detail: detail || {} }));
       } catch (e) {}
     }
@@ -146,7 +159,7 @@
         try { window.dispatchEvent(new Event("maintenixSessionInvalid")); } catch (e) {}
       }
 
-      if (response.status >= 500) {
+      if (response.status >= 400) {
         dispatchApiError({
           path: path,
           method: method || "GET",

@@ -52,7 +52,7 @@ function queryState(search) {
   const tab = String(params.get("tab") || "areas").toLowerCase();
   const status = String(params.get("status") || "").toLowerCase();
   return {
-    tab: ["users", "areas", "system"].includes(tab) ? tab : "areas",
+    tab: ["users", "areas", "site-logs", "system"].includes(tab) ? tab : "areas",
     pendingOnly: status === "pending"
   };
 }
@@ -92,6 +92,15 @@ function formatAdminDate(value) {
   return date.toLocaleString();
 }
 
+function logLevelVariant(value) {
+  const level = String(value || "").toUpperCase();
+  if (level === "CRITICAL") return "danger";
+  if (level === "ERROR") return "danger";
+  if (level === "WARN") return "warning";
+  if (level === "INFO") return "info";
+  return "secondary";
+}
+
 export default function Administration() {
   const history = useHistory();
   const location = useLocation();
@@ -127,6 +136,18 @@ export default function Administration() {
   const [systemStatus, setSystemStatus] = useState(null);
   const [loadingSystem, setLoadingSystem] = useState(false);
   const [systemError, setSystemError] = useState("");
+
+  const [siteLogs, setSiteLogs] = useState([]);
+  const [siteLogSummary, setSiteLogSummary] = useState({
+    total: 0, info: 0, warn: 0, error: 0, critical: 0, users: 0, categories: []
+  });
+  const [loadingSiteLogs, setLoadingSiteLogs] = useState(false);
+  const [siteLogError, setSiteLogError] = useState("");
+  const [siteLogSearch, setSiteLogSearch] = useState("");
+  const [siteLogLevel, setSiteLogLevel] = useState("");
+  const [siteLogCategory, setSiteLogCategory] = useState("");
+  const [siteLogHours, setSiteLogHours] = useState("24");
+  const [selectedSiteLog, setSelectedSiteLog] = useState(null);
 
   useEffect(() => {
     const next = queryState(location.search);
@@ -250,6 +271,37 @@ export default function Administration() {
     }
   }, [isAdmin]);
 
+  const loadSiteLogs = useCallback(async () => {
+    if (!isAdmin) return;
+    setLoadingSiteLogs(true);
+    setSiteLogError("");
+
+    try {
+      const params = new URLSearchParams();
+      params.set("hours", siteLogHours || "24");
+      params.set("limit", "250");
+      if (siteLogLevel) params.set("level", siteLogLevel);
+      if (siteLogCategory) params.set("category", siteLogCategory);
+      if (String(siteLogSearch || "").trim()) params.set("search", String(siteLogSearch).trim());
+
+      const data = await apiRequest(`/api/admin/site-logs?${params.toString()}`);
+      setSiteLogs(Array.isArray(data?.logs) ? data.logs : []);
+      setSiteLogSummary({
+        total: Number(data?.summary?.total || 0),
+        info: Number(data?.summary?.info || 0),
+        warn: Number(data?.summary?.warn || 0),
+        error: Number(data?.summary?.error || 0),
+        critical: Number(data?.summary?.critical || 0),
+        users: Number(data?.summary?.users || 0),
+        categories: Array.isArray(data?.summary?.categories) ? data.summary.categories : []
+      });
+    } catch (error) {
+      setSiteLogError(String(error?.message || "Unable to load Site Logs."));
+    } finally {
+      setLoadingSiteLogs(false);
+    }
+  }, [isAdmin, siteLogCategory, siteLogHours, siteLogLevel, siteLogSearch]);
+
   useEffect(() => {
     if (activeTab === "users") loadUsers();
   }, [activeTab, loadUsers]);
@@ -261,6 +313,10 @@ export default function Administration() {
   useEffect(() => {
     if (activeTab === "system") loadSystem();
   }, [activeTab, loadSystem]);
+
+  useEffect(() => {
+    if (activeTab === "site-logs") loadSiteLogs();
+  }, [activeTab, loadSiteLogs]);
 
   const userSummary = useMemo(() => ({
     total: users.length,
@@ -388,7 +444,7 @@ export default function Administration() {
         <div>
           <h4 className="mb-1">Administration</h4>
           <div className="text-muted">
-            Manage organisation users, area metadata and system status.
+            Manage organisation users, area metadata, Site Logs and system status.
           </div>
         </div>
       </div>
@@ -413,6 +469,9 @@ export default function Administration() {
                   <Badge bg="warning" text="dark" className="ms-2">{summary.pending}</Badge>
                 ) : null}
               </Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link eventKey="site-logs">Site Logs</Nav.Link>
             </Nav.Item>
             <Nav.Item>
               <Nav.Link eventKey="system">System</Nav.Link>
@@ -968,6 +1027,188 @@ export default function Administration() {
         </>
       ) : null}
 
+      {activeTab === "site-logs" ? (
+        <>
+          {siteLogError ? <Alert variant="danger">{siteLogError}</Alert> : null}
+
+          <Row className="g-3 mb-4">
+            <Col xs={12} sm={6} xl={3}>
+              <Card border="light" className="shadow-sm h-100"><Card.Body>
+                <div className="text-muted small">Errors</div>
+                <div className="h4 mb-0">{siteLogSummary.error + siteLogSummary.critical}</div>
+              </Card.Body></Card>
+            </Col>
+            <Col xs={12} sm={6} xl={3}>
+              <Card border="light" className="shadow-sm h-100"><Card.Body>
+                <div className="text-muted small">Warnings</div>
+                <div className="h4 mb-0">{siteLogSummary.warn}</div>
+              </Card.Body></Card>
+            </Col>
+            <Col xs={12} sm={6} xl={3}>
+              <Card border="light" className="shadow-sm h-100"><Card.Body>
+                <div className="text-muted small">Activity</div>
+                <div className="h4 mb-0">{siteLogSummary.total}</div>
+              </Card.Body></Card>
+            </Col>
+            <Col xs={12} sm={6} xl={3}>
+              <Card border="light" className="shadow-sm h-100"><Card.Body>
+                <div className="text-muted small">Users</div>
+                <div className="h4 mb-0">{siteLogSummary.users}</div>
+              </Card.Body></Card>
+            </Col>
+          </Row>
+
+          <Card border="light" className="shadow-sm">
+            <Card.Header>
+              <div className="d-flex flex-wrap justify-content-between align-items-center" style={{ gap: 12 }}>
+                <div>
+                  <h5 className="mb-1">Site Logs</h5>
+                  <div className="text-muted small">
+                    User activity, browser errors, API failures and security-relevant events. Sensitive credentials and payload contents are not recorded.
+                  </div>
+                </div>
+                <Button type="button" variant="outline-primary" size="sm" onClick={loadSiteLogs} disabled={loadingSiteLogs}>
+                  {loadingSiteLogs ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Refresh"}
+                </Button>
+              </div>
+            </Card.Header>
+
+            <Card.Body>
+              <Row className="g-3 mb-3">
+                <Col xs={12} lg={5}>
+                  <Form.Group>
+                    <Form.Label>Search</Form.Label>
+                    <Form.Control
+                      type="search"
+                      value={siteLogSearch}
+                      onChange={(event) => setSiteLogSearch(event.currentTarget.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          loadSiteLogs();
+                        }
+                      }}
+                      placeholder="Message, event, request ID, area or user"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col xs={12} sm={4} lg={2}>
+                  <Form.Group>
+                    <Form.Label>Level</Form.Label>
+                    <Form.Select value={siteLogLevel} onChange={(event) => setSiteLogLevel(event.currentTarget.value)}>
+                      <option value="">All levels</option>
+                      <option value="INFO">INFO</option>
+                      <option value="WARN">WARN</option>
+                      <option value="ERROR">ERROR</option>
+                      <option value="CRITICAL">CRITICAL</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col xs={12} sm={4} lg={3}>
+                  <Form.Group>
+                    <Form.Label>Module</Form.Label>
+                    <Form.Select value={siteLogCategory} onChange={(event) => setSiteLogCategory(event.currentTarget.value)}>
+                      <option value="">All modules</option>
+                      {(siteLogSummary.categories || []).map((category) => (
+                        <option value={category} key={category}>{category}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col xs={12} sm={4} lg={2}>
+                  <Form.Group>
+                    <Form.Label>Period</Form.Label>
+                    <Form.Select value={siteLogHours} onChange={(event) => setSiteLogHours(event.currentTarget.value)}>
+                      <option value="24">Last 24 hours</option>
+                      <option value="168">Last 7 days</option>
+                      <option value="720">Last 30 days</option>
+                      <option value="2160">Last 90 days</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              {loadingSiteLogs && siteLogs.length === 0 ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" role="status" />
+                  <div className="text-muted mt-2">Loading Site Logs…</div>
+                </div>
+              ) : siteLogs.length === 0 ? (
+                <Alert variant="info" className="mb-0">No Site Logs match the current filters.</Alert>
+              ) : (
+                <>
+                  <div className="table-responsive d-none d-md-block">
+                    <Table hover size="sm" className="align-middle mb-0" style={{ fontSize: "0.85rem" }}>
+                      <thead>
+                        <tr>
+                          <th>Time</th>
+                          <th>Level</th>
+                          <th>User</th>
+                          <th>Module</th>
+                          <th>Event</th>
+                          <th>Message</th>
+                          <th className="text-end">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {siteLogs.map((entry) => (
+                          <tr key={entry.id}>
+                            <td style={{ whiteSpace: "nowrap" }}>{formatAdminDate(entry.timestamp)}</td>
+                            <td>
+                              <Badge bg={logLevelVariant(entry.level)} text={entry.level === "WARN" ? "dark" : undefined}>
+                                {entry.level || "INFO"}
+                              </Badge>
+                            </td>
+                            <td style={{ overflowWrap: "anywhere" }}>
+                              <div>{entry?.user?.name || entry?.user?.email || "—"}</div>
+                              {entry?.user?.role ? <div className="text-muted small">{entry.user.role}</div> : null}
+                            </td>
+                            <td>{entry.category || "—"}</td>
+                            <td style={{ overflowWrap: "anywhere" }}>{entry.event || "—"}</td>
+                            <td style={{ minWidth: 220, overflowWrap: "anywhere" }}>{entry.message || "—"}</td>
+                            <td className="text-end">
+                              <Button type="button" size="sm" variant="outline-primary" onClick={() => setSelectedSiteLog(entry)}>
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+
+                  <div className="d-md-none">
+                    {siteLogs.map((entry) => (
+                      <Card key={entry.id} border="light" className="shadow-sm mb-3">
+                        <Card.Body>
+                          <div className="d-flex justify-content-between align-items-start" style={{ gap: 12 }}>
+                            <div className="mobile-min-width-0">
+                              <div className="fw-bold mobile-break-anywhere">{entry.event || "Site event"}</div>
+                              <div className="text-muted small">{formatAdminDate(entry.timestamp)}</div>
+                            </div>
+                            <Badge bg={logLevelVariant(entry.level)} text={entry.level === "WARN" ? "dark" : undefined}>
+                              {entry.level || "INFO"}
+                            </Badge>
+                          </div>
+                          <div className="mt-3 small">
+                            <div><strong>Module:</strong> {entry.category || "—"}</div>
+                            <div className="mobile-break-anywhere"><strong>User:</strong> {entry?.user?.name || entry?.user?.email || "—"}</div>
+                            <div className="mt-2 mobile-break-anywhere">{entry.message || "—"}</div>
+                          </div>
+                          <Button type="button" size="sm" variant="outline-primary" className="w-100 mt-3" onClick={() => setSelectedSiteLog(entry)}>
+                            View details
+                          </Button>
+                        </Card.Body>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Card.Body>
+          </Card>
+        </>
+      ) : null}
+
       {activeTab === "system" ? (
         <>
           {systemError ? <Alert variant="danger">{systemError}</Alert> : null}
@@ -1035,6 +1276,75 @@ export default function Administration() {
           </Card>
         </>
       ) : null}
+
+      <Modal
+        show={Boolean(selectedSiteLog)}
+        onHide={() => setSelectedSiteLog(null)}
+        size="lg"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Site Log details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedSiteLog ? (
+            <>
+              <Row className="g-3 mb-3">
+                <Col xs={12} md={6}>
+                  <div className="text-muted small">Timestamp</div>
+                  <div>{formatAdminDate(selectedSiteLog.timestamp)}</div>
+                </Col>
+                <Col xs={12} md={3}>
+                  <div className="text-muted small">Level</div>
+                  <Badge bg={logLevelVariant(selectedSiteLog.level)} text={selectedSiteLog.level === "WARN" ? "dark" : undefined}>
+                    {selectedSiteLog.level || "INFO"}
+                  </Badge>
+                </Col>
+                <Col xs={12} md={3}>
+                  <div className="text-muted small">Module</div>
+                  <div>{selectedSiteLog.category || "—"}</div>
+                </Col>
+                <Col xs={12} md={6}>
+                  <div className="text-muted small">User</div>
+                  <div className="mobile-break-anywhere">
+                    {selectedSiteLog?.user?.name || "—"} {selectedSiteLog?.user?.email ? `(${selectedSiteLog.user.email})` : ""}
+                  </div>
+                </Col>
+                <Col xs={12} md={6}>
+                  <div className="text-muted small">Request ID</div>
+                  <div className="mobile-break-anywhere">{selectedSiteLog.requestId || "—"}</div>
+                </Col>
+                <Col xs={12}>
+                  <div className="text-muted small">Event</div>
+                  <div className="fw-bold mobile-break-anywhere">{selectedSiteLog.event || "—"}</div>
+                  <div className="mt-1 mobile-break-anywhere">{selectedSiteLog.message || "—"}</div>
+                </Col>
+              </Row>
+
+              <div className="text-muted small mb-1">Technical details</div>
+              <pre
+                className="bg-light border rounded p-3 mb-0"
+                style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "0.78rem", maxHeight: 360, overflowY: "auto" }}
+              >
+                {JSON.stringify({
+                  route: selectedSiteLog.route || "",
+                  method: selectedSiteLog.method || "",
+                  status: selectedSiteLog.status,
+                  area: selectedSiteLog.area || "",
+                  entityId: selectedSiteLog.entityId || "",
+                  appVersion: selectedSiteLog.appVersion || "",
+                  apiVersion: selectedSiteLog.apiVersion || "",
+                  device: selectedSiteLog.device || null,
+                  details: selectedSiteLog.details || null
+                }, null, 2)}
+              </pre>
+            </>
+          ) : null}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button type="button" variant="secondary" onClick={() => setSelectedSiteLog(null)}>Close</Button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal
         show={Boolean(userToDelete)}

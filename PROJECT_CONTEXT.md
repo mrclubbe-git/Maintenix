@@ -2014,7 +2014,10 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
   - final DOCX/PDF generation requires a connection.
 - Draft sync remains local-first and automatic when connectivity returns. Unsynced local drafts are not deleted when an offline lease expires.
 - Application-shell caching never caches authenticated API responses; authenticated/reference data remains in user-scoped IndexedDB and API authorization remains server-enforced when online.
-- Backend regression run `39236872821` passed after the new 48-hour/offline lease implementation.
-- Security backend packaging run `39236872942` passed.
-- Frontend GitHub Pages build run `39237247492` passed its build and deployable-security checks; final Pages deployment result should be recorded once complete.
+- Backend regression run `39237649160` passed after the new 48-hour/offline lease implementation and deployment-note update.
+- Security backend packaging run `39237649381` passed; artifact ID `12179608707`, source head `79c4a0dd0f02055aa1bb17c53599499c619c5db5`.
+- Final GitHub Pages run `39237247492` completed successfully, including build, no-source-map/CSP checks and Pages deployment.
+- Deployed frontend head: `c0c958c6dfb524f68365616751b18bca2f4aac6f` (latest worker-refresh deploy commit).
+- Targeted CRA DEV backend handoff: `cra-offline-48h-auto-sync-backend-2026-10-19.zip`, SHA-256 `505158afe2a4f39b1afcd27aa1d4cc4d8b1bcb4eeb22731d45430183360763aa`.
+- Backend source still requires manual placement on CRA DEV followed by restart of the existing `maintenix-dev-api.service`; do not claim runtime offline acceptance until that install/restart and focused testing are confirmed.
 - No LIVE/production change was made.

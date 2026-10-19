@@ -136,6 +136,11 @@
         var path = String(detail && detail.path || "");
         if (path.indexOf("/api/site-logs/") >= 0) return;
 
+        // The Site Logger records the browser offline/online transition once.
+        // Do not emit a fresh API network-error event for every heartbeat while
+        // the device is known to be offline.
+        if (detail && detail.networkError && navigator.onLine === false) return;
+
         var key = [
           String(detail && detail.method || "GET"),
           path,

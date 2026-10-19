@@ -12,7 +12,7 @@ const STORAGE_PREFIX = `maintenix:${ORGANIZATION.code}:`;
 const SESSION_MARKER_KEY = STORAGE_PREFIX + "authSessionActive";
 const LEGACY_TOKEN_KEY = STORAGE_PREFIX + "authToken";
 
-export const AUTH_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+export const AUTH_SESSION_TTL_MS = 48 * 60 * 60 * 1000;
 
 export const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
   enabled: true,
@@ -135,6 +135,8 @@ export function clearOrgAuth() {
   window.localStorage.removeItem(SESSION_MARKER_KEY);
   orgLocalStorage.removeItem("authUser");
   orgLocalStorage.removeItem("authExpiresAt");
+  orgLocalStorage.removeItem("offlineLease");
+  orgLocalStorage.removeItem("lastSuccessfulSyncAt");
   clearOrgCsrfToken();
   try {
     window.dispatchEvent(new Event("authUserUpdated"));

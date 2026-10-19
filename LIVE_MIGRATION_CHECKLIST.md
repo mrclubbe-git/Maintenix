@@ -8,6 +8,17 @@ This file exists so every server process, worker, runtime dependency, persistent
 
 Historical migration notes may still exist in the repository. Where they conflict with this file, this checklist is the current operational reference.
 
+## Approved migration baseline — 2026-10-19
+
+The user has explicitly accepted the current CRA DEV application state as the **migration-approved version baseline**.
+
+- Accepted `main` source head at declaration: `51300a11f7cc85e54093b8af2313aaea8190aeca`
+- Accepted `deploy` frontend head at declaration: `2642634614d8a1c47915c13f9eb2b54d4eb7051d`
+- Final GitHub Pages deployment for this baseline: workflow run `39270366042` — successful.
+- This supersedes the previously recorded accepted migration version.
+- The approved baseline includes the accepted Overview tracker/mobile refinements and the Standby/Pictures mobile card improvements in addition to all previously accepted migration functionality.
+- This records **which version is approved for migration**. Do not execute the LIVE cutover or make unrelated LIVE changes until the user explicitly instructs that the migration/cutover should proceed.
+
 ---
 
 ## 1. Current runtime process inventory

@@ -2042,3 +2042,16 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Final deployed frontend head: `8680210604fde1653301f4e55d27c7bf316d3e9e`.
 - GitHub Pages run `39241677807` completed successfully, including build, deployable-security checks and Pages deployment.
 - Existing local drafts are preserved; the repair does not clear IndexedDB or server draft history.
+
+
+## CRA offline field test accepted — 2026-10-19
+
+- User completed a quick end-to-end CRA DEV offline test after the 48-hour signed offline-access and automatic-sync deployment.
+- Result: **offline workflow test passed perfectly** from the user's perspective.
+- This acceptance follows the Section Report automatic-sync 400 retry repair and final frontend deployment.
+- Treat the current CRA DEV offline baseline as accepted for continued development:
+  - protected offline entry works with the valid signed local lease;
+  - cached workflow/reference data is usable offline;
+  - local-first draft persistence works offline;
+  - reconnect/automatic sync behavior is functioning in the tested flow.
+- This is a CRA DEV acceptance only. It does not authorize or imply any LIVE/production change.

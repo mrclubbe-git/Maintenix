@@ -171,6 +171,64 @@
     }
   }
 
+  // Overview Presence table: keep headings intact and compress the
+  // three columns deliberately instead of allowing letter-by-letter wrapping.
+  .overview-presence-table {
+    width: 100%;
+    table-layout: fixed;
+
+    th,
+    td {
+      vertical-align: middle;
+      padding-left: 0.4rem;
+      padding-right: 0.4rem;
+    }
+
+    thead th {
+      white-space: nowrap !important;
+      word-break: normal !important;
+      overflow-wrap: normal !important;
+      font-size: 0.72rem;
+    }
+
+    tbody td {
+      font-size: 0.78rem;
+    }
+
+    th:nth-child(1),
+    td:nth-child(1) {
+      width: 48%;
+    }
+
+    th:nth-child(2),
+    td:nth-child(2) {
+      width: 22%;
+      white-space: nowrap !important;
+    }
+
+    th:nth-child(3),
+    td:nth-child(3) {
+      width: 30%;
+      white-space: nowrap !important;
+    }
+
+    td:nth-child(1) {
+      white-space: normal !important;
+      overflow: hidden;
+    }
+
+    .overview-presence-user {
+      min-width: 0;
+    }
+
+    .overview-presence-user-copy {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  }
+
   // Stack small button-groups vertically on mobile (opt-in)
   .mobile-stack-btn-group {
     display: flex !important;

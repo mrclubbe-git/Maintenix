@@ -4,6 +4,7 @@ import { setLastSuccessfulSyncAt, storeOfflineLeaseFromResponse } from "./offlin
 const SYNC_LOCK_KEY = "offlineSyncLock";
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const SYNC_LOCK_TTL_MS = 2 * 60 * 1000;
+const FORMAL_DRAFT_SYNC_VERSION = 1;
 
 let coordinatorStarted = false;
 let running = false;
@@ -347,12 +348,37 @@ async function syncCalloutDrafts(db) {
 
 async function syncFormalDrafts(db) {
   let records = await idbGetAll(db, "formalReportDrafts");
+
+  // Drafts from before the local-first sync contract may be marked pending
+  // without carrying the schema/version expected by the current server. Keep
+  // them local for review instead of generating repeated 400 responses.
+  for (const rec of records) {
+    if (
+      rec?.type === "formalReportDraft" &&
+      !rec.deleted &&
+      (rec.syncStatus === "pending" || rec.syncStatus === "syncing") &&
+      rec.syncVersion !== FORMAL_DRAFT_SYNC_VERSION
+    ) {
+      await idbPut(db, "formalReportDrafts", {
+        ...rec,
+        syncStatus: "blocked",
+        syncError: "Legacy local draft requires review. Open it and save it again before server synchronization."
+      });
+    }
+  }
+
+  records = await idbGetAll(db, "formalReportDrafts");
   const drafts = records.filter((rec) => (
     rec?.type === "formalReportDraft" &&
     (
       rec.deleted ||
-      rec.syncStatus === "pending" ||
-      rec.syncStatus === "syncing"
+      (
+        rec.syncVersion === FORMAL_DRAFT_SYNC_VERSION &&
+        (
+          rec.syncStatus === "pending" ||
+          rec.syncStatus === "syncing"
+        )
+      )
     )
   ));
 
@@ -448,6 +474,7 @@ async function syncFormalDrafts(db) {
       await idbPut(db, "formalReportDrafts", {
         id,
         type: "formalReportDraft",
+        syncVersion: FORMAL_DRAFT_SYNC_VERSION,
         name: detail.draft.name || summary.name || id,
         nameDirty: false,
         savedAt: detail.draft.savedAt || serverAt || new Date().toISOString(),

@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DATA_FILE = process.env.SESSION_DATA_FILE ? path.resolve(process.env.SESSION_DATA_FILE) : path.join(__dirname, "..", "data", "sessions.json");
-const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
+const SESSION_TTL_MS = 1000 * 60 * 60 * 48;
 const SESSION_COOKIE_NAME = String(process.env.SESSION_COOKIE_NAME || "maintenix_session").trim() || "maintenix_session";
 const ALLOW_LEGACY_BEARER = String(process.env.ALLOW_LEGACY_BEARER || "").toLowerCase() === "true";
 

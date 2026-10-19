@@ -42,6 +42,7 @@ jobs:
           node --check notificationWorker.js
           node --check lib/sessions.js
           node --check lib/offlineLease.js
+          node --check lib/siteLogger.js
           node --check lib/requestSecurity.js
           node --check lib/imageValidation.js
           node --check lib/profileRoutes.js
@@ -69,6 +70,7 @@ jobs:
           node --check routes/areas.js
           node --check routes/admin.js
           node --check routes/servicing.js
+          node --check routes/siteLogs.js
           python3 -m py_compile formal-reporting/report_worker.py formal-reporting/text_validation.py formal-reporting/test_text_validation.py
 
       - name: Backend regression tests

@@ -2055,3 +2055,13 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
   - local-first draft persistence works offline;
   - reconnect/automatic sync behavior is functioning in the tested flow.
 - This is a CRA DEV acceptance only. It does not authorize or imply any LIVE/production change.
+
+
+## Sign In show-password control — 2026-10-19
+
+- Added a **Show password** checkbox to the CRA Sign In form.
+- The password field now toggles between masked and visible text without changing the stored/submitted password value.
+- Main source commit: `87780489d2c230548d28d70946a9b1c19e37e3d4`.
+- Deploy commit: `3c71158f6214d7dfa34928b72bc9b7c7ed246be6`.
+- GitHub Pages deployment run `39243472606` completed successfully.
+- No backend or LIVE change was required.

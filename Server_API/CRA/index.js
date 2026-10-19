@@ -43,6 +43,57 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  const method = String(req.method || "GET").toUpperCase();
+  const routePath = String(req.originalUrl || req.url || "").split("?")[0];
+  const writeMethod = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+  const excluded =
+    routePath.startsWith("/api/presence/") ||
+    routePath.startsWith("/api/site-logs/") ||
+    routePath.startsWith("/api/auth/") ||
+    routePath.startsWith("/api/admin/");
+
+  res.on("finish", () => {
+    if (excluded) return;
+
+    const status = Number(res.statusCode || 0);
+    const shouldLogWrite = writeMethod && status >= 200 && status < 300;
+    const shouldLogDenied = status === 403 || status === 429;
+    if (!shouldLogWrite && !shouldLogDenied) return;
+
+    try {
+      const token = extractSessionToken(req);
+      const session = token ? getSession(token) : null;
+      const user = session?.userId
+        ? getUsers().find((entry) => String(entry.id) === String(session.userId)) || null
+        : null;
+
+      const moduleName = routePath
+        .replace(/^\/api\//, "")
+        .split("/")[0]
+        .replace(/[^a-z0-9_-]/gi, "")
+        .toUpperCase() || "API";
+
+      logEvent({
+        level: shouldLogDenied ? "WARN" : "INFO",
+        category: shouldLogDenied ? "SECURITY" : moduleName,
+        event: shouldLogDenied ? "API_REQUEST_DENIED" : "API_WRITE_SUCCEEDED",
+        message: shouldLogDenied
+          ? `API request denied with HTTP ${status}.`
+          : `${method} request completed successfully.`,
+        user,
+        requestId: req.requestId,
+        route: routePath,
+        method,
+        status,
+        source: "server"
+      });
+    } catch {}
+  });
+
+  next();
+});
+
+app.use((req, res, next) => {
   const origin = String(req.headers.origin || "").trim();
 
   if (origin && allowedCorsOrigins.has(origin)) {

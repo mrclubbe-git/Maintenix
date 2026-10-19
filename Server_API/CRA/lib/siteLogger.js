@@ -4,7 +4,9 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-const LOG_DIR = path.join(__dirname, "..", "data", "site-logs");
+const LOG_DIR = process.env.SITE_LOG_DIR
+  ? path.resolve(process.env.SITE_LOG_DIR)
+  : path.join(__dirname, "..", "data", "site-logs");
 const RETENTION_DAYS = Math.max(7, Number(process.env.SITE_LOG_RETENTION_DAYS || 90));
 const LEVELS = new Set(["INFO", "WARN", "ERROR", "CRITICAL"]);
 const MAX_MESSAGE = 1000;
@@ -65,9 +67,6 @@ function cleanupOldFiles(now = new Date()) {
 }
 
 function logEvent(input = {}) {
-  ensureDir();
-  cleanupOldFiles();
-
   const now = new Date();
   const level = LEVELS.has(String(input.level || "").toUpperCase())
     ? String(input.level).toUpperCase()
@@ -99,8 +98,15 @@ function logEvent(input = {}) {
     details: input.details ? sanitize(input.details) : null
   };
 
-  const file = path.join(LOG_DIR, `${isoDay(now)}.ndjson`);
-  fs.appendFileSync(file, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
+  try {
+    ensureDir();
+    cleanupOldFiles(now);
+    const file = path.join(LOG_DIR, `${isoDay(now)}.ndjson`);
+    fs.appendFileSync(file, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
+  } catch (error) {
+    try { console.error("Site Logs write failed:", error?.message || error); } catch {}
+  }
+
   return record;
 }
 

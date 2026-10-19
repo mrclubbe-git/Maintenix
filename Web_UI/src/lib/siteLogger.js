@@ -209,8 +209,18 @@ export function startSiteLogger() {
     }).catch(() => {});
   };
 
+  let connectivityState = navigator.onLine === false ? "offline" : "online";
+
   const onApiError = (event) => {
     const detail = event?.detail || {};
+
+    // Browser-offline transitions are logged once by onOffline/onOnline.
+    // Suppress repeated API/presence fetch failures while the device remains
+    // offline so the Site Logs outbox cannot be flooded by heartbeat retries.
+    if (detail.networkError === true && (navigator.onLine === false || connectivityState === "offline")) {
+      return;
+    }
+
     const status = Number(detail.status || 0);
     const serverError = status >= 500;
     logSiteEvent({
@@ -236,6 +246,9 @@ export function startSiteLogger() {
   };
 
   const onOffline = () => {
+    if (connectivityState === "offline") return;
+    connectivityState = "offline";
+
     logSiteEvent({
       level: "WARN",
       category: "OFFLINE",
@@ -245,12 +258,19 @@ export function startSiteLogger() {
   };
 
   const onOnline = () => {
-    logSiteEvent({
-      level: "INFO",
-      category: "OFFLINE",
-      event: "CONNECTIVITY_RESTORED",
-      message: "Browser connectivity was restored."
-    }).finally(() => flushSiteLogOutbox());
+    if (connectivityState === "online") return;
+    connectivityState = "online";
+
+    // Flush the queued CONNECTIVITY_LOST event first so the server log retains
+    // the natural offline -> online sequence, then record the recovery event.
+    flushSiteLogOutbox()
+      .finally(() => logSiteEvent({
+        level: "INFO",
+        category: "OFFLINE",
+        event: "CONNECTIVITY_RESTORED",
+        message: "Browser connectivity was restored."
+      }))
+      .catch(() => {});
   };
 
   window.addEventListener("error", onError);

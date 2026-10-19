@@ -2221,3 +2221,17 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Deploy commit: `a55db401a2d524a970bd9438ab9e1df170117804`.
 - GitHub Pages run `39254952717` completed successfully, including build and deployable-security checks.
 - No backend or LIVE/production change was required.
+
+
+## Overview tracker tile height refinement — 2026-10-19
+
+- User requested that the new Overview Monthly Servicing and Monthly Call Outs tracker tiles do not stretch vertically to match the taller Presence tile.
+- Tracker cards are now content-height only:
+  - removed `h-100` from the tracker cards;
+  - removed flex-column / `mt-auto` stretching behavior from their bodies;
+  - tracker columns are top-aligned with `align-self-start`.
+- Presence retains its existing height behavior.
+- Main source commit: `5462c40cc4045cf48fceaa3a9775be01da44091d`.
+- Deploy commit: `22a81e9301940d24101cd1cd42443b19b9bd5b15`.
+- GitHub Pages run `39262390114` completed successfully.
+- No backend or LIVE change was required.

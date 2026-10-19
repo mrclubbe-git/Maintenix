@@ -10,9 +10,12 @@ const zlib = require("node:zlib");
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "maintenix-security-"));
 process.env.SESSION_DATA_FILE = path.join(tempDir, "sessions.json");
 process.env.PROFILE_PICS_DIR = path.join(tempDir, "profilepics");
+process.env.OFFLINE_LEASE_PRIVATE_KEY_FILE = path.join(tempDir, "offline-lease-private.pem");
+process.env.OFFLINE_LEASE_PUBLIC_KEY_FILE = path.join(tempDir, "offline-lease-public.pem");
 delete process.env.ALLOW_LEGACY_BEARER;
 
 const sessions = require("../lib/sessions");
+const { OFFLINE_LEASE_TTL_MS, issueOfflineLease, verifyOfflineLeaseToken } = require("../lib/offlineLease");
 const { validateSignatureDataUrl } = require("../lib/imageValidation");
 const {
   PROFILE_PICS_DIR,
@@ -23,6 +26,33 @@ const {
 
 test.after(() => {
   try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+});
+
+test("session and offline lease ceilings are 48 hours", () => {
+  assert.equal(sessions.SESSION_TTL_MS, 48 * 60 * 60 * 1000);
+  assert.equal(OFFLINE_LEASE_TTL_MS, 48 * 60 * 60 * 1000);
+
+  const lease = issueOfflineLease({
+    id: "user-offline",
+    email: "offline@example.test",
+    name: "Offline User",
+    role: "L1",
+    status: "APPROVED",
+    organization: "CRA"
+  });
+
+  assert.ok(lease.token);
+  assert.ok(lease.publicKeyJwk?.n);
+  assert.ok(lease.publicKeyJwk?.e);
+  assert.ok(lease.expiresAt > Date.now() + (47 * 60 * 60 * 1000));
+
+  const payload = verifyOfflineLeaseToken(lease.token);
+  assert.equal(payload?.sub, "user-offline");
+  assert.equal(payload?.organization, "CRA");
+  assert.equal(payload?.role, "L1");
+
+  const tampered = lease.token.slice(0, -1) + (lease.token.endsWith("A") ? "B" : "A");
+  assert.equal(verifyOfflineLeaseToken(tampered), null);
 });
 
 test("cookie sessions are server-managed, CSRF-bound and individually revocable", () => {

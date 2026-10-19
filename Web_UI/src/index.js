@@ -1,5 +1,6 @@
 import { orgLocalStorage, orgSessionStorage, migrateLegacyCraLocalStorage, organizationDbName } from "./config/organization";
-import { isMaintenixPushWorkerRegistration, isMaintenixPushWorkerScriptUrl } from "./lib/devicePush";
+import { ensureMaintenixWorkerRegistration, isMaintenixPushWorkerRegistration, isMaintenixPushWorkerScriptUrl } from "./lib/devicePush";
+import { startOfflineSyncCoordinator } from "./lib/offlineSync";
 // =========================================================
 // * Volt React Dashboard
 // =========================================================
@@ -115,8 +116,11 @@ async function removeLegacyOfflineArtifacts() {
   try {
     if ("caches" in window) {
       const keys = await window.caches.keys();
-      const maintenixKeys = keys.filter((key) => String(key || "").toLowerCase().includes("maintenix"));
-      await Promise.all(maintenixKeys.map((key) => window.caches.delete(key)));
+      const legacyKeys = keys.filter((key) => {
+        const value = String(key || "").toLowerCase();
+        return value.includes("maintenix") && !value.startsWith("maintenix-app-shell-");
+      });
+      await Promise.all(legacyKeys.map((key) => window.caches.delete(key)));
     }
   } catch {}
 
@@ -144,6 +148,8 @@ function runVersionCheckOnceOnLoad() {
 
 migrateLegacyCraLocalStorage();
 removeLegacyOfflineArtifacts();
+ensureMaintenixWorkerRegistration().catch(() => {});
+startOfflineSyncCoordinator();
 runVersionCheckOnceOnLoad();
 
 /**

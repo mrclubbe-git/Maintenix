@@ -1,3 +1,5 @@
+import { orgLocalStorage } from "../config/organization";
+
 const PUSH_WORKER_FILENAME = "maintenix-push-sw.js";
 
 function publicBase() {
@@ -253,4 +255,169 @@ export async function sendDevicePushTest(authToken) {
   }
 
   return data;
+}
+
+
+const DEVICE_NOTIFICATION_ACTION_PARAM = "mtxNotificationAction";
+const DEVICE_NOTIFICATION_ID_PARAM = "mtxNotificationId";
+const DEVICE_NOTIFICATION_ACTIONS = new Set(["mark-read", "acknowledge"]);
+let deviceNotificationActionBridgeStarted = false;
+let deviceNotificationActionBusy = false;
+
+function normalizeDeviceNotificationAction(action, notificationId) {
+  const cleanAction = String(action || "").trim().toLowerCase();
+  const cleanId = String(notificationId || "").trim().slice(0, 240);
+  if (!DEVICE_NOTIFICATION_ACTIONS.has(cleanAction) || !cleanId) return null;
+  return { action: cleanAction, notificationId: cleanId };
+}
+
+function pendingDeviceNotificationActionFromUrl() {
+  if (typeof window === "undefined") return null;
+  try {
+    const url = new URL(window.location.href);
+    return normalizeDeviceNotificationAction(
+      url.searchParams.get(DEVICE_NOTIFICATION_ACTION_PARAM),
+      url.searchParams.get(DEVICE_NOTIFICATION_ID_PARAM)
+    );
+  } catch {
+    return null;
+  }
+}
+
+function rememberPendingDeviceNotificationAction(action) {
+  if (typeof window === "undefined" || !action) return;
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set(DEVICE_NOTIFICATION_ACTION_PARAM, action.action);
+    url.searchParams.set(DEVICE_NOTIFICATION_ID_PARAM, action.notificationId);
+    window.history.replaceState(window.history.state, document.title, url.href);
+  } catch {}
+}
+
+function clearPendingDeviceNotificationAction() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(DEVICE_NOTIFICATION_ACTION_PARAM);
+    url.searchParams.delete(DEVICE_NOTIFICATION_ID_PARAM);
+    window.history.replaceState(window.history.state, document.title, url.href);
+  } catch {}
+}
+
+async function performDeviceNotificationAction(action) {
+  if (!action) return false;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+
+  // The scoped authToken key intentionally resolves to the cookie-session
+  // marker. No bearer credential is exposed to the service worker.
+  const authSession = orgLocalStorage.getItem("authToken") || "";
+  if (!authSession) return false;
+
+  const endpoint = action.action === "acknowledge"
+    ? `/api/notifications/${encodeURIComponent(action.notificationId)}/ack`
+    : `/api/notifications/${encodeURIComponent(action.notificationId)}/read`;
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    cache: "no-store"
+  });
+  const data = await res.json().catch(() => ({}));
+
+  // Keep the pending action in the URL when authentication has expired so it
+  // can be retried after the user signs in again.
+  if (res.status === 401) return false;
+
+  // A missing/already-cleared notification should not become a permanent
+  // retry loop on every focus/reconnect.
+  if (res.status === 404) return true;
+
+  if (!res.ok) {
+    throw new Error(data?.message || `Notification action failed (HTTP ${res.status}).`);
+  }
+
+  try {
+    window.dispatchEvent(new CustomEvent("notificationsUpdated", { detail: data }));
+    if (
+      data?.relatedTask ||
+      String(data?.notification?.relatedEntityType || "") === "daily_planner_task"
+    ) {
+      window.dispatchEvent(new CustomEvent("dailyPlannerUpdated", { detail: data }));
+    }
+  } catch {}
+
+  return true;
+}
+
+async function tryPendingDeviceNotificationAction(actionOverride = null) {
+  if (deviceNotificationActionBusy) return false;
+
+  const action =
+    normalizeDeviceNotificationAction(
+      actionOverride?.action,
+      actionOverride?.notificationId
+    ) ||
+    pendingDeviceNotificationActionFromUrl();
+
+  if (!action) return false;
+
+  rememberPendingDeviceNotificationAction(action);
+  deviceNotificationActionBusy = true;
+  try {
+    const completed = await performDeviceNotificationAction(action);
+    if (completed) clearPendingDeviceNotificationAction();
+    return completed;
+  } catch {
+    return false;
+  } finally {
+    deviceNotificationActionBusy = false;
+  }
+}
+
+/**
+ * Bridges native Web Push action buttons back into the authenticated Maintenix
+ * application. The service worker never receives a CSRF secret or session
+ * credential; it only supplies the notification ID and requested action.
+ */
+export function startDeviceNotificationActionBridge() {
+  if (deviceNotificationActionBridgeStarted) return () => {};
+  if (typeof window === "undefined" || typeof navigator === "undefined") return () => {};
+
+  deviceNotificationActionBridgeStarted = true;
+
+  const attemptPending = () => {
+    tryPendingDeviceNotificationAction().catch(() => {});
+  };
+
+  const onWorkerMessage = (event) => {
+    const message = event?.data;
+    if (String(message?.type || "") !== "maintenix-notification-action") return;
+
+    const action = normalizeDeviceNotificationAction(
+      message?.action,
+      message?.notificationId
+    );
+    if (!action) return;
+
+    rememberPendingDeviceNotificationAction(action);
+    tryPendingDeviceNotificationAction(action).catch(() => {});
+  };
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("message", onWorkerMessage);
+  }
+  window.addEventListener("authUserUpdated", attemptPending);
+  window.addEventListener("online", attemptPending);
+  window.addEventListener("focus", attemptPending);
+
+  window.setTimeout(attemptPending, 0);
+
+  return () => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.removeEventListener("message", onWorkerMessage);
+    }
+    window.removeEventListener("authUserUpdated", attemptPending);
+    window.removeEventListener("online", attemptPending);
+    window.removeEventListener("focus", attemptPending);
+    deviceNotificationActionBridgeStarted = false;
+  };
 }

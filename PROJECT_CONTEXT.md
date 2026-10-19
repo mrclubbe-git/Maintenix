@@ -2275,3 +2275,22 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Matching frontend files were promoted to `deploy`; final deploy head: `2642634614d8a1c47915c13f9eb2b54d4eb7051d`.
 - GitHub Pages workflow run `39270366042` completed successfully.
 - This remains post-milestone DEV enhancement work and does not replace the accepted migration milestone unless explicitly accepted later.
+
+
+## Accepted migration milestone — superseding baseline — 2026-10-19
+
+- User explicitly accepted the **current CRA DEV state as the new migration-approved version baseline**.
+- This supersedes the earlier accepted migration milestone recorded on 2026-10-19.
+- Accepted source heads at the moment of declaration:
+  - `main`: `51300a11f7cc85e54093b8af2313aaea8190aeca`
+  - `deploy`: `2642634614d8a1c47915c13f9eb2b54d4eb7051d`
+- The new accepted baseline includes everything in the previous accepted milestone plus the subsequently completed and accepted frontend work:
+  - Overview Monthly Servicing and Monthly Call Outs month-to-date trackers;
+  - Overview tracker cards kept at content height rather than stretching to Presence height;
+  - dedicated mobile compression for the Overview Presence table;
+  - all-pages mobile-layout audit outcome;
+  - Standby mobile cards for the selected-user editor and Standby Schedule while preserving desktop/tablet tables;
+  - Pictures List-view mobile cards while preserving Grid view and the desktop/tablet list table.
+- The successful GitHub Pages deployment for the final frontend state is workflow run `39270366042`, with final deploy head `2642634614d8a1c47915c13f9eb2b54d4eb7051d`.
+- CRA DEV remains the development environment for subsequent work. Any later change intended to replace this migration baseline must again be tested and explicitly accepted.
+- This declaration approves the **version/state to be used as the migration baseline**; it does not by itself instruct execution of the LIVE cutover or authorize unrelated LIVE changes.

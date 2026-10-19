@@ -336,7 +336,7 @@ export default function Standby() {
                     </Row>
                   </Form>
 
-                  <div className="table-responsive">
+                  <div className="table-responsive d-none d-md-block">
                     <Table hover size="sm" className="mb-0">
                       <thead>
                         <tr>
@@ -376,6 +376,39 @@ export default function Standby() {
                         )}
                       </tbody>
                     </Table>
+                  </div>
+
+                  <div className="d-md-none">
+                    {selectedUsers.length === 0 ? (
+                      <div className="text-muted py-2">No users added yet.</div>
+                    ) : (
+                      selectedUsers.map((u, i) => (
+                        <Card key={u.id} border="light" className="shadow-sm mb-2">
+                          <Card.Body className="p-3">
+                            <div className="d-flex justify-content-between align-items-start" style={{ gap: 10 }}>
+                              <div className="mobile-min-width-0">
+                                <div className="fw-bold mobile-break-anywhere">{u.name || u.email || u.id}</div>
+                                {u.email ? (
+                                  <div className="text-muted small mobile-break-anywhere">{u.email}</div>
+                                ) : null}
+                              </div>
+                              <Badge bg="light" text="dark">#{i + 1}</Badge>
+                            </div>
+                            <div className="d-flex flex-wrap mt-3" style={{ gap: 8 }}>
+                              <Button size="sm" variant="outline-secondary" onClick={() => moveUser(u.id, -1)} disabled={i === 0}>
+                                Move up
+                              </Button>
+                              <Button size="sm" variant="outline-secondary" onClick={() => moveUser(u.id, +1)} disabled={i === selectedUsers.length - 1}>
+                                Move down
+                              </Button>
+                              <Button size="sm" variant="outline-danger" onClick={() => removeUser(u.id)}>
+                                Remove
+                              </Button>
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      ))
+                    )}
                   </div>
                 </>
               )}
@@ -452,7 +485,7 @@ export default function Standby() {
               <Badge bg={schedule.length ? "success" : "secondary"}>{schedule.length ? `${schedule.length} rotation(s)` : "None"}</Badge>
             </Card.Header>
             <Card.Body className="p-0">
-              <div className="table-responsive">
+              <div className="table-responsive d-none d-md-block">
                 <Table hover className="mb-0">
                   <thead>
                     <tr>
@@ -483,6 +516,35 @@ export default function Standby() {
                     )}
                   </tbody>
                 </Table>
+              </div>
+
+              <div className="d-md-none p-3">
+                {schedule.length === 0 ? (
+                  <div className="text-muted">No schedule available.</div>
+                ) : (
+                  schedule.map((r) => (
+                    <Card key={`${r.rotation}_${r.userId}_${r.startDate}`} border="light" className="shadow-sm mb-2">
+                      <Card.Body className="p-3">
+                        <div className="d-flex justify-content-between align-items-start" style={{ gap: 10 }}>
+                          <div className="mobile-min-width-0">
+                            <div className="fw-bold mobile-break-anywhere">{r.userName || "Unknown user"}</div>
+                          </div>
+                          <Badge bg="info">Rotation {r.rotation}</Badge>
+                        </div>
+                        <Row className="g-2 mt-2">
+                          <Col xs={6}>
+                            <div className="text-muted small">Start</div>
+                            <div className="fw-bold">{r.startDate}</div>
+                          </Col>
+                          <Col xs={6}>
+                            <div className="text-muted small">End</div>
+                            <div className="fw-bold">{r.endDate}</div>
+                          </Col>
+                        </Row>
+                      </Card.Body>
+                    </Card>
+                  ))
+                )}
               </div>
             </Card.Body>
           </Card>

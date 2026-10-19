@@ -14,7 +14,9 @@ const {
   logEvent,
   listLogs,
   getLogById,
-  summarizeLogs
+  summarizeLogs,
+  clearAllLogs,
+  RETENTION_DAYS
 } = require("../lib/siteLogger");
 
 test("Site Logs writes NDJSON and redacts sensitive keys", () => {
@@ -87,4 +89,25 @@ test("Site Logs filters and summarizes recent records", () => {
   assert.ok(summary.error >= 1);
   assert.ok(summary.users >= 2);
   assert.ok(summary.categories.includes("AUTH"));
+});
+
+
+test("Site Logs default retention is 30 days", () => {
+  assert.equal(RETENTION_DAYS, 30);
+});
+
+test("Site Logs clear-all removes current NDJSON history", () => {
+  const before = logEvent({
+    level: "INFO",
+    category: "ADMIN",
+    event: "CLEAR_TEST",
+    message: "Clear-all test record."
+  });
+
+  assert.ok(getLogById(before.id));
+  const cleared = clearAllLogs();
+  assert.ok(cleared.deletedFiles >= 1);
+  assert.ok(cleared.deletedEntries >= 1);
+  assert.equal(getLogById(before.id), null);
+  assert.equal(fs.readdirSync(LOG_DIR).filter((name) => name.endsWith(".ndjson")).length, 0);
 });

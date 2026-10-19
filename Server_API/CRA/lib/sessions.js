@@ -18,13 +18,17 @@ function ensureFile() {
   }
 }
 
+function sessionActivityAt(session) {
+  return Number(session?.lastSeenAt || session?.createdAt || 0);
+}
+
 function isFresh(session) {
-  const createdAt = Number(session?.createdAt || 0);
+  const activityAt = sessionActivityAt(session);
   return Boolean(
     session?.userId &&
     session?.csrfToken &&
-    createdAt > 0 &&
-    Date.now() - createdAt <= SESSION_TTL_MS
+    activityAt > 0 &&
+    Date.now() - activityAt <= SESSION_TTL_MS
   );
 }
 
@@ -115,7 +119,7 @@ function getSessionExpiresAt(token) {
 
   const session = sessions.get(key) || null;
   if (!session || !isFresh(session)) return 0;
-  return Number(session.createdAt || 0) + SESSION_TTL_MS;
+  return sessionActivityAt(session) + SESSION_TTL_MS;
 }
 
 function getSession(token) {

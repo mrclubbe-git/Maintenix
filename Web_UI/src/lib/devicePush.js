@@ -82,7 +82,10 @@ export async function ensureMaintenixWorkerRegistration() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
 
   const existing = await findPushWorkerRegistration();
-  if (existing) return existing;
+  if (existing) {
+    try { await existing.update(); } catch {}
+    return existing;
+  }
 
   return navigator.serviceWorker.register(pushWorkerUrl(), {
     scope: pushWorkerScope()

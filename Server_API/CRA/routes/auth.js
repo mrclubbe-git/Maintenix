@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const { getUsers, saveUsers, findByEmail } = require("../lib/userStore");
 const { hashPassword, verifyPassword } = require("../lib/passwords");
 const { issueOfflineLease } = require("../lib/offlineLease");
+const { logEvent } = require("../lib/siteLogger");
 const {
   createSession,
   getSession,
@@ -141,6 +142,19 @@ router.post("/register", (req, res) => {
     users.push(newUser);
     saveUsers(users);
 
+    logEvent({
+      level: "INFO",
+      category: "AUTH",
+      event: "USER_REGISTERED",
+      message: "New user registration submitted.",
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      source: "server",
+      entityId: newUser.id,
+      details: { email: cleanEmail, name: cleanName || "" }
+    });
+
     return res.json({ ok: true, status: "PENDING" });
   } catch {
     return res.status(500).json({ ok: false, message: "Registration failed." });
@@ -155,6 +169,17 @@ router.post("/login", (req, res) => {
     const failureState = currentFailureState(req, cleanEmail);
 
     if (failureState.count >= LOGIN_MAX_FAILURES) {
+      logEvent({
+        level: "WARN",
+        category: "AUTH",
+        event: "LOGIN_RATE_LIMITED",
+        message: "Sign-in blocked by rate limit.",
+        requestId: req.requestId,
+        route: req.originalUrl,
+        method: req.method,
+        source: "server",
+        details: { email: cleanEmail, address: clientAddress(req) }
+      });
       return rateLimitResponse(res, failureState.retryAfterMs);
     }
 
@@ -162,6 +187,18 @@ router.post("/login", (req, res) => {
     const ok = Boolean(user) && verifyPassword(String(password || ""), user.password);
     if (!ok) {
       const failure = recordFailure(req, cleanEmail);
+      logEvent({
+        level: "WARN",
+        category: "AUTH",
+        event: "LOGIN_FAILED",
+        message: "Sign-in failed.",
+        requestId: req.requestId,
+        route: req.originalUrl,
+        method: req.method,
+        status: 401,
+        source: "server",
+        details: { email: cleanEmail, address: clientAddress(req), failureCount: failure.count }
+      });
       if (failure.count >= LOGIN_MAX_FAILURES) {
         return rateLimitResponse(res, LOGIN_WINDOW_MS - (Date.now() - failure.firstAt));
       }
@@ -173,17 +210,55 @@ router.post("/login", (req, res) => {
     const role = String(user.role || "").trim().toUpperCase();
     const status = String(user.status || "").trim().toUpperCase();
     if (role !== "ADMIN" && status !== "APPROVED") {
+      logEvent({
+        level: "WARN",
+        category: "AUTH",
+        event: "LOGIN_NOT_APPROVED",
+        message: "Sign-in rejected because the account is not approved.",
+        user,
+        requestId: req.requestId,
+        route: req.originalUrl,
+        method: req.method,
+        status: 403,
+        source: "server"
+      });
       return res.status(403).json({ ok: false, message: "Pending admin approval.", status: user.status });
     }
 
     const organization = String(user.organization || ORGANIZATION_CODE).trim().toUpperCase();
     if (organization !== ORGANIZATION_CODE) {
+      logEvent({
+        level: "WARN",
+        category: "AUTH",
+        event: "LOGIN_ORGANIZATION_DENIED",
+        message: "Sign-in rejected for the current organisation.",
+        user,
+        requestId: req.requestId,
+        route: req.originalUrl,
+        method: req.method,
+        status: 403,
+        source: "server",
+        details: { requestedOrganization: ORGANIZATION_CODE, userOrganization: organization }
+      });
       return res.status(403).json({ ok: false, message: "Account is not authorised for this organisation." });
     }
 
     const token = createSession(user.id, { organization });
     const session = getSession(token);
     const expiresAt = setSessionCookie(res, token);
+
+    logEvent({
+      level: "INFO",
+      category: "AUTH",
+      event: "LOGIN_SUCCEEDED",
+      message: "User signed in successfully.",
+      user,
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      source: "server",
+      details: { address: clientAddress(req), organization }
+    });
 
     return res.json({
       ok: true,
@@ -247,8 +322,26 @@ router.get("/csrf", (req, res) => {
 // POST /api/auth/logout
 router.post("/logout", (req, res) => {
   const token = extractSessionToken(req);
+  const session = token ? getSession(token) : null;
+  const user = session?.userId ? getUsers().find((entry) => String(entry.id) === String(session.userId)) : null;
+
   if (token) deleteSession(token);
   clearSessionCookie(res);
+
+  if (user) {
+    logEvent({
+      level: "INFO",
+      category: "AUTH",
+      event: "LOGOUT",
+      message: "User logged out.",
+      user,
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      source: "server"
+    });
+  }
+
   return res.json({ ok: true });
 });
 

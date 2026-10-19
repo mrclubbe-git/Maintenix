@@ -7,7 +7,7 @@ const path = require("path");
 const LOG_DIR = process.env.SITE_LOG_DIR
   ? path.resolve(process.env.SITE_LOG_DIR)
   : path.join(__dirname, "..", "data", "site-logs");
-const RETENTION_DAYS = Math.max(7, Number(process.env.SITE_LOG_RETENTION_DAYS || 90));
+const RETENTION_DAYS = Math.max(7, Number(process.env.SITE_LOG_RETENTION_DAYS || 30));
 const LEVELS = new Set(["INFO", "WARN", "ERROR", "CRITICAL"]);
 const MAX_MESSAGE = 1000;
 const MAX_DETAIL_TEXT = 2000;
@@ -196,6 +196,30 @@ function getLogById(id) {
   return null;
 }
 
+function clearAllLogs() {
+  ensureDir();
+  let deletedFiles = 0;
+  let deletedEntries = 0;
+
+  for (const name of fs.readdirSync(LOG_DIR)) {
+    if (!/^\d{4}-\d{2}-\d{2}\.ndjson$/.test(name)) continue;
+    const full = path.join(LOG_DIR, name);
+
+    try {
+      const lines = fs.readFileSync(full, "utf8").split("\n").filter(Boolean);
+      deletedEntries += lines.length;
+    } catch {}
+
+    try {
+      fs.unlinkSync(full);
+      deletedFiles += 1;
+    } catch {}
+  }
+
+  lastCleanupDay = "";
+  return { deletedFiles, deletedEntries };
+}
+
 function summarizeLogs(hours = 24) {
   const fromMs = Date.now() - Math.max(1, Number(hours || 24)) * 60 * 60 * 1000;
   const logs = listLogs({ fromMs, toMs: Date.now(), limit: 5000 });
@@ -231,6 +255,7 @@ module.exports = {
   listLogs,
   getLogById,
   summarizeLogs,
+  clearAllLogs,
   sanitize,
   safeText
 };

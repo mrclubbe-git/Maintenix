@@ -2095,3 +2095,17 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Targeted CRA DEV backend handoff: `cra-site-logs-phase1-backend-2026-10-19.zip`, SHA-256 `b021b8b312d87186ef3db58c5b5c00dd541a57a000eac04808f3ca9c07897b9f`.
 - IMPORTANT deployment order: frontend Site Logs changes are intentionally **not yet copied to `deploy`**. Install/restart the matching DEV backend first, then deploy the frontend so the client logger does not continuously queue against an undeployed endpoint.
 - No LIVE/production change was made.
+
+
+## Site Logs Phase 1 CRA DEV deployment — 2026-10-19
+
+- User confirmed the Site Logs Phase 1 backend handoff was manually installed on CRA DEV and the existing `maintenix-dev-api.service` was restarted successfully.
+- Matching frontend files were then promoted to `deploy`:
+  - `Web_UI/public/api-bootstrap.js`
+  - `Web_UI/src/index.js`
+  - `Web_UI/src/lib/siteLogger.js`
+  - `Web_UI/src/pages/Administration.js`
+- Final deploy head: `30abcbd56c133773c4fb297874775055280ea835`.
+- GitHub Pages run `39248012807` completed successfully, including build, deployable-security checks and Pages deployment.
+- Administration -> Site Logs is therefore now available on CRA DEV for focused acceptance testing.
+- No LIVE/production change was made.

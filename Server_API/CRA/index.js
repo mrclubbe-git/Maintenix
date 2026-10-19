@@ -49,10 +49,11 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Expose-Headers", "X-Request-Id");
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type,X-CSRF-Token,X-Maintenix-App-Build");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,X-CSRF-Token");
   res.setHeader("Access-Control-Max-Age", "600");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");

@@ -83,19 +83,19 @@ function latestReportLabel(report) {
 
 function MonthlyReportTracker({ title, count, latestReport, loading, error, noun }) {
   return (
-    <Card border="light" className="shadow-sm h-100">
+    <Card border="light" className="shadow-sm">
       <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 className="mb-0">{title}</h5>
         <Badge bg="light" text="dark">Month to date</Badge>
       </Card.Header>
-      <Card.Body className="d-flex flex-column">
+      <Card.Body>
         <div className="text-muted small">{currentMonthLabel()}</div>
         <div className="display-4 fw-bold mt-2 mb-1">
           {loading && count == null ? "…" : count == null ? "—" : count}
         </div>
         <div className="fw-bold">{noun}</div>
 
-        <div className="mt-auto pt-4">
+        <div className="mt-4">
           {error ? (
             <div className="text-warning small">{error}</div>
           ) : (
@@ -369,7 +369,7 @@ export default function DashboardOverview() {
           </Card>
         </Col>
 
-        <Col xs={12} md={6} xl={3}>
+        <Col xs={12} md={6} xl={3} className="align-self-start">
           <MonthlyReportTracker
             title="Monthly Servicing"
             count={monthlyTracker.servicingCount}
@@ -380,7 +380,7 @@ export default function DashboardOverview() {
           />
         </Col>
 
-        <Col xs={12} md={6} xl={3}>
+        <Col xs={12} md={6} xl={3} className="align-self-start">
           <MonthlyReportTracker
             title="Monthly Call Outs"
             count={monthlyTracker.calloutCount}

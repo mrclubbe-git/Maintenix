@@ -69,19 +69,21 @@ python3 Server_API/CRA/formal-reporting/report_worker.py health
 
 The result must report `"ok": true`.
 
-### Web Push browser service worker
+### Maintenix browser service worker
 
-`Web_UI/public/maintenix-push-sw.js` is a **browser service worker**, not a Linux/systemd process.
+`Web_UI/public/maintenix-push-sw.js` is the single approved **browser service worker**, not a Linux/systemd process.
 
-It is deployed as part of the Web UI and is registered by users' browsers when they enable **Device notifications**. It must **not** be added to `startAll.js` or systemd.
+It is deployed as part of the Web UI and is registered by the application on supported secure browsers. Device-notification opt-in still controls Push subscription, but worker registration is also required for the offline application shell. It must **not** be added to `startAll.js` or systemd.
 
 Its responsibilities are:
 
 - receive Web Push messages while the Web UI is backgrounded/closed;
 - display native device notifications;
-- open/focus Maintenix when the user taps a notification.
+- open/focus Maintenix when the user taps a notification;
+- cache the CRA application shell (HTML/JS/CSS/static assets) after a successful online load;
+- allow the GitHub Pages/hosted CRA shell to cold-start when the network is unavailable.
 
-The old offline worker must remain removed. Only the dedicated push worker should be preserved by frontend cleanup logic.
+The removed legacy offline/recovery workers must remain removed. Do not introduce a second worker for offline mode; extend the existing `maintenix-push-sw.js` only.
 
 ---
 
@@ -180,6 +182,8 @@ Important runtime files include, but are not limited to:
 - `user-preferences.json`
 - `push-subscriptions.json`
 - `web-push-vapid.json`
+- `offline-lease-private.pem`
+- `offline-lease-public.pem`
 - `notification-delivery.json`
 - `area-metadata.json`
 - drafts
@@ -196,6 +200,8 @@ Specific rules:
 - Do not migrate DEV presence data to LIVE.
 - Do not migrate DEV push subscriptions to LIVE.
 - Preserve the LIVE VAPID key once LIVE push subscriptions exist.
+- Do **not** migrate the DEV offline-lease RSA private/public keypair to LIVE. Allow LIVE to generate its own organisation/runtime keypair on first authenticated lease issuance (or pre-provision a LIVE-specific pair through the documented environment paths).
+- Once LIVE offline leases have been issued, preserve the LIVE offline-lease signing keypair across ordinary redeployments. Replacing it invalidates still-valid local leases until users reconnect and receive a new lease.
 - Treat `data/templates/areas.txt` as operationally mutable data, not merely source.
 - Preserve LIVE `data/area-metadata.json`; it contains organisation-specific Admin overrides and pending metadata for dynamically added Areas.
 - Do not replace LIVE `area-metadata.json` with DEV runtime data during deployment.
@@ -246,7 +252,10 @@ The approved LIVE Web UI must contain:
 - Navbar in-app notification handling;
 - `Web_UI/src/lib/devicePush.js`;
 - `Web_UI/public/maintenix-push-sw.js`;
-- frontend logic that preserves the push-only worker while removing legacy offline workers.
+- `Web_UI/src/lib/offlineSession.js`;
+- `Web_UI/src/lib/offlineSync.js`;
+- frontend logic that preserves the single Maintenix worker while removing legacy offline/recovery workers;
+- IndexedDB reference-data fallback for Servicing, Call Out and ADMIN Section Reports.
 
 The production build must use the correct LIVE API base URL.
 
@@ -347,7 +356,10 @@ Then verify the public LIVE health endpoint through the actual LIVE reverse prox
 Do not consider the migration complete until all applicable checks pass:
 
 - [ ] Authentication/login works.
-- [ ] 8-hour absolute session expiry works.
+- [ ] 48-hour renewable session/inactivity window works while connected.
+- [ ] A signed 48-hour offline lease is issued after successful online validation.
+- [ ] Offline access is denied after lease expiry until successful online validation/sign-in.
+- [ ] Automatic sync runs on reconnect/app resume and refreshes Areas, Servicing reference data and ADMIN Section Report inventory.
 - [ ] Profile/preferences persist.
 - [ ] Notification bell loads.
 - [ ] In-app notification sound works.
@@ -384,7 +396,7 @@ Do not consider the migration complete until all applicable checks pass:
 | Notification delivery worker | Node.js `notificationWorker.js` | Long-running via `startAll.js` | Required | Start/supervise; processes persistent Web Push outbox |
 | Formal Reporting worker | Python `report_worker.py` | Spawned on demand by API | Required dependency | Do not daemonize; install/validate dependencies |
 | Web Push delivery | Node.js `notificationWorker.js` + `lib/pushNotifications.js` | Persistent outbox worker | Required | Start with `startAll.js`; preserve `notification-delivery.json` as runtime state |
-| Push service worker | Browser JS `maintenix-push-sw.js` | Registered by browser | Required for device push | Deploy with Web UI; no systemd process |
+| Maintenix browser worker | Browser JS `maintenix-push-sw.js` | Registered by browser | Required for device push + offline app shell | Deploy with Web UI; no systemd process; preserve as the single worker |
 
 ### Rule for future development
 

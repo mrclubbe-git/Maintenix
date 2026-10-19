@@ -2235,3 +2235,20 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Deploy commit: `22a81e9301940d24101cd1cd42443b19b9bd5b15`.
 - GitHub Pages run `39262390114` completed successfully.
 - No backend or LIVE change was required.
+
+
+## Overview mobile Presence compression — 2026-10-19
+
+- User approved the inspected recommendation to improve the Overview Presence table on mobile without changing shared table behavior globally.
+- Presence now uses a dedicated `overview-presence-table` mobile treatment instead of the generic `mobile-wrap-table` helper.
+- Mobile behavior:
+  - headings `User`, `Status`, and `Last seen` stay on one line;
+  - table uses fixed 100% layout with 48% / 22% / 30% column distribution;
+  - mobile cell padding and font sizing are tightened;
+  - Status and Last seen values stay on one line;
+  - only the User/name area may wrap, with safe long-text breaking and no letter-by-letter heading wrapping.
+- Shared `mobile-wrap-table` behavior was left unchanged to protect other accepted mobile screens.
+- Main commits: `cf951a9af8094cbdee99283f37a10d4c18f545e6` and `7dfd90613150ab17eeed0a36f4a8c4d80fa2b658`.
+- Final deploy head: `62c272d987bf66e60aa90fb1444d9eea63760f76`.
+- GitHub Pages run `39263827076` completed successfully.
+- No backend or LIVE change was required.

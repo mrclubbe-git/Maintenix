@@ -1161,6 +1161,7 @@ export default function Administration() {
                       <option value="24">Last 24 hours</option>
                       <option value="168">Last 7 days</option>
                       <option value="720">Last 30 days</option>
+                      <option value="1440">Last 60 days</option>
                     </Form.Select>
                   </Form.Group>
                 </Col>

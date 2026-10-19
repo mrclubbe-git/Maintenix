@@ -1,7 +1,7 @@
 const express = require("express");
 const { getUsers, saveUsers } = require("../lib/userStore");
 const { getSession, extractBearer, deleteSessionsForUser } = require("../lib/sessions");
-const { logEvent, listLogs, getLogById, summarizeLogs } = require("../lib/siteLogger");
+const { logEvent, listLogs, getLogById, summarizeLogs, clearAllLogs } = require("../lib/siteLogger");
 const sharedAreas = require("./areas");
 const {
   cleanSpaces,
@@ -319,7 +319,7 @@ router.patch("/areas/:area/metadata", requireAdmin, noStore, (req, res) => {
 router.get("/site-logs", requireAdmin, noStore, (req, res) => {
   try {
     const now = Date.now();
-    const hours = Math.min(24 * 90, Math.max(1, Number(req.query.hours || 24)));
+    const hours = Math.min(24 * 30, Math.max(1, Number(req.query.hours || 24)));
     const fromMs = req.query.from ? Date.parse(String(req.query.from)) : now - hours * 60 * 60 * 1000;
     const toMs = req.query.to ? Date.parse(String(req.query.to)) : now;
     const logs = listLogs({
@@ -355,6 +355,38 @@ router.get("/site-logs", requireAdmin, noStore, (req, res) => {
     return res.json({ ok: true, logs, summary });
   } catch (error) {
     return res.status(500).json({ ok: false, message: String(error?.message || "Failed to load Site Logs.") });
+  }
+});
+
+// DELETE /api/admin/site-logs
+router.delete("/site-logs", requireAdmin, noStore, (req, res) => {
+  try {
+    const cleared = clearAllLogs();
+
+    // Write one fresh audit marker after clearing so the destructive action
+    // itself remains visible without retaining the cleared historical records.
+    logEvent({
+      level: "WARN",
+      category: "ADMIN",
+      event: "SITE_LOGS_CLEARED",
+      message: "All Site Logs were manually cleared by an administrator.",
+      user: req.admin,
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      source: "server",
+      details: {
+        deletedFiles: cleared.deletedFiles,
+        deletedEntries: cleared.deletedEntries
+      }
+    });
+
+    return res.json({ ok: true, ...cleared });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      message: String(error?.message || "Failed to clear Site Logs.")
+    });
   }
 });
 

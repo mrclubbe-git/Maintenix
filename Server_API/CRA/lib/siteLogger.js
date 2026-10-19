@@ -7,7 +7,7 @@ const path = require("path");
 const LOG_DIR = process.env.SITE_LOG_DIR
   ? path.resolve(process.env.SITE_LOG_DIR)
   : path.join(__dirname, "..", "data", "site-logs");
-const RETENTION_DAYS = Math.max(7, Number(process.env.SITE_LOG_RETENTION_DAYS || 30));
+const RETENTION_DAYS = Math.max(7, Number(process.env.SITE_LOG_RETENTION_DAYS || 60));
 const LEVELS = new Set(["INFO", "WARN", "ERROR", "CRITICAL"]);
 const MAX_MESSAGE = 1000;
 const MAX_DETAIL_TEXT = 2000;

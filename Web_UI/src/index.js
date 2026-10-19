@@ -1,6 +1,7 @@
 import { orgLocalStorage, orgSessionStorage, migrateLegacyCraLocalStorage, organizationDbName } from "./config/organization";
 import { ensureMaintenixWorkerRegistration, isMaintenixPushWorkerRegistration, isMaintenixPushWorkerScriptUrl } from "./lib/devicePush";
 import { startOfflineSyncCoordinator } from "./lib/offlineSync";
+import { startSiteLogger } from "./lib/siteLogger";
 // =========================================================
 // * Volt React Dashboard
 // =========================================================
@@ -150,6 +151,7 @@ migrateLegacyCraLocalStorage();
 removeLegacyOfflineArtifacts();
 ensureMaintenixWorkerRegistration().catch(() => {});
 startOfflineSyncCoordinator();
+startSiteLogger();
 runVersionCheckOnceOnLoad();
 
 /**

@@ -41,6 +41,7 @@ jobs:
             "Server_API/CRA/lib/requestSecurity.js"
             "Server_API/CRA/lib/servicingGenerator.js"
             "Server_API/CRA/lib/sessions.js"
+            "Server_API/CRA/lib/siteLogger.js"
             "Server_API/CRA/package.json"
             "Server_API/CRA/routes/admin.js"
             "Server_API/CRA/routes/areas.js"
@@ -53,7 +54,9 @@ jobs:
             "Server_API/CRA/routes/servicing.js"
             "Server_API/CRA/routes/standby.js"
             "Server_API/CRA/routes/stock.js"
+            "Server_API/CRA/routes/siteLogs.js"
             "Server_API/CRA/test/security-remediation.test.js"
+            "Server_API/CRA/test/site-logger.test.js"
           )
 
           for file in "${files[@]}"; do

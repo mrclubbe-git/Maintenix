@@ -5,6 +5,7 @@ if (!root) return () => {};
 const state = { sections: [], section: null, month: '', week: null, weekRange: '', compiledName: '', compiledDesignation: '', systems: [], responses: {}, index: 0 };
 
 const FORMAL_DRAFT_STORE = 'formalReportDrafts';
+const FORMAL_DRAFT_SYNC_VERSION = 1;
 let draftDb = null;
 let stopped = false;
 const draftSyncInFlight = new Set();
@@ -393,8 +394,13 @@ async function syncPendingDrafts() {
     record &&
     (
       record.deleted ||
-      record.syncStatus === 'pending' ||
-      record.syncStatus === 'syncing'
+      (
+        record.syncVersion === FORMAL_DRAFT_SYNC_VERSION &&
+        (
+          record.syncStatus === 'pending' ||
+          record.syncStatus === 'syncing'
+        )
+      )
     )
   ));
   if (!pending.length) return;
@@ -416,6 +422,7 @@ async function saveDraft() {
     const record = {
       id: value.id,
       type: 'formalReportDraft',
+      syncVersion: FORMAL_DRAFT_SYNC_VERSION,
       name: existing?.name || defaultDraftName(value),
       nameDirty: Boolean(existing?.nameDirty),
       savedAt,
@@ -512,6 +519,7 @@ async function loadDraft(id) {
       const cached = {
         id: data.draft.id,
         type: 'formalReportDraft',
+        syncVersion: FORMAL_DRAFT_SYNC_VERSION,
         name: data.draft.name || defaultDraftName(data.draft),
         savedAt: data.draft.savedAt || new Date().toISOString(),
         value: data.draft,
@@ -541,6 +549,7 @@ async function renameDraft(id) {
       record = {
         id,
         type: 'formalReportDraft',
+        syncVersion: FORMAL_DRAFT_SYNC_VERSION,
         name: data.draft?.name || defaultDraftName(data.draft || {}),
         savedAt: data.draft?.savedAt || new Date().toISOString(),
         value: data.draft,
@@ -552,6 +561,7 @@ async function renameDraft(id) {
 
     const updated = {
       ...record,
+      syncVersion: FORMAL_DRAFT_SYNC_VERSION,
       name: cleanName,
       nameDirty: true,
       savedAt: new Date().toISOString(),
@@ -577,6 +587,7 @@ async function deleteDraft(id) {
     if (existing) {
       await idbPut({
         ...existing,
+        syncVersion: FORMAL_DRAFT_SYNC_VERSION,
         deleted: true,
         syncStatus: 'pending',
         syncError: '',
@@ -586,6 +597,7 @@ async function deleteDraft(id) {
       await idbPut({
         id,
         type: 'formalReportDraft',
+        syncVersion: FORMAL_DRAFT_SYNC_VERSION,
         name: id,
         savedAt: new Date().toISOString(),
         value: null,

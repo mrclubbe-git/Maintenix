@@ -2154,3 +2154,14 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
   - ADMIN manual `Clear all`;
   - fresh `SITE_LOGS_CLEARED` audit marker after a clear.
 - No LIVE/production change was made.
+
+
+## Site Logs message wrapping — 2026-10-19
+
+- User requested that long Site Logs messages wrap inside the Administration table so no horizontal/out-of-window scrolling is needed.
+- The desktop Site Logs table now uses a fixed 100% layout with explicit column widths and aggressive wrapping for User, Module, Event and Message cells.
+- Removed the Message column minimum width that could force horizontal overflow.
+- Main source commit: `52d4b1a58b8c36b1c6fa105dc19b99c68eed3262`.
+- Deploy commit: `0e9bb5394c8bf54165e77f920e6948f409df19c0`.
+- GitHub Pages run `39251414298` completed successfully.
+- No backend or LIVE change was required.

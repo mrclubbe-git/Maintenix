@@ -40,6 +40,73 @@ function getInitials(nameOrEmail) {
   return s.slice(0, 2).toUpperCase();
 }
 
+function currentMonthKey(date = new Date()) {
+  const d = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function reportMonthKey(report) {
+  const explicit = String(report?.reportMonth || "").trim();
+  if (/^\d{4}-\d{2}$/.test(explicit)) return explicit;
+
+  const created = new Date(report?.createdAt || "");
+  return Number.isNaN(created.getTime()) ? "" : currentMonthKey(created);
+}
+
+function reportTypeForRow(report) {
+  const explicit = String(report?.reportType || report?.type || "").trim().toUpperCase();
+  if (explicit === "SERVICING" || explicit === "SERVICE") return "SERVICING";
+  if (explicit === "CALLOUT" || explicit === "CALL_OUT" || explicit === "CALL-OUT") return "CALLOUT";
+
+  const fileName = String(report?.displayFileName || report?.fileName || "").trim();
+  if (/^Service_Report_/i.test(fileName)) return "SERVICING";
+  if (/^(?:CallOut|Callout|Call_Out|Call-Out)_Report_/i.test(fileName) || /^callout(?:_|-|\b)/i.test(fileName)) {
+    return "CALLOUT";
+  }
+  return "UNKNOWN";
+}
+
+function currentMonthLabel() {
+  try {
+    return new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date());
+  } catch {
+    return currentMonthKey();
+  }
+}
+
+function latestReportLabel(report) {
+  if (!report?.createdAt) return "No reports yet this month";
+  const when = new Date(report.createdAt);
+  if (Number.isNaN(when.getTime())) return "Report generated this month";
+  return `Latest ${timeAgo(report.createdAt)}`;
+}
+
+function MonthlyReportTracker({ title, count, latestReport, loading, error, noun }) {
+  return (
+    <Card border="light" className="shadow-sm h-100">
+      <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 className="mb-0">{title}</h5>
+        <Badge bg="light" text="dark">Month to date</Badge>
+      </Card.Header>
+      <Card.Body className="d-flex flex-column">
+        <div className="text-muted small">{currentMonthLabel()}</div>
+        <div className="display-4 fw-bold mt-2 mb-1">
+          {loading && count == null ? "…" : count == null ? "—" : count}
+        </div>
+        <div className="fw-bold">{noun}</div>
+
+        <div className="mt-auto pt-4">
+          {error ? (
+            <div className="text-warning small">{error}</div>
+          ) : (
+            <div className="text-muted small">{latestReportLabel(latestReport)}</div>
+          )}
+        </div>
+      </Card.Body>
+    </Card>
+  );
+}
+
 function getProfilePhotoUrl(u) {
   // Try the most likely keys used elsewhere in the app/server
   const raw =
@@ -135,6 +202,15 @@ export default function DashboardOverview() {
   const [presenceUsers, setPresenceUsers] = useState([]);
   const [presenceErr, setPresenceErr] = useState("");
 
+  const [monthlyTracker, setMonthlyTracker] = useState({
+    servicingCount: null,
+    calloutCount: null,
+    latestServicing: null,
+    latestCallout: null
+  });
+  const [monthlyTrackerLoading, setMonthlyTrackerLoading] = useState(false);
+  const [monthlyTrackerErr, setMonthlyTrackerErr] = useState("");
+
   async function loadPresence() {
     if (!authToken) {
       setPresenceErr("Token missing. Please log in again.");
@@ -168,6 +244,71 @@ export default function DashboardOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken]);
 
+  async function loadMonthlyTracker() {
+    if (!authToken) {
+      setMonthlyTrackerErr("Sign in again to load report totals.");
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setMonthlyTrackerErr("Offline — showing the last loaded totals.");
+      return;
+    }
+
+    setMonthlyTrackerLoading(true);
+    setMonthlyTrackerErr("");
+
+    try {
+      const res = await fetch("/api/reports", { headers: {} });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMonthlyTrackerErr(data?.message || `Unable to load report totals (HTTP ${res.status}).`);
+        return;
+      }
+
+      const wantedMonth = currentMonthKey();
+      const reports = Array.isArray(data.reports) ? data.reports : [];
+      const current = reports.filter((report) => reportMonthKey(report) === wantedMonth);
+
+      const servicing = current
+        .filter((report) => reportTypeForRow(report) === "SERVICING")
+        .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+      const callouts = current
+        .filter((report) => reportTypeForRow(report) === "CALLOUT")
+        .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+
+      setMonthlyTracker({
+        servicingCount: servicing.length,
+        calloutCount: callouts.length,
+        latestServicing: servicing[0] || null,
+        latestCallout: callouts[0] || null
+      });
+    } catch {
+      setMonthlyTrackerErr("Report tracker is temporarily unavailable.");
+    } finally {
+      setMonthlyTrackerLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMonthlyTracker();
+
+    const intervalId = setInterval(() => {
+      if (typeof navigator === "undefined" || navigator.onLine !== false) loadMonthlyTracker();
+    }, 5 * 60_000);
+
+    const refresh = () => loadMonthlyTracker();
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken]);
+
   return (
     <>
       <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center py-4 gap-2">
@@ -177,9 +318,9 @@ export default function DashboardOverview() {
         </div>
       </div>
 
-      <Row className="mb-4">
+      <Row className="mb-4 g-3">
         {/* Users online / last seen */}
-        <Col xs={12}>
+        <Col xs={12} xl={6}>
           <Card border="light" className="shadow-sm h-100">
             <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h5 className="mb-0">Users Online / Last Seen</h5>
@@ -226,6 +367,28 @@ export default function DashboardOverview() {
               </Table>
             </Card.Body>
           </Card>
+        </Col>
+
+        <Col xs={12} md={6} xl={3}>
+          <MonthlyReportTracker
+            title="Monthly Servicing"
+            count={monthlyTracker.servicingCount}
+            latestReport={monthlyTracker.latestServicing}
+            loading={monthlyTrackerLoading}
+            error={monthlyTrackerErr}
+            noun="Service reports generated"
+          />
+        </Col>
+
+        <Col xs={12} md={6} xl={3}>
+          <MonthlyReportTracker
+            title="Monthly Call Outs"
+            count={monthlyTracker.calloutCount}
+            latestReport={monthlyTracker.latestCallout}
+            loading={monthlyTrackerLoading}
+            error={monthlyTrackerErr}
+            noun="Call Out reports generated"
+          />
         </Col>
       </Row>
     </>

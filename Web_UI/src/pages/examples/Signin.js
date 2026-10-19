@@ -1,4 +1,5 @@
 import { clearOrgAuth, isOrgAuthExpired, orgLocalStorage, setOrgAuth, setOrgCsrfToken } from "../../config/organization";
+import { storeOfflineLeaseFromResponse, verifyStoredOfflineLease } from "../../lib/offlineSession";
 import React, { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faUnlockAlt } from "@fortawesome/free-solid-svg-icons";
@@ -25,15 +26,30 @@ export default function Signin() {
     const existingToken = orgLocalStorage.getItem("authToken") || "";
     if (!existingToken) return undefined;
 
-    if (isOrgAuthExpired()) {
-      clearStoredAuth();
-      return undefined;
-    }
-
     let mounted = true;
     const controller = new AbortController();
 
+    async function useOfflineLeaseIfValid() {
+      const offline = await verifyStoredOfflineLease();
+      if (!offline?.valid || !offline?.user) return false;
+      orgLocalStorage.setItem("authExpiresAt", String(offline.expiresAt));
+      orgLocalStorage.setItem("authUser", JSON.stringify(offline.user));
+      if (mounted) window.location.hash = Routes.DashboardOverview.path;
+      return true;
+    }
+
     async function verifyExistingSession() {
+      if (isOrgAuthExpired()) {
+        if (await useOfflineLeaseIfValid()) return;
+        clearStoredAuth();
+        return;
+      }
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        await useOfflineLeaseIfValid();
+        return;
+      }
+
       try {
         const res = await fetch("/api/profile/me", {
           
@@ -43,7 +59,10 @@ export default function Signin() {
 
         if (res.ok && data?.user) {
           setOrgCsrfToken(data?.csrfToken || "");
-          if (data?.expiresAt) orgLocalStorage.setItem("authExpiresAt", String(data.expiresAt));
+          storeOfflineLeaseFromResponse(data);
+          const leaseExpiry = Number(data?.offlineLease?.expiresAt || 0);
+          if (leaseExpiry > Date.now()) orgLocalStorage.setItem("authExpiresAt", String(leaseExpiry));
+          else if (data?.expiresAt) orgLocalStorage.setItem("authExpiresAt", String(data.expiresAt));
           orgLocalStorage.setItem("authUser", JSON.stringify(data.user));
           window.dispatchEvent(new Event("authUserUpdated"));
           if (mounted) window.location.hash = Routes.DashboardOverview.path;
@@ -55,7 +74,7 @@ export default function Signin() {
         }
       } catch (e) {
         if (e?.name === "AbortError") return;
-        // Stay on Sign In if the API cannot validate the stored token.
+        await useOfflineLeaseIfValid();
       }
     }
 
@@ -99,7 +118,8 @@ export default function Signin() {
         return;
       }
 
-      setOrgAuth(data.user, data.expiresAt, data.csrfToken);
+      setOrgAuth(data.user, data?.offlineLease?.expiresAt || data.expiresAt, data.csrfToken);
+      storeOfflineLeaseFromResponse(data);
 
       setSuccessMsg(`Logged in as ${data.user.email} (${data.user.role}).`);
       setLoading(false);

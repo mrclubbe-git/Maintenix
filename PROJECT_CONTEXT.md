@@ -2023,3 +2023,22 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Targeted CRA DEV backend handoff: `cra-offline-48h-auto-sync-backend-2026-10-19.zip`, SHA-256 `505158afe2a4f39b1afcd27aa1d4cc4d8b1bcb4eeb22731d45430183360763aa`.
 - Backend source still requires manual placement on CRA DEV followed by restart of the existing `maintenix-dev-api.service`; do not claim runtime offline acceptance until that install/restart and focused testing are confirmed.
 - No LIVE/production change was made.
+
+
+## Section Report automatic-sync 400 retry repair — 2026-10-19
+
+- Console diagnostics after enabling global offline sync showed repeated `POST /api/formal-reports/drafts` HTTP 400 responses.
+- Root cause was the automatic Section Report sync contract: pre-version/legacy local records and permanent server validation failures were treated as ordinary pending work, so the browser retried them repeatedly.
+- Repair:
+  - Section Report draft records now carry `syncVersion = 1` when created/loaded/renamed/deleted by the current client;
+  - pre-version pending/syncing local records are preserved but quarantined as `blocked` / `Needs review` instead of being auto-posted;
+  - opening and saving such a draft upgrades it to the current sync contract and retries normally;
+  - a server HTTP 400 is treated as a permanent validation rejection for that saved version and becomes `blocked` rather than an endlessly retried `pending` record;
+  - network/transient failures remain `pending` and retry automatically;
+  - ordinary content POST no longer resends the local display name; explicit rename continues through PATCH;
+  - legacy local mirrors with an existing server copy may be refreshed from the server instead of being blindly re-uploaded.
+- No backend source change or restart is required for this repair.
+- Main source commits: `782db4fbc19886e3ba76633112e2f71b39363e37`, `766ad3cb9880583529199144dc950c3cb5f01443`.
+- Final deployed frontend head: `8680210604fde1653301f4e55d27c7bf316d3e9e`.
+- GitHub Pages run `39241677807` completed successfully, including build, deployable-security checks and Pages deployment.
+- Existing local drafts are preserved; the repair does not clear IndexedDB or server draft history.

@@ -71,19 +71,26 @@ async function fetchPushConfiguration(authToken) {
 }
 
 async function findPushWorkerRegistration() {
-  if (!supportsDevicePush()) return null;
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
 
   const registrations = await navigator.serviceWorker.getRegistrations();
   return registrations.find(isMaintenixPushWorkerRegistration) || null;
 }
 
-async function ensurePushWorkerRegistration() {
+export async function ensureMaintenixWorkerRegistration() {
+  if (typeof window === "undefined" || !window.isSecureContext) return null;
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
+
   const existing = await findPushWorkerRegistration();
   if (existing) return existing;
 
   return navigator.serviceWorker.register(pushWorkerUrl(), {
     scope: pushWorkerScope()
   });
+}
+
+async function ensurePushWorkerRegistration() {
+  return ensureMaintenixWorkerRegistration();
 }
 
 export async function getDevicePushState(authToken) {

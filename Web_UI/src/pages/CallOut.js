@@ -747,12 +747,6 @@ export default function CallOut() {
     await idbPut(dbRef.current, "calloutCache", { key, value, updatedAt: new Date().toISOString() });
   }
 
-  async function cacheGet(key) {
-    if (!dbRef.current) return null;
-    const rec = await idbGet(dbRef.current, "calloutCache", key);
-    return rec?.value ?? null;
-  }
-
   async function cacheGetRecord(key) {
     if (!dbRef.current) return null;
     return await idbGet(dbRef.current, "calloutCache", key);

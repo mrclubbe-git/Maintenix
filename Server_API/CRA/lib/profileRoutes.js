@@ -4,6 +4,7 @@ const express = require("express");
 
 const { extractBearer, getSession, getSessionExpiresAt } = require("./sessions");
 const { decodeImageDataUrl, safeGeneratedImageName } = require("./imageValidation");
+const { issueOfflineLease } = require("./offlineLease");
 const {
   ensureProfilePicsDir,
   publicUrlForProfilePhoto,
@@ -50,7 +51,8 @@ router.get("/me", requireAuth, (req, res) => {
       photoUrl: u.photoUrl || ""
     },
     expiresAt: getSessionExpiresAt(req.authSessionToken),
-    csrfToken: req.authSession?.csrfToken || ""
+    csrfToken: req.authSession?.csrfToken || "",
+    offlineLease: issueOfflineLease(u, { organization: req.authSession?.organization })
   });
 });
 

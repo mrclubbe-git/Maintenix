@@ -479,23 +479,11 @@ The server template remains:
 Treat this accepted version as the V1 formatting baseline for future servicing-report changes.
 
 
-## Offline mode status — temporarily disabled
+## Offline mode history — 2026-10-08 decision superseded
 
-As of 2026-10-08, browser offline support is intentionally disabled until the overall site is complete.
+The 2026-10-08 decision to keep CRA browser offline support disabled was superseded on 2026-10-19.
 
-Current decision:
-
-- The React UI must operate online-only for now.
-- Browser service-worker registration has been removed.
-- The offline app-shell worker and recovery-worker build hooks/files have been removed.
-- Offline sign-in/session support has been removed.
-- The Settings offline-mode controls and offline-token notifications have been removed.
-- Servicing and Call Out no longer permit offline save/generate workflows; an internet connection is required.
-- A startup cleanup in `Web_UI/src/index.js` unregisters any legacy Maintenix browser service-worker registrations and clears Maintenix browser caches so previously installed workers stop controlling the GitHub Pages app.
-- The normal server-side report workers (`Server_API/servicingWorker.js`, `Server_API/calloutWorker.js`) remain enabled because they are part of online report generation and are not browser offline workers.
-- The current local IndexedDB-backed draft/job staging code may remain where required by the existing online workflow, but it must not be presented or used as an offline mode.
-
-When the overall site is complete, offline functionality can be deliberately reintroduced as a separate project phase.
+The removed legacy offline/recovery workers remain removed; they must not be restored. CRA now uses the existing `Web_UI/public/maintenix-push-sw.js` as the single browser worker for both Web Push and the approved application-shell cache. Authoritative current offline behaviour is documented in the 2026-10-19 offline section near the end of this file.
 
 
 ## Site-wide button standard
@@ -953,7 +941,7 @@ Pictures and the responder defect description remain optional, matching the pre-
 - Existing CRA Cloudflare routing remains unchanged: public `/CRA/` requests are rewritten at the edge and tunneled to the CRA DEV API on `127.0.0.1:5056`.
 - Production remains separate and untouched.
 
-## CRA 8-hour authentication expiry — 2026-10-12
+## CRA 8-hour authentication expiry — 2026-10-12 (historical; superseded 2026-10-19)
 
 - User selected an absolute 8-hour login lifetime for CRA.
 - This is a maximum session age from login, not an inactivity/sliding timeout.
@@ -1984,4 +1972,49 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Final GitHub Pages build/deploy run `39158262663` passed, including the no-source-map/CSP deployment checks.
 - Targeted DEV backend handoff contains only `Server_API/CRA/routes/callout.js` and `Server_API/CRA/routes/formalReports.js`; SHA-256 `e0fdc74e1cf52c01c5d00ee92e8d1b13e7640ce29e30dabac698f409435ab367`.
 - Frontend is deployed to CRA DEV. The two backend route files still require manual DEV placement and restart of the existing `maintenix-dev-api.service` before the server-side response optimizations/rename sync are active.
+- No LIVE/production change was made.
+
+
+## CRA 48-hour signed offline access + automatic sync — 2026-10-19
+
+- User approved reintroducing the field/offline workflow after the online-only application baseline was validated.
+- The previous absolute 8-hour policy is superseded. CRA now uses a **48-hour renewable inactivity window**:
+  - server session TTL is 48 hours from the most recent validated activity;
+  - the browser session cookie is renewed by successful online authentication/profile validation;
+  - automatic online synchronization calls profile validation, so a connected active device keeps its session current without a forced periodic logout;
+  - if the device cannot successfully validate online for 48 hours, both server-cookie continuity and offline operational access expire and the user must reconnect/sign in.
+- Offline operational access requires a signed local lease:
+  - backend module `Server_API/CRA/lib/offlineLease.js` issues RS256 leases valid for 48 hours;
+  - the signing keypair is generated/persisted as runtime data under `Server_API/CRA/data/offline-lease-private.pem` and `offline-lease-public.pem` unless overridden by environment paths;
+  - private signing material is runtime state and must never be committed to Git;
+  - frontend `Web_UI/src/lib/offlineSession.js` verifies the lease signature, organisation, user, role/status and expiry before allowing protected routes without an API connection.
+- The existing `maintenix-push-sw.js` is now the single supported CRA browser worker for:
+  - Web Push;
+  - application-shell caching for cold-start/offline launch of the GitHub Pages CRA;
+  - network-first navigation with cached-shell fallback.
+  No second offline/recovery worker is introduced.
+- Automatic sync is implemented globally by `Web_UI/src/lib/offlineSync.js`:
+  - runs on app start, browser online events, focus/visibility return, auth-user updates and every five minutes while online;
+  - validates the current server session;
+  - refreshes Areas, Servicing services, Substation/Conveyor checklists and (ADMIN only) Section Report inventory;
+  - writes those reference datasets to the existing organisation-scoped IndexedDB stores;
+  - pushes pending Servicing, Call Out and (ADMIN only) Section Report draft changes;
+  - only a successful authenticated reference-data refresh renews the locally stored offline lease/sync timestamp.
+- Servicing offline workflow:
+  - Pre-Start, Checklist, Review, evidence/signature and local draft save can run from synchronized Areas/services/checklists;
+  - a browser/API that reports online but cannot reach the backend falls back to the synchronized snapshot;
+  - adding a new Area and final report generation still require a connection.
+- Call Out offline workflow:
+  - cached Areas are used for Pre-Start;
+  - bundled Call Out questions, camera evidence, comments, signature and local draft save remain usable offline;
+  - adding a new Area and report generation require a connection.
+- Section Reports offline workflow:
+  - ADMIN section/system inventory is synchronized into the formal-report IndexedDB;
+  - Setup, Questionnaire, Review and Save Draft can run from that synchronized inventory;
+  - final DOCX/PDF generation requires a connection.
+- Draft sync remains local-first and automatic when connectivity returns. Unsynced local drafts are not deleted when an offline lease expires.
+- Application-shell caching never caches authenticated API responses; authenticated/reference data remains in user-scoped IndexedDB and API authorization remains server-enforced when online.
+- Backend regression run `39236872821` passed after the new 48-hour/offline lease implementation.
+- Security backend packaging run `39236872942` passed.
+- Frontend GitHub Pages build run `39237247492` passed its build and deployable-security checks; final Pages deployment result should be recorded once complete.
 - No LIVE/production change was made.

@@ -2111,22 +2111,24 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - No LIVE/production change was made.
 
 
-## Site Logs clear-all + 30-day retention — 2026-10-19
+## Site Logs clear-all + 60-day retention — 2026-10-19
+
+- User corrected the requested retention before backend deployment: use **60 days**, not 30 days. The earlier 30-day package should be discarded.
 
 - User accepted Site Logs Phase 1 and requested:
   - an ADMIN manual **Clear all** control;
-  - automatic retention reduced from 90 days to **30 days**.
+  - automatic retention set to **60 days**.
 - Backend source changes on main:
-  - `Server_API/CRA/lib/siteLogger.js`: default `SITE_LOG_RETENTION_DAYS` is now 30 and `clearAllLogs()` deletes all current daily NDJSON files;
+  - `Server_API/CRA/lib/siteLogger.js`: default `SITE_LOG_RETENTION_DAYS` is now 60 and `clearAllLogs()` deletes all current daily NDJSON files;
   - `Server_API/CRA/routes/admin.js`: ADMIN-only `DELETE /api/admin/site-logs` clears current history and immediately writes a fresh `SITE_LOGS_CLEARED` WARN audit entry containing the administrator and deleted file/entry counts;
-  - list/query period is capped at 30 days.
+  - list/query period is capped at 60 days.
 - Frontend source:
   - Administration -> Site Logs now has a destructive **Clear all** button with confirmation modal;
   - after clearing, the UI refreshes automatically and shows the new `SITE_LOGS_CLEARED` audit marker;
-  - the 90-day filter was removed; 30 days is the longest UI period.
-- Default runtime retention is now 30 days. `SITE_LOG_RETENTION_DAYS` may still override it where explicitly configured.
+  - the 90-day filter was removed; 60 days is the longest UI period.
+- Default runtime retention is now 60 days. `SITE_LOG_RETENTION_DAYS` may still override it where explicitly configured.
 - Backend regression run `39249140076` passed, including Site Logs clear-all and retention tests.
 - Backend packaging run `39249140162` passed; artifact ID `12183889460`.
-- Targeted CRA DEV backend handoff: `cra-site-logs-clear30-backend-2026-10-19.zip`, SHA-256 `738ead05cc763c0e4927cec8ea54ea85fb86f90d83ddec3f02fedeabfbb6e7b4`.
+- Targeted CRA DEV backend handoff: `cra-site-logs-clear60-backend-2026-10-19.zip`, SHA-256 pending regeneration after the 60-day correction..
 - Matching frontend change is intentionally not yet copied to `deploy`; install/restart the DEV backend first, then promote the UI control.
 - No LIVE/production change was made.

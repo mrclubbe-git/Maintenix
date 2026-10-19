@@ -2252,3 +2252,26 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Final deploy head: `62c272d987bf66e60aa90fb1444d9eea63760f76`.
 - GitHub Pages run `39263827076` completed successfully.
 - No backend or LIVE change was required.
+
+
+## Standby + Pictures mobile card layouts — 2026-10-19
+
+- Follow-up to the successful Overview Presence mobile-table correction and the subsequent all-pages mobile-layout audit.
+- The audit found no equivalent heading-compression problem elsewhere; only Standby and Pictures List view still relied on horizontally scrolling desktop tables on narrow phones.
+- Standby:
+  - the selected-user editor keeps its existing table unchanged on tablet/desktop;
+  - phones now use dedicated user cards with position, name/email, Move up, Move down and Remove controls;
+  - the Standby Schedule keeps its existing table unchanged on tablet/desktop;
+  - phones now use dedicated schedule cards showing user, rotation, start and end dates.
+- Pictures:
+  - Grid view remains unchanged and remains the default;
+  - List view keeps its existing six-column table unchanged on tablet/desktop;
+  - phones now render compact list cards with thumbnail, report/file details, section/month, area, technician, captured time and the same View/Download/Delete actions.
+- The global Volt table `white-space: nowrap` behavior was intentionally left unchanged. The mobile improvements are page-specific to avoid regressions in accepted layouts elsewhere.
+- No backend, API contract, runtime-data or LIVE/production change was required.
+- Main source commits:
+  - `6c5873496414b0447a22f2dc20f14392d4c44178` — Standby mobile cards;
+  - `beb56e142452046a3e76167c580d3abd74495ded` — Pictures mobile list cards.
+- Matching frontend files were promoted to `deploy`; final deploy head: `2642634614d8a1c47915c13f9eb2b54d4eb7051d`.
+- GitHub Pages workflow run `39270366042` completed successfully.
+- This remains post-milestone DEV enhancement work and does not replace the accepted migration milestone unless explicitly accepted later.

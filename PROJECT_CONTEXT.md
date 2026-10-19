@@ -2132,3 +2132,14 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - Targeted CRA DEV backend handoff: `cra-site-logs-clear60-backend-2026-10-19.zip`, SHA-256 `65d980cc2a6278f502e01551ce74ce5dcaecb3752e8a881056c6c0c9223f62ee`..
 - Matching frontend change is intentionally not yet copied to `deploy`; install/restart the DEV backend first, then promote the UI control.
 - No LIVE/production change was made.
+
+
+## Site Logs clear-all + 60-day frontend deployment — 2026-10-19
+
+- User requested deployment of the Site Logs manual clear-all control and corrected 60-day retention UI.
+- `Web_UI/src/pages/Administration.js` was promoted from main to deploy.
+- Deploy commit: `d6a4a2c879c20c0a51c6b47fb8306932a162fc1c`.
+- GitHub Pages run `39250784327` completed successfully, including build, deployable-security checks and Pages deployment.
+- CRA DEV now shows the **Clear all** Site Logs control and offers history periods up to **60 days**.
+- Backend source/package for the matching 60-day retention + DELETE endpoint remains the package `cra-site-logs-clear60-backend-2026-10-19.zip`; do not claim that corrected backend package was installed unless the user explicitly confirms it.
+- No LIVE/production change was made.

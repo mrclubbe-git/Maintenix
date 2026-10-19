@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const os = require("os");
 const fs = require("fs");
 const path = require("path");
@@ -8,6 +9,7 @@ const { allowedOrigins, csrfProtection } = require("./lib/requestSecurity");
 const { extractSessionToken, getSession } = require("./lib/sessions");
 const { getUsers } = require("./lib/userStore");
 const { PROFILE_PICS_DIR } = require("./lib/profilePhotoStorage");
+const { logEvent } = require("./lib/siteLogger");
 
 // routes
 const authRoutes = require("./routes/auth");
@@ -26,12 +28,19 @@ const notificationsRoutes = require("./routes/notifications");
 const pushRoutes = require("./routes/push");
 const dailyPlannerRoutes = require("./routes/dailyPlanner");
 const formalReportsRoutes = require("./routes/formalReports");
+const siteLogsRoutes = require("./routes/siteLogs");
 
 const app = express();
 const allowedCorsOrigins = allowedOrigins();
 const ORGANIZATION_CODE = String(process.env.ORGANIZATION_CODE || "CRA").trim().toUpperCase() || "CRA";
 
 app.disable("x-powered-by");
+
+app.use((req, res, next) => {
+  req.requestId = `req_${crypto.randomUUID().replace(/-/g, "")}`;
+  res.setHeader("X-Request-Id", req.requestId);
+  next();
+});
 
 app.use((req, res, next) => {
   const origin = String(req.headers.origin || "").trim();
@@ -105,6 +114,7 @@ app.use("/api/notifications", notificationsRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/daily-planner", dailyPlannerRoutes);
 app.use("/api/formal-reports", formalReportsRoutes);
+app.use("/api/site-logs", siteLogsRoutes);
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
@@ -210,14 +220,57 @@ app.get("/api/server/status", requireAdminMetrics, (_req, res) => {
 /**
  * Cleanly handle payload-too-large errors (prevents confusing 500s).
  */
-app.use((err, _req, res, next) => {
+app.use((err, req, res, next) => {
   if (err && (err.type === "entity.too.large" || err.status === 413 || err.code === "LIMIT_FILE_SIZE")) {
+    try {
+      logEvent({
+        level: "WARN",
+        category: "API",
+        event: "PAYLOAD_TOO_LARGE",
+        message: "Request payload exceeded the configured upload limit.",
+        requestId: req.requestId,
+        route: req.originalUrl,
+        method: req.method,
+        status: 413,
+        appVersion: req.headers["x-maintenix-app-build"] || "",
+        source: "server"
+      });
+    } catch {}
     return res.status(413).json({
       ok: false,
-      message: "Upload is too large. Please choose a smaller image."
+      message: "Upload is too large. Please choose a smaller image.",
+      requestId: req.requestId
     });
   }
   next(err);
+});
+
+app.use((err, req, res, _next) => {
+  try {
+    logEvent({
+      level: "ERROR",
+      category: "API",
+      event: "UNHANDLED_API_ERROR",
+      message: String(err?.message || "Unhandled API error."),
+      requestId: req.requestId,
+      route: req.originalUrl,
+      method: req.method,
+      status: Number(err?.status || 500),
+      appVersion: req.headers["x-maintenix-app-build"] || "",
+      source: "server",
+      details: {
+        errorName: String(err?.name || ""),
+        errorCode: String(err?.code || "")
+      }
+    });
+  } catch {}
+
+  if (res.headersSent) return;
+  return res.status(Number(err?.status || 500)).json({
+    ok: false,
+    message: "Unexpected server error.",
+    requestId: req.requestId
+  });
 });
 
 const PORT = process.env.PORT || 5055;

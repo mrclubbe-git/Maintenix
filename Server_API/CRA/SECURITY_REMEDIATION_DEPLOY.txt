@@ -158,7 +158,7 @@ Site Logs runtime update — 2026-10-19
   unless SITE_LOG_DIR overrides it.
 - The API service account must be able to create/write this directory.
 - Logs are daily NDJSON files (YYYY-MM-DD.ndjson) with lazy retention cleanup.
-- Default retention is 90 days; SITE_LOG_RETENTION_DAYS may override it.
+- Default retention is 30 days; SITE_LOG_RETENTION_DAYS may override it.
 - Site Logs are runtime operational data:
   - never overwrite them from Git;
   - never copy DEV logs into LIVE during normal migration;
@@ -175,3 +175,7 @@ Site Logs runtime update — 2026-10-19
 - No new systemd service, worker, cron job or daemon is required.
 - Site Logs client ingestion is authenticated, CSRF-protected and rate-limited.
 - Administration -> Site Logs is ADMIN-only.
+
+- ADMIN may manually clear Site Logs through DELETE /api/admin/site-logs.
+  The clear removes all current daily NDJSON files, then writes one fresh
+  SITE_LOGS_CLEARED audit entry recording the administrator and deleted counts.

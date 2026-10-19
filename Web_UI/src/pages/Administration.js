@@ -316,7 +316,10 @@ export default function Administration() {
 
   useEffect(() => {
     if (activeTab === "site-logs") loadSiteLogs();
-  }, [activeTab, loadSiteLogs]);
+    // Filters are applied explicitly by Refresh/Enter so typing does not issue
+    // a request (and audit event) for every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const userSummary = useMemo(() => ({
     total: users.length,
@@ -1068,7 +1071,7 @@ export default function Administration() {
                   </div>
                 </div>
                 <Button type="button" variant="outline-primary" size="sm" onClick={loadSiteLogs} disabled={loadingSiteLogs}>
-                  {loadingSiteLogs ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Refresh"}
+                  {loadingSiteLogs ? <><Spinner size="sm" className="me-2" /> Refreshing…</> : "Apply / refresh"}
                 </Button>
               </div>
             </Card.Header>

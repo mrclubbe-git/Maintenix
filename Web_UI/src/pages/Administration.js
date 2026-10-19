@@ -1176,17 +1176,26 @@ export default function Administration() {
                 <Alert variant="info" className="mb-0">No Site Logs match the current filters.</Alert>
               ) : (
                 <>
-                  <div className="table-responsive d-none d-md-block">
-                    <Table hover size="sm" className="align-middle mb-0" style={{ fontSize: "0.85rem" }}>
+                  <div className="d-none d-md-block">
+                    <Table
+                      hover
+                      size="sm"
+                      className="align-middle mb-0"
+                      style={{
+                        width: "100%",
+                        tableLayout: "fixed",
+                        fontSize: "0.85rem"
+                      }}
+                    >
                       <thead>
                         <tr>
-                          <th>Time</th>
-                          <th>Level</th>
-                          <th>User</th>
-                          <th>Module</th>
-                          <th>Event</th>
-                          <th>Message</th>
-                          <th className="text-end">Details</th>
+                          <th style={{ width: "15%" }}>Time</th>
+                          <th style={{ width: "8%" }}>Level</th>
+                          <th style={{ width: "14%" }}>User</th>
+                          <th style={{ width: "10%" }}>Module</th>
+                          <th style={{ width: "16%" }}>Event</th>
+                          <th style={{ width: "29%" }}>Message</th>
+                          <th className="text-end" style={{ width: "8%" }}>Details</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1198,13 +1207,19 @@ export default function Administration() {
                                 {entry.level || "INFO"}
                               </Badge>
                             </td>
-                            <td style={{ overflowWrap: "anywhere" }}>
+                            <td style={{ whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }}>
                               <div>{entry?.user?.name || entry?.user?.email || "—"}</div>
                               {entry?.user?.role ? <div className="text-muted small">{entry.user.role}</div> : null}
                             </td>
-                            <td>{entry.category || "—"}</td>
-                            <td style={{ overflowWrap: "anywhere" }}>{entry.event || "—"}</td>
-                            <td style={{ minWidth: 220, overflowWrap: "anywhere" }}>{entry.message || "—"}</td>
+                            <td style={{ whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                              {entry.category || "—"}
+                            </td>
+                            <td style={{ whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                              {entry.event || "—"}
+                            </td>
+                            <td style={{ whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                              {entry.message || "—"}
+                            </td>
                             <td className="text-end">
                               <Button type="button" size="sm" variant="outline-primary" onClick={() => setSelectedSiteLog(entry)}>
                                 View

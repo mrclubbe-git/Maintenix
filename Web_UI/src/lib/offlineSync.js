@@ -131,14 +131,19 @@ function releaseSyncLock(id) {
   } catch {}
 }
 
-async function refreshReferenceData(servicingDb, calloutDb, formalDb) {
-  const [areasData, servicesData, substationData, conveyorData, sectionsData] = await Promise.all([
+async function refreshReferenceData(servicingDb, calloutDb, formalDb, role) {
+  const isAdmin = String(role || "").trim().toUpperCase() === "ADMIN";
+  const baseRequests = [
     apiJson("/api/areas"),
     apiJson("/api/servicing/services"),
     apiJson("/api/servicing/checklist?type=substation"),
-    apiJson("/api/servicing/checklist?type=conveyor"),
-    apiJson("/api/formal-reports/sections")
-  ]);
+    apiJson("/api/servicing/checklist?type=conveyor")
+  ];
+
+  if (isAdmin) baseRequests.push(apiJson("/api/formal-reports/sections"));
+
+  const results = await Promise.all(baseRequests);
+  const [areasData, servicesData, substationData, conveyorData, sectionsData] = results;
 
   const nowIso = new Date().toISOString();
   const areas = Array.isArray(areasData?.areas) ? areasData.areas : [];
@@ -149,22 +154,26 @@ async function refreshReferenceData(servicingDb, calloutDb, formalDb) {
   const conveyor = conveyorData?.checklist && typeof conveyorData.checklist === "object"
     ? conveyorData.checklist
     : conveyorData;
-  const sections = Array.isArray(sectionsData?.sections) ? sectionsData.sections : [];
 
-  await Promise.all([
+  const writes = [
     idbPut(servicingDb, "servicingCache", { key: "areas", value: areas, updatedAt: nowIso }),
     idbPut(servicingDb, "servicingCache", { key: "services", value: services, updatedAt: nowIso }),
     idbPut(servicingDb, "servicingCache", { key: "checklist_substation", value: substation, updatedAt: nowIso }),
     idbPut(servicingDb, "servicingCache", { key: "checklist_conveyor", value: conveyor, updatedAt: nowIso }),
-    idbPut(calloutDb, "calloutCache", { key: "areas", value: areas, updatedAt: nowIso }),
-    idbPut(formalDb, "formalReportDrafts", {
+    idbPut(calloutDb, "calloutCache", { key: "areas", value: areas, updatedAt: nowIso })
+  ];
+
+  if (isAdmin) {
+    const sections = Array.isArray(sectionsData?.sections) ? sectionsData.sections : [];
+    writes.push(idbPut(formalDb, "formalReportDrafts", {
       id: "__reference_sections__",
       type: "formalReference",
       value: sections,
       updatedAt: nowIso
-    })
-  ]);
+    }));
+  }
 
+  await Promise.all(writes);
   return nowIso;
 }
 
@@ -332,13 +341,15 @@ export async function runAutomaticOfflineSync() {
     calloutDb = await openCalloutDb();
     formalDb = await openFormalDb();
 
-    await refreshReferenceData(servicingDb, calloutDb, formalDb);
+    const role = String(profile?.user?.role || "").trim().toUpperCase();
+    await refreshReferenceData(servicingDb, calloutDb, formalDb, role);
 
-    await Promise.all([
+    const draftSyncs = [
       syncServicingDrafts(servicingDb),
-      syncCalloutDrafts(calloutDb),
-      syncFormalDrafts(formalDb)
-    ]);
+      syncCalloutDrafts(calloutDb)
+    ];
+    if (role === "ADMIN") draftSyncs.push(syncFormalDrafts(formalDb));
+    await Promise.all(draftSyncs);
 
     setOrgCsrfToken(profile?.csrfToken || "");
     if (profile?.user) {
@@ -390,6 +401,7 @@ export function startOfflineSyncCoordinator() {
 
   window.addEventListener("online", onOnline);
   window.addEventListener("focus", onFocus);
+  window.addEventListener("authUserUpdated", attempt);
   document.addEventListener("visibilitychange", onVisibility);
 
   const timer = window.setInterval(attempt, SYNC_INTERVAL_MS);
@@ -398,6 +410,7 @@ export function startOfflineSyncCoordinator() {
   return () => {
     window.removeEventListener("online", onOnline);
     window.removeEventListener("focus", onFocus);
+    window.removeEventListener("authUserUpdated", attempt);
     document.removeEventListener("visibilitychange", onVisibility);
     window.clearInterval(timer);
     coordinatorStarted = false;

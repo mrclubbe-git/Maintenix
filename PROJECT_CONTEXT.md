@@ -2343,3 +2343,36 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
 - The archive contains migration instructions, LIVE-data preservation instructions, approved-baseline identifiers, a package inventory, verification notes and reference migration documentation.
 - Final local QA passed: ZIP integrity, backend-data exclusion, template exclusion, no packaged `users.json`/reports metadata, approved baseline identifiers, backend JS syntax checks, Formal Reporting Python compilation and required instruction documents.
 - Creating this package does **not** execute the LIVE migration and does not modify LIVE.
+
+
+## Migration package v2 — current served site + selective LIVE data — 2026-10-19
+
+- User corrected the migration-data rule: LIVE `Server_API/CRA/data/` must **not** be treated as a single directory that is either preserved untouched or replaced wholesale.
+- The earlier package `Maintenix_Approved_Migration_2026-10-19.zip` is **superseded and must not be used**.
+- Replacement package:
+  - `Maintenix_Current_Site_Migration_2026-10-19_v2.zip`
+  - SHA-256: `869f89b4a62d2d7d225a8a7ecf92831eea7abbfe8bf420f87f29b8fa0d4942ff`
+  - successful package workflow run: `39291062567`
+  - workflow/package builder final commit: `0b96bd533146f626a4aa54ec757a5f54767c81b6`
+- Frontend in the package is the exact repository-served `deploy` state:
+  - deploy head `8ef05c88f0d263a3bbf9161244f94aa667c1a966`
+  - successful Pages run `39281337899`
+  - this includes the native Web Push **Mark as read / Acknowledge** enhancement because the user explicitly required the migration package to match the site currently served by the repo.
+- Backend source remains the accepted/current CRA backend:
+  - accepted main baseline `51300a11f7cc85e54093b8af2313aaea8190aeca`
+  - accepted/current `Server_API/CRA` tree SHA `35e7367e289e4f0a30213bdf7a90253a9de2476d`
+  - verified current main CRA backend tree is byte-identical to that accepted backend tree.
+- v2 package deliberately excludes `Server_API/CRA/data/` itself and instead contains a file-specific `DATA_MIGRATION_MATRIX.md`.
+- LIVE production/business data to preserve includes at least `users.json`, `reports.meta.json`, `uploads/` (reports/pictures/evidence), `stock.json`, `standby.json`, and existing production planner/notification/preferences/profile/area/log/key/draft/queue state where present.
+- Ephemeral LIVE `sessions.json` and `presence.json` are backed up then reset for the migrated session/presence implementation.
+- CRA DEV contributes **only** `/home/charl/projects/maintenix-dev-api/Server_API/CRA/data/templates/`.
+- `data/templates/areas.txt` is runtime-mutable, so the migration instructions stage DEV templates and merge LIVE-only Area names into the staged `areas.txt` before installing templates.
+- No other DEV runtime data is copied to LIVE.
+- New runtime files introduced during development that do not yet exist on LIVE must be created by LIVE on first use rather than copied from DEV.
+- Local validation of the final v2 ZIP passed:
+  - archive checksum;
+  - no packaged backend `data/` directory;
+  - current push worker contains `Acknowledge` / `Mark as read`;
+  - shell continuation examples and the Area-merge Python snippet render correctly in the instructions.
+- `LIVE_MIGRATION_CHECKLIST.md` was updated at commit `0b4bc871f9052f0e3f52f911177a6d91420f70b9` with the same selective-data rule.
+- Creating the package does **not** execute or authorize unrelated LIVE changes; LIVE cutover still requires the explicit migration execution instruction.

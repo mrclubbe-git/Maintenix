@@ -1,4 +1,4 @@
-name: Build Approved Migration Package
+name: Build Current Site Migration Package v2
 
 on:
   workflow_dispatch:
@@ -21,23 +21,23 @@ jobs:
           ref: 51300a11f7cc85e54093b8af2313aaea8190aeca
           path: approved-main
 
-      - name: Checkout approved deploy baseline
+      - name: Checkout current served deploy
         uses: actions/checkout@v4
         with:
-          ref: 2642634614d8a1c47915c13f9eb2b54d4eb7051d
+          ref: 8ef05c88f0d263a3bbf9161244f94aa667c1a966
           path: approved-deploy
 
       - name: Assemble migration package
         shell: bash
         run: |
           set -euo pipefail
-          PKG_ROOT="$GITHUB_WORKSPACE/out/Maintenix_Approved_Migration_2026-10-19"
+          PKG_ROOT="$GITHUB_WORKSPACE/out/Maintenix_Current_Site_Migration_2026-10-19_v2"
           mkdir -p "$PKG_ROOT"
 
-          # Exact approved frontend state comes from the accepted deploy head.
+          # Exact frontend source currently served by the deploy branch.
           cp -a approved-deploy/Web_UI "$PKG_ROOT/Web_UI"
 
-          # Exact approved backend source comes from the accepted main head.
+          # Backend source is the accepted/current CRA backend; current main has the same CRA tree.
           mkdir -p "$PKG_ROOT/Server_API"
           cp -a approved-main/Server_API/CRA "$PKG_ROOT/Server_API/CRA"
 
@@ -51,205 +51,289 @@ jobs:
           cp approved-main/LIVE_V1.2_MIGRATION_NOTES.txt "$PKG_ROOT/reference/LIVE_V1.2_MIGRATION_NOTES.txt"
           cp approved-main/Server_API/CRA/SERVER_REQUIREMENTS.txt "$PKG_ROOT/reference/SERVER_REQUIREMENTS.txt"
 
-          cat > "$PKG_ROOT/APPROVED_BASELINE.txt" <<'EOF'
-          MAINTENIX APPROVED MIGRATION BASELINE
-          =====================================
+          cat > "$PKG_ROOT/CURRENT_SITE_PROVENANCE.txt" <<'EOF'
+          MAINTENIX CURRENT SITE MIGRATION SOURCE
+          =======================================
 
-          Accepted on: 2026-10-19
+          Frontend/deploy head currently served by the repo:
+          8ef05c88f0d263a3bbf9161244f94aa667c1a966
 
-          Approved frontend/deploy head:
-          2642634614d8a1c47915c13f9eb2b54d4eb7051d
+          Successful GitHub Pages run for that head:
+          39281337899
 
-          Approved source/backend main head:
+          Backend/source baseline:
           51300a11f7cc85e54093b8af2313aaea8190aeca
 
-          Important:
-          - This package intentionally excludes Server_API/CRA/data/.
-          - LIVE runtime data must remain in place.
-          - Do not copy DEV runtime data to LIVE.
-          - Copy only the required DEV template directory during the template step.
-          - Post-baseline development performed after acceptance is not included.
+          Verified current main Server_API/CRA tree:
+          35e7367e289e4f0a30213bdf7a90253a9de2476d
+
+          Accepted backend Server_API/CRA tree:
+          35e7367e289e4f0a30213bdf7a90253a9de2476d
+
+          Therefore the current repo backend tree is byte-identical to the accepted
+          backend tree. The frontend in this package is the exact currently served
+          deploy state, including the native Web Push Mark-as-read/Acknowledge change.
+
+          Templates are intentionally not packaged. They must be copied from CRA DEV
+          using the staged procedure in MIGRATION_INSTRUCTIONS.md.
+
+          This package intentionally excludes Server_API/CRA/data because LIVE data
+          is migrated selectively, not overwritten wholesale.
           EOF
 
-          cat > "$PKG_ROOT/PRESERVE_LIVE_DATA.txt" <<'EOF'
-          PRESERVE LIVE DATA - DO NOT OVERWRITE
-          =====================================
+          cat > "$PKG_ROOT/DATA_MIGRATION_MATRIX.md" <<'EOF'
+          MAINTENIX LIVE DATA MIGRATION MATRIX
+          ====================================
 
-          The migration package contains NO Server_API/CRA/data directory by design.
+          Do NOT treat Server_API/CRA/data as one keep/replace unit.
 
-          Keep the existing LIVE Server_API/CRA/data directory in place.
-
-          This preserves, among other runtime state:
+          PRESERVE THE LIVE COPY:
           - users.json
           - reports.meta.json
-          - all generated reports
-          - all report pictures and uploaded evidence
-          - uploads/
-          - profilepics/
+          - uploads/ (reports, PDFs, report pictures, call-out pictures, delivery notes/evidence)
           - stock.json
           - standby.json
-          - daily-planner.json
-          - notifications.json
-          - user-preferences.json
-          - area-metadata.json
-          - sessions.json
-          - presence.json
-          - push-subscriptions.json
-          - web-push-vapid.json
-          - offline-lease key files already issued on LIVE
-          - notification-delivery.json
-          - site-logs/
-          - servicing drafts, queues, payloads and status data
-          - call-out drafts, queues, payloads and status data
-          - formal-reporting runtime state
+          - daily-planner.json, if present
+          - notifications.json, if present
+          - user-preferences.json, if present
+          - area-metadata.json, if present
+          - profilepics/, if present
+          - site-logs/, if present
+          - push-subscriptions.json and web-push-vapid.json, if LIVE push is already in use
+          - offline-lease-private.pem / offline-lease-public.pem, if already issued on LIVE
+          - notification-delivery.json, if present
+          - existing servicing/call-out drafts, payloads, status and queue state
 
-          NEVER replace LIVE users.json with DEV users.json.
-          NEVER copy DEV reports, photos, uploads, sessions, push subscriptions,
-          Site Logs, notification-delivery state, or other runtime data into LIVE.
+          RESET/RECREATE ON LIVE:
+          - sessions.json: back up, then remove so users authenticate under the new session implementation
+          - presence.json: back up, then remove; it repopulates after reconnect
+          - libreoffice-profile/: safe to recreate
+          - temporary *.tmp files: remove only while Maintenix is stopped
+
+          COPY FROM CRA DEV:
+          - ONLY Server_API/CRA/data/templates/
+
+          IMPORTANT: data/templates/areas.txt is runtime-mutable. Stage the DEV
+          templates first, merge any LIVE-only Area names into the staged areas.txt,
+          then install the staged template directory.
+
+          DO NOT copy any other DEV data file or directory.
+
+          Repository audit:
+          The repo tracks reports.meta.json, standby.json, stock.json, users.json and
+          templates/**. Post-import tracked data changes are in the template/configuration
+          set. The production records remain LIVE-owned.
           EOF
 
           cat > "$PKG_ROOT/MIGRATION_INSTRUCTIONS.md" <<'EOF'
-          # Maintenix approved DEV -> LIVE migration instructions
+          # Maintenix current-site DEV -> LIVE migration instructions
 
           ## 1. Package identity
 
-          This archive is built from the explicitly accepted migration baseline:
+          This v2 migration package supersedes the earlier package.
 
-          - frontend/deploy: `2642634614d8a1c47915c13f9eb2b54d4eb7051d`
-          - backend/source: `51300a11f7cc85e54093b8af2313aaea8190aeca`
+          Frontend source is the exact `deploy` commit currently served by GitHub Pages:
 
-          It deliberately does **not** include later post-acceptance development.
+          `8ef05c88f0d263a3bbf9161244f94aa667c1a966`
 
-          ## 2. Critical data-preservation rule
+          GitHub Pages run `39281337899` completed successfully for that head.
 
-          The archive deliberately contains **no** `Server_API/CRA/data/` directory.
+          Backend source is the accepted/current CRA backend:
 
-          Do not delete, rename over, or replace the existing LIVE `data/` directory.
-          The existing LIVE data is the authoritative production state.
+          `51300a11f7cc85e54093b8af2313aaea8190aeca`
 
-          In particular, preserve LIVE:
+          The current main `Server_API/CRA` tree and accepted backend tree both resolve to:
 
-          - `users.json`
-          - generated reports and `reports.meta.json`
-          - report photos / uploaded pictures / `uploads/`
-          - `profilepics/`
-          - Stock Control data
-          - Standby data
-          - Daily Planner data
-          - notification state
-          - user preferences
-          - area metadata
-          - LIVE Web Push subscriptions and VAPID key
-          - LIVE offline-lease signing keys once issued
-          - Site Logs
-          - queue/status/draft/payload state
-          - all other runtime state under `Server_API/CRA/data/`
+          `35e7367e289e4f0a30213bdf7a90253a9de2476d`
 
-          **Never copy DEV runtime data to LIVE.**
+          This confirms the backend application source has not drifted.
+
+          ## 2. Data migration is selective
+
+          Do **not** keep or replace the whole LIVE `data/` directory as one unit.
+
+          Use `DATA_MIGRATION_MATRIX.md`.
+
+          The migration is:
+
+          **current repo application source + current CRA DEV templates + existing LIVE production data**
 
           ## 3. Back up LIVE before changing anything
 
-          Stop before migration if a verified backup cannot be made.
-
-          Example placeholders:
+          Example:
 
           ```bash
-          LIVE_APP=/opt/apps/maintenix
+          LIVE_CRA=/opt/apps/maintenix/Server_API/CRA
           TS=$(date +%Y%m%d-%H%M%S)
 
-          sudo cp -a "$LIVE_APP" "${LIVE_APP}.pre-migration-${TS}"
-          sudo tar -C "$LIVE_APP/Server_API/CRA" -czf "/safe/backup/maintenix-live-data-${TS}.tgz" data
+          sudo tar -C "$LIVE_CRA" -czf "/safe/backup/maintenix-cra-pre-migration-$TS.tgz" .
+          sudo tar -C "$LIVE_CRA" -czf "/safe/backup/maintenix-data-pre-migration-$TS.tgz" data
           ```
 
-          Verify that the backup contains `data/users.json`, existing reports and uploads before continuing.
+          Verify the backup contains `data/users.json`, `data/reports.meta.json`,
+          `data/uploads/` and existing production pictures/reports before continuing.
 
-          ## 4. Stop the existing LIVE Maintenix service
-
-          Use the actual LIVE service name:
+          ## 4. Stop LIVE Maintenix
 
           ```bash
           sudo systemctl stop <live-maintenix-service>
           ```
 
-          Confirm that the old API/workers have stopped before replacing source files.
+          Confirm the API and workers are stopped.
 
-          ## 5. Install the approved backend source without touching LIVE data
+          ## 5. Install backend source while excluding data
 
-          Unpack this migration archive into a staging directory first.
+          Unpack this migration archive into a staging directory.
 
-          Copy the contents of:
-
-          `Server_API/CRA/`
-
-          over the LIVE CRA application source **while excluding the LIVE data directory**.
-
-          Safe pattern:
+          Copy the packaged backend source:
 
           ```bash
-          rsync -a --delete \
-            --exclude 'data/' \
-            /path/to/unpacked/Maintenix_Approved_Migration_2026-10-19/Server_API/CRA/ \
-            /opt/apps/maintenix/Server_API/CRA/
+          rsync -a --delete \\
+            --exclude 'data/' \\
+            /path/to/unpacked/Maintenix_Current_Site_Migration_2026-10-19_v2/Server_API/CRA/ \\
+            "$LIVE_CRA/"
           ```
 
-          The destination path above is an example. Confirm the real LIVE backend directory first.
-
-          After the copy, verify that the original LIVE `data/users.json`, reports and uploads are still present.
-
-          ## 6. Copy templates from CRA DEV — templates only
-
-          Per the migration requirement, templates are not supplied by this archive.
-
-          Copy **only** the DEV template directory:
-
-          `Server_API/CRA/data/templates/`
-
-          into the matching LIVE directory.
-
-          Do not copy any other DEV `data/` file or directory.
-
-          Back up the existing LIVE template directory first:
+          Immediately verify:
 
           ```bash
-          sudo cp -a \
-            /opt/apps/maintenix/Server_API/CRA/data/templates \
-            /opt/apps/maintenix/Server_API/CRA/data/templates.pre-migration-$(date +%Y%m%d-%H%M%S)
+          test -s "$LIVE_CRA/data/users.json"
+          test -e "$LIVE_CRA/data/reports.meta.json"
+          test -d "$LIVE_CRA/data/uploads"
           ```
 
-          Then copy only templates from the DEV API host/location. Example when both paths are locally accessible:
+          Stop and restore the backup if production data is missing.
+
+          ## 6. Preserve LIVE production/business records
+
+          Keep the LIVE versions of:
+
+          - `users.json`
+          - `reports.meta.json`
+          - `uploads/` including historical reports, PDFs, pictures/evidence and delivery notes
+          - `stock.json`
+          - `standby.json`
+          - `daily-planner.json` if present
+          - `notifications.json` if present
+          - `user-preferences.json` if present
+          - `area-metadata.json` if present
+          - `profilepics/` if present
+          - `site-logs/` if present
+          - existing LIVE Web Push subscriptions/VAPID key if already in use
+          - existing LIVE offline-lease keys if already issued
+          - notification delivery state if present
+          - existing servicing/call-out drafts, queues, payloads and status files
+
+          Never replace these with DEV content.
+
+          ## 7. Reset only ephemeral LIVE state
+
+          With Maintenix still stopped:
 
           ```bash
-          rsync -a --delete \
-            /path/to/CRA-DEV/Server_API/CRA/data/templates/ \
-            /opt/apps/maintenix/Server_API/CRA/data/templates/
+          rm -f "$LIVE_CRA/data/sessions.json"
+          rm -f "$LIVE_CRA/data/presence.json"
+          rm -rf "$LIVE_CRA/data/libreoffice-profile"
+          find "$LIVE_CRA/data" -type f -name '*.tmp' -delete
           ```
 
-          If DEV is on another host, use your approved transfer method, but the source must be only the `data/templates/` directory.
+          This forces new authenticated sessions/presence under the migrated version
+          while leaving business data intact.
 
-          **Do not transfer from DEV:** `users.json`, `reports.meta.json`, `uploads/`, pictures, reports, sessions, presence, notifications, push subscriptions, VAPID keys, offline-lease keys, site logs, drafts, queues, status files, or any other runtime state.
+          ## 8. Copy templates from CRA DEV only
 
-          ## 7. Install backend dependencies
+          CRA DEV template source:
 
-          From the final LIVE CRA backend directory:
+          `/home/charl/projects/maintenix-dev-api/Server_API/CRA/data/templates/`
+
+          Stage only that directory:
 
           ```bash
-          cd /opt/apps/maintenix/Server_API/CRA
+          TEMPLATE_STAGE="/tmp/maintenix-templates-$TS"
+          mkdir -p "$TEMPLATE_STAGE"
+
+          rsync -a --delete \\
+            /home/charl/projects/maintenix-dev-api/Server_API/CRA/data/templates/ \\
+            "$TEMPLATE_STAGE/"
+          ```
+
+          **Do not copy any other file or directory from CRA DEV `data/`.**
+
+          Do not copy DEV users, reports, pictures/uploads, stock, standby, sessions,
+          notifications, preferences, keys, logs, drafts, queues, payloads or status.
+
+          ## 9. Merge LIVE runtime-added Areas into DEV templates
+
+          `data/templates/areas.txt` is runtime-mutable: Maintenix can add Areas to it.
+
+          Preserve LIVE-only Areas by merging them into the staged DEV file before
+          installing the template set:
+
+          ```bash
+          python3 - "$LIVE_CRA/data/templates/areas.txt" "$TEMPLATE_STAGE/areas.txt" <<'PY'
+          from pathlib import Path
+          import sys
+
+          live_path = Path(sys.argv[1])
+          stage_path = Path(sys.argv[2])
+
+          def values(path):
+              if not path.exists():
+                  return []
+              return [x.strip() for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+          merged = []
+          seen = set()
+
+          for value in values(stage_path) + values(live_path):
+              key = " ".join(value.split()).casefold()
+              if key and key not in seen:
+                  seen.add(key)
+                  merged.append(value)
+
+          stage_path.write_text("\\n".join(merged) + "\\n", encoding="utf-8")
+          print(f"Merged {len(merged)} unique Areas.")
+          PY
+          ```
+
+          ## 10. Install the staged DEV templates
+
+          Back up current LIVE templates first:
+
+          ```bash
+          cp -a "$LIVE_CRA/data/templates" "$LIVE_CRA/data/templates.pre-migration-$TS"
+          ```
+
+          Then install the staged template set:
+
+          ```bash
+          mkdir -p "$LIVE_CRA/data/templates"
+          rsync -a --delete "$TEMPLATE_STAGE/" "$LIVE_CRA/data/templates/"
+          ```
+
+          This is the **only** content copied from CRA DEV.
+
+          ## 11. New runtime files introduced during development
+
+          If a current-code runtime file does not exist on LIVE, do not copy its DEV
+          version. Leave it absent and let LIVE create its own file/key on first use.
+
+          This is especially important for VAPID keys, offline-lease keys,
+          notification delivery state, Site Logs and other runtime metadata/state.
+
+          ## 12. Install backend dependencies
+
+          ```bash
+          cd "$LIVE_CRA"
           npm ci
           ```
 
-          Do not run `npm audit fix` as part of the migration.
+          Do not run `npm audit fix`.
 
-          Required external runtime items include:
+          Required system dependencies include Node.js 18+, Python 3,
+          Python `python-docx`, LibreOffice headless and `pdftotext`.
 
-          - Node.js 18 or newer
-          - Python 3
-          - Python `python-docx`
-          - LibreOffice headless
-          - `pdftotext` / `poppler-utils`
-
-          ## 8. Validate backend source before restart
-
-          From `Server_API/CRA`:
+          ## 13. Validate backend
 
           ```bash
           node --check index.js
@@ -266,115 +350,84 @@ jobs:
           node --check lib/reportStorage.js
           node --check routes/admin.js
           node --check routes/areas.js
+          node --check routes/reports.js
+          node --check routes/servicing.js
+          node --check routes/callout.js
           node --check routes/push.js
-          ```
-
-          Validate dependencies as the LIVE service account where practical:
-
-          ```bash
-          sudo -u <live-service-user> node -e "require('web-push'); console.log('web-push OK')"
-          sudo -u <live-service-user> node -e "require('./lib/pushNotifications'); console.log('pushNotifications OK')"
           python3 formal-reporting/report_worker.py health
           ```
 
           Formal Reporting health must report `"ok": true`.
 
-          ## 9. Frontend deployment
+          ## 14. Frontend deployment
 
-          `Web_UI/` in this archive is the exact accepted frontend source from the approved deploy head.
+          `Web_UI/` in this archive is the exact source currently served by the repo
+          at deploy head `8ef05c88f0d263a3bbf9161244f94aa667c1a966`.
 
-          Build it for the final LIVE origin, not the DEV API origin. The production build must use the final LIVE API base and final hosting/public path.
+          Build this source for the final LIVE origin and LIVE public path.
+          Do **not** deploy the existing GitHub Pages build unchanged because that
+          build targets the CRA DEV API/GitHub Pages path.
 
-          Do not publish a build that still points at `dev-api.main-tenix.com`.
+          Do not publish a frontend still pointing to `dev-api.main-tenix.com`.
 
-          Deploy the resulting static build using the approved LIVE web-hosting/Cloudflare arrangement.
+          ## 15. Final Cloudflare/hosting configuration
 
-          Confirm that:
+          Configure the final production frontend/API route and agreed Cloudflare
+          security headers. Confirm LIVE frontend/API routing, `/uploads/*`, CORS,
+          and the production scope for `maintenix-push-sw.js`.
 
-          - `/api/*` and `/uploads/*` resolve to the LIVE API;
-          - the browser service worker `maintenix-push-sw.js` is served from the intended LIVE scope;
-          - final CORS allows the LIVE frontend origin;
-          - final Cloudflare security headers/routing are applied.
+          ## 16. Start LIVE
 
-          ## 10. Start the LIVE backend stack
-
-          The approved backend has four long-running Node.js processes launched by:
+          The backend starts four long-running Node processes with:
 
           ```bash
           npm run start:all
           ```
 
-          This starts:
-
-          1. API — `index.js`
-          2. Servicing worker — `servicingWorker.js`
-          3. Call Out worker — `calloutWorker.js`
-          4. Notification delivery worker — `notificationWorker.js`
-
-          Start/restart the existing LIVE supervisor/systemd service:
+          Start the existing LIVE supervisor:
 
           ```bash
           sudo systemctl start <live-maintenix-service>
           sudo systemctl status <live-maintenix-service> --no-pager
           ```
 
-          ## 11. Immediate health checks
-
-          Confirm local API health:
+          ## 17. Health check
 
           ```bash
           curl -i http://127.0.0.1:<live-port>/api/health
           ```
 
-          Expected body:
+          Expected body: `{"ok":true}`.
 
-          ```json
-          {"ok":true}
-          ```
+          Then validate the public LIVE health endpoint.
 
-          Then test the public LIVE health endpoint through the final proxy/Cloudflare route.
+          ## 18. Mandatory production-data acceptance
 
-          ## 12. Data-integrity checks before user acceptance
-
-          Before declaring the cut-over successful, verify:
-
-          - the original LIVE users can still sign in;
-          - `users.json` is the original LIVE file, not DEV data;
-          - historical LIVE reports remain listed and downloadable;
-          - historical LIVE report pictures remain visible;
-          - existing uploads remain reachable;
-          - Stock Control data remains intact;
-          - Standby and Daily Planner data remain intact where applicable;
-          - profile pictures remain available;
-          - the API can write new runtime data;
-          - the service survives a controlled restart.
-
-          ## 13. Feature acceptance
+          Verify existing LIVE users, reports, report pictures/evidence, uploads,
+          Stock Control, Standby, Daily Planner/profile photos where used, runtime-added
+          Areas, Site Logs and notification state remain intact. Then generate a new
+          Servicing report, Call Out report and Formal/Section report and confirm new
+          pictures can be stored/viewed without affecting historical content.
 
           Run the complete checklist in:
 
           `reference/LIVE_MIGRATION_CHECKLIST_APPROVED_BASELINE.md`
 
-          Important acceptance areas include authentication, offline leases, automatic sync, Servicing, Call Out, Section/Formal Reporting, report generation, Pictures, Stock Control, Standby, Daily Planner, Site Logs, notifications and Web Push.
+          ## 19. Rollback
 
-          ## 14. Rollback
+          If validation fails, stop the migrated service, restore the full pre-migration
+          CRA backup and data/template backups as required, start the previous version,
+          and verify login, reports, pictures and API health.
 
-          If migration validation fails:
+          Never use DEV runtime data as rollback data.
 
-          1. stop the new LIVE service;
-          2. restore the pre-migration application-source backup;
-          3. restore runtime data only if the migration actually modified/corrupted it;
-          4. restore the pre-migration template backup if template incompatibility caused the failure;
-          5. start the previous LIVE version;
-          6. verify API health, user login, reports and pictures.
+          ## 20. Final rule
 
-          Do not replace a known-good LIVE data backup with DEV data during rollback.
+          Do not copy the whole DEV `data/` directory.
+          Do not replace the whole LIVE `data/` directory.
 
-          ## 15. Final prohibition
-
-          The only material copied from CRA DEV during this migration should be the required `Server_API/CRA/data/templates/` directory.
-
-          All other LIVE runtime data remains LIVE-owned and in place.
+          Use only current repo application source, CRA DEV `data/templates/`
+          (with LIVE `areas.txt` merged), and existing LIVE production records.
           EOF
 
           find "$PKG_ROOT" -type f -print | sort > "$PKG_ROOT/PACKAGE_FILE_LIST.txt"
@@ -385,16 +438,25 @@ jobs:
             exit 1
           fi
 
+          grep -q 'Acknowledge' "$PKG_ROOT/Web_UI/public/maintenix-push-sw.js"
+          grep -q 'Mark as read' "$PKG_ROOT/Web_UI/public/maintenix-push-sw.js"
+
+          cat > "$PKG_ROOT/SUPERSEDES_PREVIOUS_PACKAGE.txt" <<'EOF'
+          DO NOT USE THE EARLIER Maintenix_Approved_Migration_2026-10-19.zip.
+          This v2 package corrects LIVE data handling and uses the exact currently
+          served repo frontend.
+          EOF
+
           cd "$GITHUB_WORKSPACE/out"
-          zip -qr Maintenix_Approved_Migration_2026-10-19.zip Maintenix_Approved_Migration_2026-10-19
-          sha256sum Maintenix_Approved_Migration_2026-10-19.zip > Maintenix_Approved_Migration_2026-10-19.zip.sha256
+          zip -qr Maintenix_Current_Site_Migration_2026-10-19_v2.zip Maintenix_Current_Site_Migration_2026-10-19_v2
+          sha256sum Maintenix_Current_Site_Migration_2026-10-19_v2.zip > Maintenix_Current_Site_Migration_2026-10-19_v2.zip.sha256
 
       - name: Upload migration package
         uses: actions/upload-artifact@v4
         with:
-          name: Maintenix_Approved_Migration_2026-10-19
+          name: Maintenix_Current_Site_Migration_2026-10-19_v2
           path: |
-            out/Maintenix_Approved_Migration_2026-10-19.zip
-            out/Maintenix_Approved_Migration_2026-10-19.zip.sha256
+            out/Maintenix_Current_Site_Migration_2026-10-19_v2.zip
+            out/Maintenix_Current_Site_Migration_2026-10-19_v2.zip.sha256
           if-no-files-found: error
           retention-days: 30

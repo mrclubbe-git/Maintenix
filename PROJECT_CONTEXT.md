@@ -2521,3 +2521,33 @@ Repairs are now committed on main at source commit `782c0960281406b40b494208d2cd
   - shell continuation examples and the Area-merge Python snippet render correctly in the instructions.
 - `LIVE_MIGRATION_CHECKLIST.md` was updated at commit `0b4bc871f9052f0e3f52f911177a6d91420f70b9` with the same selective-data rule.
 - Creating the package does **not** execute or authorize unrelated LIVE changes; LIVE cutover still requires the explicit migration execution instruction.
+
+
+## Section Reports drafts across Steps 1–3 — 2026-10-21
+
+- Development resumed against the post-LIVE-clone `main` branch; the 2026-10-19 LIVE clone marker branches remain unchanged.
+- User requested that Section Reporting drafts be available throughout the complete 3-step workflow rather than only at final Review.
+- Frontend behavior:
+  - Step 1 (Setup) now has **Save draft** and can persist partial setup information before the questionnaire is started;
+  - Step 2 (Questionnaire) now has **Save draft** and can persist incomplete system answers / partially entered defect details;
+  - Step 3 (Review) retains **Save draft** and now records the saved workflow step/final-confirmation state;
+  - Saved Drafts display the saved workflow step and reopen at that saved step;
+  - legacy drafts without a workflow-step marker continue to load through the compatibility fallback.
+- Draft identity is retained when a Step 1 draft continues through Steps 2 and 3, preventing a partial draft from becoming a separate draft merely because the workflow advanced.
+- Backend draft validation now accepts incomplete content for draft persistence while final report generation keeps the existing strict completeness validation.
+- Server draft records now store `workflowStep` and use draft schema version 3. Final generation still requires a complete section/month/week, Compiled By details, full questionnaire, final confirmation, and complete defect finding/action text.
+- Rollback branches created before the change:
+  - `rollback/section-reports-all-step-drafts-pre-change-main-20261021` -> `bf491f656aefae9dbdb67152e0de4be6a1dab51b`;
+  - `rollback/section-reports-all-step-drafts-pre-change-deploy-20261021` -> `8ef05c88f0d263a3bbf9161244f94aa667c1a966`.
+- Main source commits:
+  - `52a89b55077b35dee52f08b4927e44fcf868da98` — Step 1/2/3 draft controls;
+  - `43b28eb07310fe02906a7dff6773bdbf08a68e2d` — frontend all-step draft persistence/restoration;
+  - `1d07bf51e5a940c624b92fae803d069a0bedb9b0` — backend partial-draft validation/persistence.
+- Backend GitHub Actions regression run `39568329020` completed successfully, including syntax checks and `npm run test:backend`.
+- Matching frontend files were promoted to `deploy`; final deploy head `192189af971cf8f9746d133b737f1c9430ee0bd3`.
+- GitHub Pages run `39568515217` completed successfully.
+- Changed-file handoff for this task:
+  - frontend: `Web_UI/src/pages/SectionReports.js`, `Web_UI/src/pages/formalReportingController.js`;
+  - backend: `Server_API/CRA/routes/formalReports.js`.
+- The backend file must still be manually installed on CRA DEV and the existing DEV backend service restarted before end-to-end DEV acceptance.
+- No LIVE files/services/data were changed.

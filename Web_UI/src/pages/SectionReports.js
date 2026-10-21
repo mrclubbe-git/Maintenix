@@ -20,7 +20,7 @@ const pageMarkup = `
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"><div class="fw-bold">Saved Drafts</div><div id="draft-count" class="text-muted small">0 draft(s)</div></div>
       <div class="card-body">
         <div id="drafts-list"><div class="text-muted small">Loading drafts…</div></div>
-        <div class="text-muted small draft-help">Drafts save on this device first and synchronize to your server draft folder in the background when online.</div>
+        <div class="text-muted small draft-help">Save Draft is available in Steps 1, 2 and 3. Drafts save on this device first and synchronize to your server draft folder in the background when online.</div>
       </div>
     </section>
     <div id="notice" class="notice hidden" role="status"></div>
@@ -32,13 +32,13 @@ const pageMarkup = `
         <label class="field"><span>Calendar week number</span><select id="week" required><option value="">Select week</option></select><small id="week-range">Monday–Sunday date range will appear here.</small></label>
         <label class="field"><span>Compiled by</span><input id="compiled-name" type="text" autocomplete="name" placeholder="Name and surname" maxlength="120" required></label>
         <label class="field"><span>Designation / position</span><input id="compiled-designation" type="text" placeholder="Designation or position" maxlength="160" required></label>
-        <div class="actions field-wide"><button class="btn btn-primary" type="submit">Start questionnaire</button></div>
+        <div class="actions field-wide"><button id="save-draft-step-1" class="btn btn-outline-secondary" type="button" data-save-draft>Save draft</button><button class="btn btn-primary" type="submit">Start questionnaire</button></div>
       </form>
     </section>
     <section id="step-2" class="screen hidden">
       <div class="card border-light shadow-sm mb-3 questionnaire-header"><div><h5 id="questionnaire-title" class="mb-1">System questionnaire</h5><p id="questionnaire-period" class="text-muted mb-0"></p></div><div class="progress-copy"><strong id="progress-count">0 of 0 completed</strong><div class="progress-track"><span id="progress-bar"></span></div></div></div>
       <div id="systems-list" class="systems-list"></div>
-      <div class="question-nav"><button id="previous-step" class="btn btn-outline-secondary" type="button">Previous</button><button id="next-review" class="btn btn-primary" type="button">Next: Review</button></div>
+      <div class="question-nav"><button id="previous-step" class="btn btn-outline-secondary" type="button">Previous</button><button id="save-draft-step-2" class="btn btn-outline-secondary" type="button" data-save-draft>Save draft</button><button id="next-review" class="btn btn-primary" type="button">Next: Review</button></div>
     </section>
     <section id="step-3" class="screen hidden">
       <div class="card border-light shadow-sm">
@@ -48,7 +48,7 @@ const pageMarkup = `
         <div id="review-list" class="review-list"></div>
         <label class="final-confirmation"><input id="final-confirmation" type="checkbox"><span>I confirm that the questionnaire and report details are complete and may be issued as final.</span></label>
         <div id="generated-files" class="generated-files hidden"></div>
-        <div class="actions review-actions"><button id="save-draft" class="btn btn-outline-secondary" type="button">Save draft</button><button id="generate-report" class="btn btn-primary" type="button" disabled>Generate final DOCX &amp; PDF</button></div>
+        <div class="actions review-actions"><button id="save-draft-step-3" class="btn btn-outline-secondary" type="button" data-save-draft>Save draft</button><button id="generate-report" class="btn btn-primary" type="button" disabled>Generate final DOCX &amp; PDF</button></div>
         <p class="muted note">Final files are generated only after explicit confirmation.</p>
         </div>
       </div>

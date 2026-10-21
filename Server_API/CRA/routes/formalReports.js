@@ -155,37 +155,75 @@ function formalDraftSummary(draft) {
     section: draft.section,
     month: draft.month,
     week: draft.week,
+    workflowStep: [1, 2, 3].includes(Number(draft.workflowStep)) ? Number(draft.workflowStep) : (draft.section ? 2 : 1),
     compiledName: draft.compiledName,
     savedAt: draft.savedAt
   };
 }
 
-function validateDraft(payload) {
-  const section = sectionInventory().find((candidate) => candidate.name === payload?.section);
-  if (!section) return "Unknown reporting section";
-  if (!/^\d{4}-\d{2}$/.test(String(payload?.month || ""))) return "Month must use YYYY-MM";
-  if (!Number.isInteger(payload?.week) || payload.week < 1 || payload.week > 53) return "Week must be 1–53";
+function defaultDraftName(payload) {
+  const parts = [];
+  const section = String(payload?.section || "").trim();
+  const month = String(payload?.month || "").trim();
+  const week = Number(payload?.week || 0);
+  if (section) parts.push(section);
+  if (month) parts.push(month);
+  if (week >= 1 && week <= 53) parts.push(`Week ${week}`);
+  return parts.length ? parts.join(" · ") : "Section Report Draft";
+}
+
+function validateDraft(payload, { allowIncomplete = false } = {}) {
+  const workflowStep = payload?.workflowStep == null ? null : Number(payload.workflowStep);
+  if (workflowStep != null && ![1, 2, 3].includes(workflowStep)) return "Workflow step must be 1, 2 or 3";
+
+  const sectionName = String(payload?.section || "").trim();
+  const section = sectionName
+    ? sectionInventory().find((candidate) => candidate.name === sectionName)
+    : null;
+
+  const requiresSetup = !allowIncomplete || (workflowStep != null && workflowStep >= 2);
+  if (requiresSetup && !section) return "Unknown reporting section";
+  if (sectionName && !section) return "Unknown reporting section";
+
+  const month = String(payload?.month || "").trim();
+  if (requiresSetup && !/^\d{4}-\d{2}$/.test(month)) return "Month must use YYYY-MM";
+  if (month && !/^\d{4}-\d{2}$/.test(month)) return "Month must use YYYY-MM";
+
+  const week = payload?.week;
+  const hasWeek = week != null && week !== "";
+  if (requiresSetup && (!Number.isInteger(week) || week < 1 || week > 53)) return "Week must be 1–53";
+  if (hasWeek && (!Number.isInteger(week) || week < 1 || week > 53)) return "Week must be 1–53";
+
   if (!Array.isArray(payload?.responses)) return "Responses must be an array";
+
   const compiledName = String(payload?.compiledName || "").trim();
   const compiledDesignation = String(payload?.compiledDesignation || "").trim();
   if (compiledName.length > MAX_COMPILED_NAME) return `Compiled By name must be ${MAX_COMPILED_NAME} characters or fewer`;
   if (compiledDesignation.length > MAX_COMPILED_DESIGNATION) return `Compiled By designation must be ${MAX_COMPILED_DESIGNATION} characters or fewer`;
-  const validIds = new Set(section.systems.map((system) => system.id));
+
+  if (!section && payload.responses.length) return "Responses require a reporting section";
+  const validIds = new Set((section?.systems || []).map((system) => system.id));
+
   for (const response of payload.responses) {
     if (!validIds.has(String(response.systemId))) return `Unknown system ${response.systemId}`;
     if (![null, "yes", "no"].includes(response.defectsFound ?? null)) return "Invalid defects response";
+
     if (response.defectsFound === "yes") {
-      if (!Array.isArray(response.defects) || response.defects.length === 0) return "A Yes response requires a defect";
+      if (!Array.isArray(response.defects)) return "Defects must be an array";
+      if (!allowIncomplete && response.defects.length === 0) return "A Yes response requires a defect";
+
       for (const defect of response.defects) {
-        const finding = String(defect.finding || "").trim();
-        const action = String(defect.action || "").trim();
-        if (!finding || !action) return "Each defect requires a finding and required action";
+        const finding = String(defect?.finding || "").trim();
+        const action = String(defect?.action || "").trim();
+
+        if (!allowIncomplete && (!finding || !action)) return "Each defect requires a finding and required action";
         if (finding.length > MAX_DEFECT_TEXT || action.length > MAX_DEFECT_TEXT) {
           return `Defect findings and actions must be ${MAX_DEFECT_TEXT} characters or fewer`;
         }
       }
     }
   }
+
   return null;
 }
 
@@ -254,7 +292,7 @@ router.get("/sections", (req, res) => res.json({ ok: true, sections: sectionInve
 router.post("/drafts", (req, res) => {
   migrateLegacyDraftsForUser(req);
 
-  const error = validateDraft(req.body);
+  const error = validateDraft(req.body, { allowIncomplete: true });
   if (error) return res.status(400).json({ ok: false, error });
 
   const id = safeId(req.body.id);
@@ -262,7 +300,7 @@ router.post("/drafts", (req, res) => {
 
   const destination = userDraftPath(req, id);
   const existing = fs.existsSync(destination) ? readJson(destination) : {};
-  const defaultName = `${req.body.section} · ${req.body.month} · Week ${req.body.week}`;
+  const defaultName = defaultDraftName(req.body);
   const requestedName = String(req.body?.name || "").replace(/\s+/g, " ").trim();
   if (requestedName.length > 120) {
     return res.status(400).json({ ok: false, error: "Draft name must be 120 characters or fewer" });
@@ -278,7 +316,7 @@ router.post("/drafts", (req, res) => {
       email: req.user.email || "",
       name: req.user.name || ""
     },
-    version: 2
+    version: 3
   };
 
   writeJsonAtomic(destination, saved);

@@ -2,7 +2,21 @@ import { organizationDbName } from "../config/organization";
 export default function initializeFormalReporting(root) {
 if (!root) return () => {};
 
-const state = { sections: [], section: null, month: '', week: null, weekRange: '', compiledName: '', compiledDesignation: '', systems: [], responses: {}, index: 0 };
+const state = {
+  sections: [],
+  section: null,
+  month: '',
+  week: null,
+  weekRange: '',
+  compiledName: '',
+  compiledDesignation: '',
+  systems: [],
+  responses: {},
+  index: 0,
+  workflowStep: 1,
+  draftId: '',
+  finalConfirmed: false
+};
 
 const FORMAL_DRAFT_STORE = 'formalReportDrafts';
 const FORMAL_DRAFT_SYNC_VERSION = 1;
@@ -65,7 +79,19 @@ function idbDelete(id) {
 }
 
 function defaultDraftName(value) {
-  return `${value.section} · ${value.month} · Week ${value.week}`;
+  const parts = [];
+  const section = String(value?.section || '').trim();
+  const month = String(value?.month || '').trim();
+  const week = Number(value?.week || 0);
+  if (section) parts.push(section);
+  if (month) parts.push(month);
+  if (week >= 1 && week <= 53) parts.push(`Week ${week}`);
+  return parts.length ? parts.join(' · ') : 'Section Report Draft';
+}
+
+function normalizeWorkflowStep(value, fallback = 1) {
+  const step = Number(value);
+  return [1, 2, 3].includes(step) ? step : fallback;
 }
 
 function localDraftSummary(record) {
@@ -76,6 +102,7 @@ function localDraftSummary(record) {
     section: value.section,
     month: value.month,
     week: value.week,
+    workflowStep: normalizeWorkflowStep(value.workflowStep, value.section ? 2 : 1),
     compiledName: value.compiledName,
     savedAt: record.savedAt || '',
     syncStatus: record.syncStatus || 'pending',
@@ -148,10 +175,65 @@ function updateWeekRange() {
   $('week-range').classList.toggle('warning-text', !overlaps);
 }
 
+function syncSetupState() {
+  const selectedSection = state.sections.find((item) => item.name === $('section').value) || null;
+  const previousSectionName = String(state.section?.name || '');
+  const nextSectionName = String(selectedSection?.name || '');
+  const month = String($('month').value || '').trim();
+  const weekValue = Number($('week').value || 0);
+  const week = Number.isInteger(weekValue) && weekValue >= 1 && weekValue <= 53 ? weekValue : null;
+
+  state.section = selectedSection;
+  state.month = month;
+  state.week = week;
+  state.compiledName = $('compiled-name').value.trim();
+  state.compiledDesignation = $('compiled-designation').value.trim();
+
+  if (month && week) {
+    const range = isoWeekRange(Number(month.slice(0, 4)), week);
+    state.weekRange = `${dateLabel(range.monday)} – ${dateLabel(range.sunday)}`;
+  } else {
+    state.weekRange = '';
+  }
+
+  if (previousSectionName !== nextSectionName) {
+    state.responses = {};
+    state.systems = selectedSection?.systems || [];
+    state.finalConfirmed = false;
+  } else if (selectedSection && state.systems.length === 0) {
+    state.systems = selectedSection.systems || [];
+  }
+
+  return {
+    section: selectedSection,
+    month,
+    week,
+    compiledName: state.compiledName,
+    compiledDesignation: state.compiledDesignation
+  };
+}
+
+function ensureDraftId() {
+  if (state.draftId) return state.draftId;
+
+  const sectionName = String(state.section?.name || '').trim();
+  if (sectionName && state.month && state.week) {
+    const slug = sectionName.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    state.draftId = `${slug}-${state.month}-week-${state.week}`;
+    return state.draftId;
+  }
+
+  const suffix = Math.random().toString(36).slice(2, 8);
+  state.draftId = `section-report-draft-${Date.now()}-${suffix}`;
+  return state.draftId;
+}
+
 function setStep(step) {
+  const nextStep = normalizeWorkflowStep(step, 1);
+  state.workflowStep = nextStep;
   root.querySelectorAll('.screen').forEach((screen) => screen.classList.add('hidden'));
-  $(`step-${step}`).classList.remove('hidden');
-  const progress = Math.round((step / 3) * 100);
+  $(`step-${nextStep}`).classList.remove('hidden');
+  const progress = Math.round((nextStep / 3) * 100);
   const progressBar = $('workflow-progress-bar');
   progressBar.style.width = `${progress}%`;
   progressBar.textContent = `${progress}%`;
@@ -258,7 +340,7 @@ function updateProgress() {
   $('progress-bar').style.width = `${state.systems.length ? completed / state.systems.length * 100 : 0}%`;
 }
 
-function renderReview() {
+function renderReview({ preserveConfirmation = false } = {}) {
   syncAllInputs();
   const responses = state.systems.map((system) => ({ system, response: currentResponse(system.id) }));
   const yes = responses.filter(({ response }) => response.defectsFound === 'yes').length;
@@ -266,8 +348,9 @@ function renderReview() {
   const pending = responses.filter(({ response }) => !responseComplete(response)).length;
   $('yes-count').textContent = String(yes); $('no-count').textContent = String(no); $('pending-count').textContent = String(pending);
   $('review-period').textContent = `${state.section.name} · ${monthLabel(state.month)} · Week ${state.week} (${state.weekRange})`;
-  $('final-confirmation').checked = false;
-  $('generate-report').disabled = true;
+  state.finalConfirmed = preserveConfirmation ? Boolean(state.finalConfirmed) : false;
+  $('final-confirmation').checked = state.finalConfirmed;
+  $('generate-report').disabled = !state.finalConfirmed;
   $('review-list').replaceChildren(...responses.map(({ system, response }, index) => {
     const row = doc.createElement('article');
     const complete = responseComplete(response);
@@ -286,16 +369,21 @@ function renderReview() {
 }
 
 function draftPayload() {
-  const slug = state.section.name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (state.workflowStep === 1) syncSetupState();
+  else syncAllInputs();
+
+  state.finalConfirmed = state.workflowStep === 3 && Boolean($('final-confirmation')?.checked);
+
   return {
-    id: `${slug}-${state.month}-week-${state.week}`,
-    section: state.section.name,
+    id: ensureDraftId(),
+    workflowStep: state.workflowStep,
+    section: String(state.section?.name || ''),
     month: state.month,
     week: state.week,
     weekRange: state.weekRange,
     compiledName: state.compiledName,
     compiledDesignation: state.compiledDesignation,
-    finalConfirmed: $('final-confirmation').checked,
+    finalConfirmed: state.finalConfirmed,
     responses: state.systems.map((system) => currentResponse(system.id))
   };
 }
@@ -490,7 +578,7 @@ async function loadDrafts({ includeServer = true } = {}) {
         <div class="draft-row">
           <div class="draft-copy">
             <div class="fw-bold draft-name">${escapeHtml(draft.name || `${draft.section} · ${draft.month} · Week ${draft.week}`)}${status}</div>
-            <div class="text-muted small">Updated: ${draft.savedAt ? new Date(draft.savedAt).toLocaleString('en-ZA') : 'Server draft'}</div>
+            <div class="text-muted small">Step ${normalizeWorkflowStep(draft.workflowStep, draft.section ? 2 : 1)} of 3 · Updated: ${draft.savedAt ? new Date(draft.savedAt).toLocaleString('en-ZA') : 'Server draft'}</div>
             ${syncError}
           </div>
           <div class="draft-actions"><button class="btn btn-primary btn-sm" type="button" data-load-draft="${escapeHtml(draft.id)}">Load</button><button class="btn btn-outline-secondary btn-sm" type="button" data-rename-draft="${escapeHtml(draft.id)}">Rename</button><button class="btn btn-outline-danger btn-sm" type="button" data-delete-draft="${escapeHtml(draft.id)}">Delete</button></div>
@@ -642,16 +730,56 @@ async function generateReport() {
 
 function reopenEntry(entry, message) {
   if (!entry) return;
-  const section = state.sections.find((item) => item.name === entry.section);
-  if (!section) return showNotice('The report section is no longer available.', 'error');
-  state.section = section; state.month = entry.month; state.week = entry.week; state.weekRange = entry.weekRange;
-  state.compiledName = entry.compiledName; state.compiledDesignation = entry.compiledDesignation;
-  state.systems = section.systems; state.responses = Object.fromEntries(entry.responses.map((response) => [String(response.systemId), response]));
-  $('section').value = entry.section; $('month').value = entry.month; $('week').value = String(entry.week);
-  $('compiled-name').value = entry.compiledName; $('compiled-designation').value = entry.compiledDesignation;
-  $('questionnaire-title').textContent = entry.section;
-  $('questionnaire-period').textContent = `${monthLabel(entry.month)} · Week ${entry.week} (${entry.weekRange})`;
-  renderSystems(); setStep(2); showNotice(message);
+
+  const sectionName = String(entry.section || '').trim();
+  const section = sectionName ? state.sections.find((item) => item.name === sectionName) || null : null;
+  if (sectionName && !section) return showNotice('The report section is no longer available.', 'error');
+
+  state.draftId = String(entry.id || '').trim();
+  state.section = section;
+  state.month = String(entry.month || '');
+  state.week = Number.isInteger(Number(entry.week)) && Number(entry.week) >= 1 && Number(entry.week) <= 53 ? Number(entry.week) : null;
+  state.weekRange = String(entry.weekRange || '');
+  state.compiledName = String(entry.compiledName || '');
+  state.compiledDesignation = String(entry.compiledDesignation || '');
+  state.systems = section?.systems || [];
+  state.responses = Object.fromEntries(
+    (Array.isArray(entry.responses) ? entry.responses : [])
+      .filter((response) => response?.systemId != null)
+      .map((response) => [String(response.systemId), response])
+  );
+  state.finalConfirmed = Boolean(entry.finalConfirmed);
+
+  $('section').value = sectionName;
+  $('month').value = state.month;
+  $('week').value = state.week ? String(state.week) : '';
+  $('compiled-name').value = state.compiledName;
+  $('compiled-designation').value = state.compiledDesignation;
+  updateWeekRange();
+  $('system-count').textContent = section ? `${section.systemCount} systems will be included.` : 'Select an area to view its systems.';
+
+  const savedStep = normalizeWorkflowStep(entry.workflowStep, section ? 2 : 1);
+  if (savedStep === 1 || !section) {
+    setStep(1);
+    showNotice(message);
+    return;
+  }
+
+  $('questionnaire-title').textContent = section.name;
+  $('questionnaire-period').textContent = state.month && state.week
+    ? `${monthLabel(state.month)} · Week ${state.week} (${state.weekRange})`
+    : '';
+
+  renderSystems();
+
+  if (savedStep === 3 && state.systems.length && state.systems.every((system) => responseComplete(currentResponse(system.id)))) {
+    renderReview({ preserveConfirmation: true });
+  } else {
+    state.finalConfirmed = false;
+    setStep(2);
+  }
+
+  showNotice(message);
 }
 
 function monthLabel(value) {
@@ -745,20 +873,24 @@ $('month').addEventListener('change', updateWeekRange);
 $('week').addEventListener('change', updateWeekRange);
 $('setup-form').addEventListener('submit', (event) => {
   event.preventDefault();
-  const section = state.sections.find((item) => item.name === $('section').value);
-  const month = $('month').value; const week = Number($('week').value);
-  const compiledName = $('compiled-name').value.trim(); const compiledDesignation = $('compiled-designation').value.trim();
+  const { section, month, week, compiledName, compiledDesignation } = syncSetupState();
   if (!section || !month || !week || !compiledName || !compiledDesignation) return showNotice('Complete the area, service period and Compiled By details.', 'error');
   if (compiledName.length > 120) return showNotice('Compiled By name must be 120 characters or fewer.', 'error');
   if (compiledDesignation.length > 160) return showNotice('Designation / position must be 160 characters or fewer.', 'error');
   const range = isoWeekRange(Number(month.slice(0, 4)), week);
   if (!overlapMonth(range, month)) return showNotice('The selected calendar week does not overlap the selected month.', 'error');
-  state.section = section; state.month = month; state.week = week; state.weekRange = `${dateLabel(range.monday)} – ${dateLabel(range.sunday)}`; state.compiledName = compiledName; state.compiledDesignation = compiledDesignation; state.systems = section.systems; state.responses = {}; state.index = 0;
+  state.weekRange = `${dateLabel(range.monday)} – ${dateLabel(range.sunday)}`;
+  state.index = 0;
+  state.finalConfirmed = false;
   $('questionnaire-title').textContent = section.name;
   $('questionnaire-period').textContent = `${monthLabel(month)} · Week ${week} (${state.weekRange})`;
   renderSystems(); setStep(2);
 });
-$('previous-step').addEventListener('click', () => { syncAllInputs(); setStep(1); });
+$('previous-step').addEventListener('click', () => {
+  syncAllInputs();
+  state.finalConfirmed = false;
+  setStep(1);
+});
 $('next-review').addEventListener('click', () => {
   syncAllInputs();
   const incompleteSystem = state.systems.find((system) => !responseComplete(currentResponse(system.id)));
@@ -770,10 +902,18 @@ $('next-review').addEventListener('click', () => {
   }
   renderReview();
 });
-$('back-to-systems').addEventListener('click', () => { renderSystems(); setStep(2); });
-$('save-draft').addEventListener('click', saveDraft);
+$('back-to-systems').addEventListener('click', () => {
+  state.finalConfirmed = false;
+  $('final-confirmation').checked = false;
+  renderSystems();
+  setStep(2);
+});
+root.querySelectorAll('[data-save-draft]').forEach((button) => button.addEventListener('click', saveDraft));
 $('generate-report').addEventListener('click', generateReport);
-$('final-confirmation').addEventListener('change', () => { $('generate-report').disabled = !$('final-confirmation').checked; });
+$('final-confirmation').addEventListener('change', () => {
+  state.finalConfirmed = $('final-confirmation').checked;
+  $('generate-report').disabled = !state.finalConfirmed;
+});
 root.addEventListener('click', async (event) => {
   const link = event.target.closest?.('[data-secure-download]');
   if (!link) return;

@@ -2,7 +2,7 @@
 
 > **Purpose:** This file is the persistent source of truth for critical Maintenix development context across ChatGPT project sessions.
 >
-> **Last updated:** 2026-10-19
+> **Last updated:** 2026-10-21
 >
 > Future work should read this file before making architecture, workflow, report-template, or servicing changes.
 
@@ -12,7 +12,7 @@ This section is the **authoritative workflow and development rule set for all fu
 
 ### Development status
 
-- Development is paused as of **2026-10-19**.
+- Development resumed on **2026-10-21**. The 2026-10-19 LIVE VERSION CLONE remains frozen as the production/reference baseline while new work continues from `main`.
 - The current repository state is designated the **LIVE VERSION CLONE**: it is the frozen source reference for the version intended to match/live alongside the production migration state.
 - Two immutable Git marker branches are used for this frozen reference:
   - `live-version-clone-main-20261019` — complete source/documentation snapshot from `main`;
@@ -38,19 +38,26 @@ This section is the **authoritative workflow and development rule set for all fu
 - Keep changes narrow. Avoid unrelated cleanup or broad refactors while implementing a requested fix.
 - Significant or risky changes should have a clear rollback point before code modification.
 
-### CRA DEV backend workflow — mandatory
+### CRA DEV code handoff workflow — mandatory
 
-The backend workflow for future development is **repo-first + manual DEV installation**:
+The development workflow is **repo-first + explicit changed-file handoff**:
 
-1. Inspect the current `Server_API/CRA/` source in GitHub.
-2. Make the required backend changes on `main`.
-3. Run the relevant syntax/tests/checks.
-4. Provide the **exact changed backend files in the chat session** for the user to manually install on CRA DEV.
-5. The user manually copies those files to CRA DEV and restarts the existing Maintenix backend service when required.
-6. Validate the change on CRA DEV.
-7. Only after testing/acceptance may the state be considered for a future LIVE version.
+1. Inspect the current `Web_UI/` and `Server_API/CRA/` source in GitHub as relevant to the requested change.
+2. Make all required frontend and/or backend source changes on `main`.
+3. Run the relevant frontend build/checks and backend syntax/tests/checks.
+4. For frontend changes, promote only the required changed `Web_UI` files to `deploy` and verify the GitHub Pages workflow when the DEV Pages deployment is part of the change.
+5. At the end of **every completed development update**, provide the user with the **exact changed frontend files and exact changed backend files in the chat session**.
+6. The handoff must be split clearly into:
+   - **Frontend changed files — `Web_UI/...`**
+   - **Backend changed files — `Server_API/CRA/...`**
+7. Provide the actual updated files for both sides, not only a summary or backend-only handoff. If one side has no changed files, explicitly state **None** for that side.
+8. The user manually installs any backend files that require installation on CRA DEV and restarts the existing Maintenix backend service when required.
+9. Validate the change on CRA DEV / DEV frontend as applicable.
+10. Only after testing/acceptance may the state be considered for a future LIVE version.
 
 Do **not** assume backend changes deploy automatically. Do **not** silently replace files on CRA DEV or LIVE. Do **not** restart a backend service unless the workflow/request explicitly requires it.
+
+**New handoff rule accepted 2026-10-21:** even when a request primarily affects only frontend or only backend behavior, the final development handoff must always report both frontend and backend changed-file sets so the user can see exactly what changed across the application.
 
 Current CRA DEV backend root:
 
@@ -132,6 +139,17 @@ When future development is finished and the user explicitly declares a new state
 5. Update `PROJECT_CONTEXT.md` and `LIVE_MIGRATION_CHECKLIST.md` as needed.
 6. Create new immutable dated LIVE-clone marker branches rather than moving the 2026-10-19 markers.
 7. Build a fresh migration package if LIVE deployment is required.
+
+### Development handoff rule — 2026-10-21
+
+- Development has resumed after the 2026-10-19 LIVE clone freeze.
+- The dated LIVE clone marker branches remain immutable rollback/reference points and are not moved by new development.
+- Repository source remains authoritative: edit `main` first, and continue the existing frontend `deploy` promotion workflow when applicable.
+- After every completed update, provide the user with both changed-file sets:
+  - frontend files changed under `Web_UI/`;
+  - backend files changed under `Server_API/CRA/`.
+- The handoff must include the actual updated files from both sides. If no file changed on one side, explicitly report `None`.
+- This supersedes the earlier backend-only file handoff rule.
 
 ## 1. Repository and development workflow
 
